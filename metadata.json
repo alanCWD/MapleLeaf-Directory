@@ -1,0 +1,7 @@
+{
+  "name": "MapleLeaf Directory - Canadian Cannabis Hub",
+  "description": "A comprehensive directory for licensed and aboriginal cannabis stores across Canada, featuring store claiming for owners and smart search for consumers.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
