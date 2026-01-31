@@ -33,7 +33,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     const found = stores.find(s => s.id === id);
     if (found) {
       setStore(found);
-      // If store already has hours but insights state is empty, pre-populate insights partially
       if (found.hours && !insights) {
         setInsights(prev => prev ? prev : { hours: found.hours });
       }
@@ -41,13 +40,35 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   }, [id, stores]);
 
   useEffect(() => {
-    // Only fetch if we don't have basic insights (atmosphere is a good key for full insights)
     if (store && !insights?.atmosphere) {
       fetchInsights();
     }
   }, [store]);
 
-  // Inject Structured Data for SEO
+  // Robust hashing function to generate a unique numeric seed from the store ID
+  const getHashCode = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  };
+
+  const seed = store?.id ? getHashCode(store.id) : 0;
+  
+  // Interior design keyword pool for the Detail Header
+  const interiorPool = ['lounge', 'decor', 'furniture', 'interior', 'lighting', 'modern', 'vintage', 'plants', 'bohemian', 'industrial'];
+  const detailTags = [
+    interiorPool[seed % interiorPool.length],
+    interiorPool[(seed + 3) % interiorPool.length],
+    'atmosphere'
+  ];
+
+  // Distinct offset and large resolution for detail headers
+  const nameSlug = store?.name.toLowerCase().replace(/[^a-z]/g, '') || 'store';
+  const detailHeaderUrl = `https://loremflickr.com/1600/600/${detailTags.join(',')},${nameSlug}?lock=${(seed + 8000) % 20000}`;
+
   useEffect(() => {
     if (!store) return;
 
@@ -68,7 +89,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       "@type": "Store",
       "name": store.name,
       "description": `${store.type} cannabis store in ${store.province}, Canada.`,
-      "image": `https://picsum.photos/seed/${store.id}/1600/600`,
+      "image": detailHeaderUrl,
       "address": {
         "@type": "PostalAddress",
         "streetAddress": store.address,
@@ -103,7 +124,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         existingScript.remove();
       }
     };
-  }, [store, insights]);
+  }, [store, insights, detailHeaderUrl]);
 
   const fetchInsights = async () => {
     if (!store) return;
@@ -112,7 +133,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       const data = await getStoreInsights(store.name);
       setInsights(data);
       
-      // Update global store with discovered hours if they changed or were missing
       if (Array.isArray(data.hours) && JSON.stringify(data.hours) !== JSON.stringify(store.hours)) {
         onUpdateStore({
           ...store,
@@ -139,8 +159,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     };
 
     const updatedReviews = [review, ...(store.reviews || [])];
-    
-    // Calculate new average rating
     const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
     const avgRating = parseFloat((totalRating / updatedReviews.length).toFixed(1));
 
@@ -170,31 +188,31 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${store.name}, ${store.address}, ${store.province}, Canada`)}`;
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  
-  // Safe extraction of hours
   const hoursList = Array.isArray(insights?.hours) ? insights?.hours : (Array.isArray(store.hours) ? store.hours : null);
 
   return (
     <div className="bg-stone-50 min-h-screen pb-24">
-      {/* Header / Hero */}
       <div className="relative h-[400px] overflow-hidden">
         <img 
-          src={`https://picsum.photos/seed/${store.id}/1600/600`} 
+          src={detailHeaderUrl} 
           alt={store.name} 
           className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = `https://placehold.co/1600x600/065f46/ffffff?text=${encodeURIComponent(store.name)}`;
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-transparent"></div>
         <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="text-white">
               <div className="flex gap-2 mb-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg ${store.type === 'Licensed' ? 'bg-emerald-600' : 'bg-amber-500'}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg ${store.type === 'Sovereign' ? 'bg-purple-600' : 'bg-emerald-600'}`}>
                   {store.type}
                 </span>
                 {store.isClaimed && (
                   <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-lg">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.64.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
-                    Verified Business
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 01-2.812 2.812c.051.64.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
+                    Verified Gem
                   </span>
                 )}
               </div>
@@ -235,10 +253,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         </div>
       </div>
 
-      {/* Content Grid */}
       <div className="max-w-7xl mx-auto px-4 mt-12 grid lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-12">
-          {/* Featured Offerings */}
           <section>
             <h2 className="text-2xl font-extrabold text-stone-900 mb-6 flex items-center gap-2">
               <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
@@ -257,7 +273,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </div>
           </section>
 
-          {/* Store Attributes Section */}
           {insights && (
             <section className="bg-white rounded-[40px] p-8 md:p-12 border border-stone-200 shadow-sm">
               <h2 className="text-2xl font-black text-stone-900 mb-8 tracking-tight">Store Attributes</h2>
@@ -284,11 +299,10 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </section>
           )}
 
-          {/* Reviews & Ratings Section */}
           <section id="reviews">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
-                <span className="w-2 h-8 bg-amber-500 rounded-full"></span>
+                <span className="w-2 h-8 bg-purple-500 rounded-full"></span>
                 Community Reviews
               </h2>
               <button 
@@ -387,7 +401,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           </section>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-8">
           <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
             <h3 className="text-lg font-black text-stone-900 mb-6 uppercase tracking-wider">Information</h3>
@@ -438,7 +451,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </div>
           </div>
 
-          {/* Operating Hours Sidebar Section */}
           <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
             <h3 className="text-lg font-black text-stone-900 mb-6 uppercase tracking-wider flex items-center gap-2">
               <svg className="w-5 h-5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>

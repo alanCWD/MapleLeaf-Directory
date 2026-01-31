@@ -2,7 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { Province, Store } from "../types";
 
-// Always use the exact initialization pattern from guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const extractJson = (text: string) => {
@@ -16,23 +15,45 @@ const extractJson = (text: string) => {
   }
 };
 
+export const getVibeRecommendations = async (preferences: any, availableStores: Store[]): Promise<string[]> => {
+  const storeContext = availableStores.map(s => ({ id: s.id, name: s.name, type: s.type, offerings: s.featuredOfferings }));
+  
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Based on these user preferences: ${JSON.stringify(preferences)}, 
+    select the IDs of the top 3 most relevant sovereign or local gem shops from this list: ${JSON.stringify(storeContext)}.
+    
+    Return ONLY a JSON array of string IDs.`,
+    config: { responseMimeType: "application/json" }
+  });
+
+  try {
+    return JSON.parse(response.text);
+  } catch (e) {
+    return [];
+  }
+};
+
 export const searchStores = async (query: string, userLocation?: { lat: number; lng: number }): Promise<{ 
   stores: Partial<Store>[];
 }> => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Find cannabis stores in Canada for: "${query}". 
-      Include both licensed dispensaries AND aboriginal sovereign shops.
+      contents: `Find niche, independent cannabis shops in Canada for: "${query}". 
+      STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
+      FOCUS ONLY ON: 
+      1. Sovereign Indigenous dispensaries (often located on First Nations land).
+      2. Independent "Local Gems" that operate outside the standard corporate retail model.
       
       Provide a JSON code block containing an array called "stores".
       Each object in "stores" must have:
       - name: string
-      - type: "Licensed" or "Aboriginal"
+      - type: "Sovereign" or "Local Gem"
       - address: string
       - province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
       - website: string
-      - sourceUrl: string (The URL of the listing or website where this store was found)
+      - sourceUrl: string
       - rating: number
       - featuredOfferings: string[]`,
       config: {
@@ -55,9 +76,6 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
   }
 };
 
-/**
- * Discovers major retail hubs (cities/towns) in a province to enable targeted syncing.
- */
 export const getMajorCities = async (province: Province): Promise<string[]> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -75,11 +93,12 @@ export const bulkSyncProvince = async (province: Province, subRegion?: string): 
   const locationTag = subRegion ? `${subRegion}, ${province}` : province;
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `List up to 15 unique cannabis dispensaries in ${locationTag}. 
-    Include Licensed stores and Aboriginal/Indigenous shops.
+    contents: `Identify niche, independent cannabis shops in ${locationTag}. 
+    MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores. 
+    Focus strictly on Sovereign/Indigenous shops and independent local gems.
     
     Return as JSON with a "stores" array.
-    Required fields: name, type ("Licensed" or "Aboriginal"), address, featuredOfferings (string[]), rating (number), website (string), sourceUrl (string), hours (array of {day, time}).
+    Required fields: name, type ("Sovereign" or "Local Gem"), address, featuredOfferings (string[]), rating (number), website (string), sourceUrl (string), hours (array of {day, time}).
     
     Format response strictly as a JSON block.`,
     config: {
@@ -94,13 +113,13 @@ export const bulkSyncProvince = async (province: Province, subRegion?: string): 
 export const getStoreInsights = async (storeName: string): Promise<any> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Analyze the Canadian cannabis store: "${storeName}". Return JSON with: 
+    contents: `Analyze the niche Canadian cannabis store: "${storeName}". This is an independent or sovereign shop. Return JSON with: 
     - atmosphere: string
     - community: string
     - specialties: string
-    - sovereignty: string (if applicable)
+    - sovereignty: string (explain the indigenous roots or independent status)
     - proTip: string
-    - hours: array of {day: string, time: string} (Required: Must be an array of objects)`,
+    - hours: array of {day: string, time: string}`,
     config: { responseMimeType: "application/json" }
   });
   try {

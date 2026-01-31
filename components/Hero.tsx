@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { searchStores } from '../services/geminiService';
-import { Store } from '../types';
+import { Store, StoreType } from '../types';
 
 interface HeroProps {
   onSearchResults: (results: Store[]) => void;
@@ -22,14 +22,20 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
       const result = await searchStores(query, userLocation);
       
       if (result.stores && result.stores.length > 0) {
-        const processedStores: Store[] = result.stores.map((s: any) => ({
-          ...s,
-          id: `search-${btoa((s.name || '') + (s.address || '')).substring(0, 12)}`,
-          isClaimed: false,
-          rating: s.rating || 4.0,
-          type: s.type || 'Licensed',
-          province: s.province
-        } as Store));
+        const processedStores: Store[] = result.stores.map((s: any) => {
+          const safeId = btoa((s.name || '') + (s.address || ''))
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 12);
+            
+          return {
+            ...s,
+            id: `search-${safeId}`,
+            isClaimed: false,
+            rating: s.rating || 4.5,
+            type: (s.type as StoreType) || 'Sovereign',
+            province: s.province
+          } as Store;
+        });
         
         onSearchResults(processedStores);
       }
@@ -41,27 +47,48 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
   };
 
   return (
-    <div className="relative bg-emerald-900 py-24 overflow-hidden">
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full mix-blend-overlay filter blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-emerald-400 rounded-full mix-blend-overlay filter blur-3xl"></div>
+    <div className="relative pt-32 pb-24 overflow-hidden">
+      {/* Floating Circles - Green and Purple Theme */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-emerald-100 rounded-full blur-2xl animate-float"></div>
+        <div className="absolute top-40 right-20 w-48 h-48 bg-purple-100 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-10 left-1/4 w-40 h-40 bg-lime-100 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }}></div>
       </div>
       
-      <div className="relative max-w-4xl mx-auto px-4 text-center">
-        <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-          Your Local Canadian <br/><span className="text-emerald-400">Cannabis Connection</span>
+      <div className="relative max-w-5xl mx-auto px-4 text-center">
+        <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest mb-8 border border-emerald-100 shadow-sm animate-bounce">
+          <span>🍃 Sovereign & Independent Discovery</span>
+        </div>
+        
+        <h1 className="text-5xl md:text-7xl font-black text-stone-900 mb-6 leading-[1.1] tracking-tight">
+          Find Your <span className="text-emerald-500">Roots.</span> <br/>
+          Find Your <span className="text-purple-600 relative inline-block">
+            Flow.
+            <svg className="absolute -bottom-2 left-0 w-full h-4 text-purple-600/40" viewBox="0 0 100 20" preserveAspectRatio="none">
+              <path 
+                d="M0 10 Q 12.5 2, 25 10 T 50 10 T 75 10 T 100 10" 
+                stroke="currentColor" 
+                strokeWidth="6" 
+                fill="transparent" 
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
         </h1>
-        <p className="text-xl text-emerald-100/80 mb-10 max-w-2xl mx-auto">
-          Discover licensed dispensaries and indigenous-owned shops across every province. Real-time directory powered by AI.
+        
+        <p className="text-xl text-stone-500 mb-12 max-w-2xl mx-auto font-medium">
+          Beyond the corporate shelf. Discover the hidden stashes, independent growers, and sovereign shops across Canada.
         </p>
 
-        <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2 bg-white p-2 rounded-2xl shadow-2xl max-w-2xl mx-auto">
+        <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3 bg-white p-3 rounded-[32px] shadow-2xl shadow-emerald-900/10 max-w-2xl mx-auto border border-stone-100 transform transition-all focus-within:scale-[1.02]">
           <div className="flex-grow flex items-center px-4">
-            <svg className="w-5 h-5 text-stone-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <div className="w-10 h-10 bg-stone-50 rounded-full flex items-center justify-center mr-3">
+               <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
             <input 
               type="text" 
-              placeholder="e.g., 'Aboriginal dispensaries in Shannonville'..." 
-              className="w-full py-3 text-stone-800 placeholder-stone-400 focus:outline-none"
+              placeholder="Try 'Sovereign flower in Tyendinaga'..." 
+              className="w-full py-4 text-stone-800 placeholder-stone-400 focus:outline-none font-bold text-lg bg-transparent"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -69,17 +96,17 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
           <button 
             type="submit" 
             disabled={isSearching}
-            className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-500 transition disabled:opacity-50 min-w-[140px]"
+            className="bg-emerald-600 text-white px-10 py-4 rounded-[24px] font-black hover:bg-emerald-500 transition-all disabled:opacity-50 min-w-[160px] text-lg shadow-xl hover:shadow-emerald-200"
           >
             {isSearching ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Discovery Active
+                Curation...
               </span>
-            ) : 'Find Now'}
+            ) : 'Explore Gems'}
           </button>
         </form>
       </div>

@@ -15,7 +15,7 @@ export enum Province {
   YT = "Yukon"
 }
 
-export type StoreType = 'Licensed' | 'Aboriginal';
+export type StoreType = 'Sovereign' | 'Local Gem';
 
 export interface Review {
   id: string;
@@ -45,6 +45,16 @@ export interface Store {
   sourceUrl?: string;
   reviews?: Review[];
   hours?: OperatingHours[];
+}
+
+export interface UserProfile {
+  email?: string;
+  preferences?: {
+    priority?: string;
+    vibe?: string;
+    method?: string;
+  };
+  lastSeenProvince?: Province;
 }
 
 export interface ServicePackage {

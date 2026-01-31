@@ -1,6 +1,6 @@
 {
-  "name": "MapleLeaf Directory - Canadian Cannabis Hub",
-  "description": "A comprehensive directory for licensed and aboriginal cannabis stores across Canada, featuring store claiming for owners and smart search for consumers.",
+  "name": "MapleLeaf Directory - Sovereign & Niche Cannabis",
+  "description": "A niche directory focusing exclusively on independent local gems and sovereign indigenous cannabis shops across Canada. No corporate government retail allowed.",
   "requestFramePermissions": [
     "geolocation"
   ]
