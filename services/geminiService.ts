@@ -2,7 +2,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { Province, Store } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!ai) {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured. Please set it in the Secrets tab.");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 const extractJson = (text: string) => {
   try {
@@ -18,7 +29,7 @@ const extractJson = (text: string) => {
 export const getVibeRecommendations = async (preferences: any, availableStores: Store[]): Promise<string[]> => {
   const storeContext = availableStores.map(s => ({ id: s.id, name: s.name, type: s.type, offerings: s.featuredOfferings }));
   
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Based on these user preferences: ${JSON.stringify(preferences)}, 
     select the IDs of the top 3 most relevant sovereign or local gem shops from this list: ${JSON.stringify(storeContext)}.
@@ -38,7 +49,7 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
   stores: Partial<Store>[];
 }> => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Find niche, independent cannabis shops in Canada for: "${query}". 
       STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
@@ -77,7 +88,7 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
 };
 
 export const getMajorCities = async (province: Province): Promise<string[]> => {
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `List the top 5 most populous cities or regions in ${province}, Canada as a JSON array of strings.`,
     config: { responseMimeType: "application/json" }
@@ -91,7 +102,7 @@ export const getMajorCities = async (province: Province): Promise<string[]> => {
 
 export const bulkSyncProvince = async (province: Province, subRegion?: string): Promise<Partial<Store>[]> => {
   const locationTag = subRegion ? `${subRegion}, ${province}` : province;
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-2.5-flash",
     contents: `Identify niche, independent cannabis shops in ${locationTag}. 
     MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores. 
@@ -111,7 +122,7 @@ export const bulkSyncProvince = async (province: Province, subRegion?: string): 
 };
 
 export const getStoreInsights = async (storeName: string): Promise<any> => {
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `Analyze the niche Canadian cannabis store: "${storeName}". This is an independent or sovereign shop. Return JSON with: 
     - atmosphere: string
