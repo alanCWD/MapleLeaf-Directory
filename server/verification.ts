@@ -9,45 +9,76 @@ interface PlacesResult {
   types: string[];
 }
 
+async function searchPlacesNew(
+  query: string,
+  apiKey: string
+): Promise<PlacesResult | null> {
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+    },
+    body: JSON.stringify({ textQuery: query }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`New API ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (!data.places || data.places.length === 0) return null;
+
+  const place = data.places[0];
+  return {
+    placeId: place.id,
+    name: place.displayName?.text || '',
+    address: place.formattedAddress || '',
+    lat: place.location?.latitude,
+    lng: place.location?.longitude,
+    types: place.types || [],
+  };
+}
+
+async function searchPlacesLegacy(
+  query: string,
+  apiKey: string
+): Promise<PlacesResult | null> {
+  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Legacy API ${response.status}`);
+
+  const data = await response.json();
+  if (data.status === 'REQUEST_DENIED') throw new Error(`Legacy API denied: ${data.error_message}`);
+  if (data.status !== 'OK' || !data.results || data.results.length === 0) return null;
+
+  const place = data.results[0];
+  return {
+    placeId: place.place_id,
+    name: place.name,
+    address: place.formatted_address,
+    lat: place.geometry?.location?.lat,
+    lng: place.geometry?.location?.lng,
+    types: place.types || [],
+  };
+}
+
 async function searchGooglePlaces(
   query: string,
   apiKey: string
 ): Promise<PlacesResult | null> {
   try {
-    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
-      },
-      body: JSON.stringify({ textQuery: query }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Google Places API error: ${response.status} - ${errorText}`);
+    return await searchPlacesNew(query, apiKey);
+  } catch (newErr) {
+    console.log(`[Verification] New Places API failed (${(newErr as Error).message}), trying legacy...`);
+    try {
+      return await searchPlacesLegacy(query, apiKey);
+    } catch (legacyErr) {
+      console.error(`[Verification] Both Places APIs failed. New: ${(newErr as Error).message}, Legacy: ${(legacyErr as Error).message}`);
       return null;
     }
-
-    const data = await response.json();
-    if (!data.places || data.places.length === 0) {
-      console.log('[Verification] No Places results found');
-      return null;
-    }
-
-    const place = data.places[0];
-    return {
-      placeId: place.id,
-      name: place.displayName?.text || '',
-      address: place.formattedAddress || '',
-      lat: place.location?.latitude,
-      lng: place.location?.longitude,
-      types: place.types || [],
-    };
-  } catch (error) {
-    console.error('Google Places search error:', error);
-    return null;
   }
 }
 
