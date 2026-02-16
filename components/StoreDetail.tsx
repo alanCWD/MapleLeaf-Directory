@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Store, Review } from '../types';
 import { getStoreInsights } from '../services/geminiService';
+import { VerificationBadge } from './VerificationBadge';
+import { EvidencePanel } from './EvidencePanel';
+import { FlagButton } from './FlagButton';
 
 interface StoreDetailProps {
   stores: Store[];
@@ -24,7 +27,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   
-  // Review form state
   const [newReview, setNewReview] = useState({ userName: '', rating: 5, comment: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -45,7 +47,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     }
   }, [store]);
 
-  // Robust hashing function to generate a unique numeric seed from the store ID
   const getHashCode = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -57,7 +58,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
   const seed = store?.id ? getHashCode(store.id) : 0;
   
-  // Interior design keyword pool for the Detail Header
   const interiorPool = ['lounge', 'decor', 'furniture', 'interior', 'lighting', 'modern', 'vintage', 'plants', 'bohemian', 'industrial'];
   const detailTags = [
     interiorPool[seed % interiorPool.length],
@@ -65,7 +65,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     'atmosphere'
   ];
 
-  // Distinct offset and large resolution for detail headers
   const nameSlug = store?.name.toLowerCase().replace(/[^a-z]/g, '') || 'store';
   const detailHeaderUrl = `https://loremflickr.com/1600/600/${detailTags.join(',')},${nameSlug}?lock=${(seed + 8000) % 20000}`;
 
@@ -196,7 +195,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         <img 
           src={detailHeaderUrl} 
           alt={store.name} 
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover ${store.verificationStatus === 'historically_closed' ? 'grayscale' : ''}`}
           onError={(e) => {
             (e.target as HTMLImageElement).src = `https://placehold.co/1600x600/065f46/ffffff?text=${encodeURIComponent(store.name)}`;
           }}
@@ -205,14 +204,18 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="text-white">
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
                 <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg ${store.type === 'Sovereign' ? 'bg-purple-600' : 'bg-emerald-600'}`}>
                   {store.type}
                 </span>
+                <VerificationBadge 
+                  status={store.verificationStatus} 
+                  confidenceScore={store.confidenceScore}
+                />
                 {store.isClaimed && (
                   <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1 shadow-lg">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 01-2.812 2.812c.051.64.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
-                    Verified Gem
+                    Claimed
                   </span>
                 )}
               </div>
@@ -255,6 +258,41 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
       <div className="max-w-7xl mx-auto px-4 mt-12 grid lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-12">
+          {store.verificationStatus === 'ai_suggested' && (
+            <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h3 className="font-bold text-amber-800 mb-1">Unverified Listing</h3>
+                  <p className="text-amber-700 text-sm leading-relaxed">
+                    This listing was AI-suggested and has not been independently verified. It may not exist in the real world. 
+                    Information shown may be inaccurate. If you have knowledge about this location, please help us verify it using the report button below.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {store.verificationStatus === 'historically_closed' && (
+            <div className="bg-stone-100 border-2 border-stone-300 rounded-2xl p-6">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🕐</span>
+                <div>
+                  <h3 className="font-bold text-stone-800 mb-1">Historically Closed</h3>
+                  <p className="text-stone-600 text-sm leading-relaxed">
+                    This location has been marked as historically closed. It may have been operational in the past but is no longer active.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <EvidencePanel
+            sources={store.evidenceSources || []}
+            confidenceScore={store.confidenceScore || 0}
+            placesApiMatch={store.placesApiMatch || false}
+          />
+
           <section>
             <h2 className="text-2xl font-extrabold text-stone-900 mb-6 flex items-center gap-2">
               <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
@@ -416,11 +454,19 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                 <span className="text-stone-500 font-medium">Province</span>
                 <span className="font-bold text-stone-800">{store.province}</span>
               </div>
+              <div className="flex justify-between items-center py-3 border-b border-stone-100">
+                <span className="text-stone-500 font-medium">Verification</span>
+                <VerificationBadge 
+                  status={store.verificationStatus} 
+                  confidenceScore={store.confidenceScore} 
+                  compact 
+                />
+              </div>
               {store.sourceUrl && (
                 <div className="flex justify-between items-center py-3 border-b border-stone-100">
                   <span className="text-stone-500 font-medium">Data Source</span>
                   <a href={store.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline truncate max-w-[150px]">
-                    {new URL(store.sourceUrl).hostname}
+                    {(() => { try { return new URL(store.sourceUrl).hostname; } catch { return 'Source'; } })()}
                   </a>
                 </div>
               )}
@@ -480,13 +526,21 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             )}
           </div>
 
+          <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
+            <h3 className="text-lg font-black text-stone-900 mb-4 uppercase tracking-wider">Report an Issue</h3>
+            <p className="text-xs text-stone-500 mb-4 leading-relaxed">
+              Think this listing is incorrect, doesn't exist, or has moved? Let us know so we can improve our directory.
+            </p>
+            <FlagButton storeId={store.id} />
+          </div>
+
           <div className="bg-emerald-50 p-8 rounded-3xl border border-emerald-100">
              <h4 className="text-emerald-900 font-black mb-4">Are you the owner?</h4>
              <p className="text-sm text-emerald-700 mb-6 leading-relaxed">
-               Claim this listing to update your products, images, and offer same-day delivery to your local customers.
+               Claim this listing to update your information, respond to reviews, and access analytics.
              </p>
-             <Link to="/owners" className="block text-center bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-500 transition">
-               Learn More
+             <Link to="/owners" className="block w-full text-center bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10">
+               Claim This Listing
              </Link>
           </div>
         </div>

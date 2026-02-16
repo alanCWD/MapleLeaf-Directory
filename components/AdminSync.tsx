@@ -1,15 +1,18 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { bulkSyncProvince, getMajorCities } from '../services/geminiService';
-import { Province, Store } from '../types';
+import { Province, Store, VerificationStatus } from '../types';
+import { bulkVerifyStores } from '../services/api';
 
 interface AdminSyncProps {
-  onSync: (stores: Store[]) => void;
+  onSync: (stores: Store[]) => Promise<Store[]> | void;
 }
 
 export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeepDiscovery, setIsDeepDiscovery] = useState(false);
+  const [autoVerify, setAutoVerify] = useState(true);
   const [currentProvince, setCurrentProvince] = useState<Province | null>(null);
   const [currentCity, setCurrentCity] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -22,6 +25,9 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
     setIsSyncing(true);
     setLogs([]);
     addLog(`🚀 Initializing ${isDeepDiscovery ? 'DEEP' : 'STANDARD'} Discovery Engine...`);
+    if (autoVerify) {
+      addLog(`🔍 Auto-verification enabled. Stores will be checked against real-world sources.`);
+    }
     
     const provinces = Object.values(Province);
     let totalFound = 0;
@@ -47,7 +53,6 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
           
           if (rawStores.length > 0) {
             const processedStores: Store[] = rawStores.map(s => {
-              // Create a clean numeric/alphanumeric seed for deterministic placeholder selection
               const safeId = btoa((s.name || '') + (s.address || ''))
                 .replace(/[^a-zA-Z0-9]/g, '')
                 .substring(0, 12);
@@ -58,19 +63,46 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
                 province: p,
                 isClaimed: false,
                 rating: s.rating || 4.0,
-                type: (s.type as any) || 'Licensed'
+                type: (s.type as any) || 'Local Gem',
+                verificationStatus: 'ai_suggested' as VerificationStatus,
+                confidenceScore: 0,
+                evidenceSources: [],
+                evidenceCount: 0,
+                flagCount: 0,
+                adminReviewed: false,
+                placesApiMatch: false,
               } as Store;
             });
 
-            onSync(processedStores);
-            totalFound += processedStores.length;
-            addLog(`✅ Parsed ${processedStores.length} stores in ${region || p}`);
+            const savedStores = await onSync(processedStores);
+            const storeList = savedStores || processedStores;
+            totalFound += storeList.length;
+            addLog(`✅ Parsed ${storeList.length} stores in ${region || p}`);
+
+            if (autoVerify && storeList.length > 0) {
+              addLog(`🔍 Running verification pipeline on ${storeList.length} stores...`);
+              try {
+                const storeIds = storeList.map(s => s.id);
+                const verificationResult = await bulkVerifyStores(storeIds);
+                
+                let verified = 0;
+                let unverified = 0;
+                for (const r of verificationResult.results) {
+                  if (r.verification?.verificationStatus === 'verified') verified++;
+                  else unverified++;
+                }
+                addLog(`✅ Verification complete: ${verified} verified, ${unverified} unverified`);
+              } catch (verifyErr: any) {
+                addLog(`⚠️ Verification error: ${verifyErr?.message || 'Check console'}`);
+              }
+            }
+          } else {
+            addLog(`📭 No results found in ${region || p}`);
           }
         } catch (err: any) {
           addLog(`⚠️  Error in ${region || p}: ${err?.message || 'Check Console'}`);
         }
         
-        // Anti-throttling delay
         await new Promise(r => setTimeout(r, 1500));
       }
     }
@@ -79,6 +111,9 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
     setCurrentProvince(null);
     setCurrentCity(null);
     addLog(`🏁 DISCOVERY COMPLETE. Total new unique records: ${totalFound}`);
+    if (autoVerify) {
+      addLog(`📋 Check the Review Queue for stores needing manual approval.`);
+    }
   };
 
   return (
@@ -89,7 +124,7 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
           <div className="flex flex-col md:flex-row justify-between items-start gap-6 relative z-10">
             <div>
               <h2 className="text-3xl font-black mb-2 tracking-tight">Master Database Sync</h2>
-              <p className="text-emerald-100/60 font-medium">Manage Canada-wide data discovery & persistence.</p>
+              <p className="text-emerald-100/60 font-medium">Manage Canada-wide data discovery & verification.</p>
             </div>
             <div className="flex flex-col items-end gap-3">
               <label className="flex items-center gap-3 cursor-pointer bg-white/10 px-5 py-2.5 rounded-2xl border border-white/10 backdrop-blur-md transition-all hover:bg-white/20">
@@ -101,6 +136,16 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
                   className="w-5 h-5 accent-emerald-400"
                 />
                 <span className="text-[10px] font-black uppercase tracking-widest text-white">Deep Discovery</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer bg-white/10 px-5 py-2.5 rounded-2xl border border-white/10 backdrop-blur-md transition-all hover:bg-white/20">
+                <input 
+                  type="checkbox" 
+                  checked={autoVerify}
+                  onChange={(e) => setAutoVerify(e.target.checked)}
+                  disabled={isSyncing}
+                  className="w-5 h-5 accent-blue-400"
+                />
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Auto-Verify</span>
               </label>
               {isSyncing && (
                 <div className="flex items-center gap-2 bg-emerald-500/30 text-emerald-300 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse border border-emerald-400/20">
@@ -119,21 +164,29 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
               <p className="text-stone-800 text-lg font-black">{currentProvince || 'System Idle'}</p>
               <p className="text-emerald-600 text-xs font-bold uppercase tracking-wider">{currentCity || 'Province-Wide Scan'}</p>
             </div>
-            <button 
-              onClick={startDiscovery}
-              disabled={isSyncing}
-              className={`w-full md:w-auto px-12 py-5 rounded-2xl font-black transition-all flex items-center justify-center gap-3 text-lg ${isSyncing ? 'bg-stone-50 text-stone-300 cursor-not-allowed border border-stone-100' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-2xl shadow-emerald-600/20'}`}
-            >
-              {isSyncing ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Mapping Canada...
-                </>
-              ) : 'Run Discovery Engine'}
-            </button>
+            <div className="flex flex-col items-end gap-3">
+              <button 
+                onClick={startDiscovery}
+                disabled={isSyncing}
+                className={`w-full md:w-auto px-12 py-5 rounded-2xl font-black transition-all flex items-center justify-center gap-3 text-lg ${isSyncing ? 'bg-stone-50 text-stone-300 cursor-not-allowed border border-stone-100' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-2xl shadow-emerald-600/20'}`}
+              >
+                {isSyncing ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Mapping Canada...
+                  </>
+                ) : 'Run Discovery Engine'}
+              </button>
+              <Link 
+                to="/admin/review" 
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
+              >
+                Open Review Queue →
+              </Link>
+            </div>
           </div>
 
           <div className="bg-[#0a2e1f] rounded-[32px] p-8 h-[500px] overflow-y-auto shadow-inner font-mono text-xs leading-relaxed border-8 border-stone-100">
@@ -143,7 +196,7 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
             </div>
             <div className="space-y-2">
               {logs.map((log, i) => (
-                <div key={i} className={`p-1 ${log.includes('❌') ? 'text-rose-400' : log.includes('✅') ? 'text-emerald-400' : log.includes('🏙️') ? 'text-sky-400' : 'text-emerald-100/40'}`}>
+                <div key={i} className={`p-1 ${log.includes('⚠️') ? 'text-rose-400' : log.includes('✅') ? 'text-emerald-400' : log.includes('🏙️') ? 'text-sky-400' : log.includes('🔍') ? 'text-blue-400' : 'text-emerald-100/40'}`}>
                   {log}
                 </div>
               ))}

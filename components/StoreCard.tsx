@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Store } from '../types';
+import { VerificationBadge } from './VerificationBadge';
 
 interface StoreCardProps {
   store: Store;
@@ -10,7 +11,6 @@ interface StoreCardProps {
 }
 
 export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggleFavorite }) => {
-  // Robust hashing function to generate a unique numeric seed from the store ID
   const getHashCode = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -22,27 +22,29 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggl
 
   const seed = getHashCode(store.id);
   
-  // Create a pool of varied architectural/exterior keywords to ensure variety
   const exteriorPool = ['modern', 'architecture', 'rustic', 'exterior', 'facade', 'garden', 'timber', 'glass', 'minimalist', 'building'];
   const boutiquePool = ['boutique', 'chic', 'urban', 'industrial', 'street', 'storefront'];
   const naturePool = ['lodge', 'cabin', 'forest', 'native', 'heritage', 'natural'];
 
-  // Select 3 random-ish tags based on the seed
   const tags = store.type === 'Sovereign' 
     ? [naturePool[seed % naturePool.length], exteriorPool[(seed + 1) % exteriorPool.length], 'wood']
     : [boutiquePool[seed % boutiquePool.length], exteriorPool[(seed + 1) % exteriorPool.length], 'urban'];
 
-  // Inject the store name slug and a high-entropy lock seed
   const nameSlug = store.name.toLowerCase().replace(/[^a-z]/g, '');
   const imageUrl = `https://loremflickr.com/400/300/${tags.join(',')},${nameSlug}?lock=${seed % 10000}`;
 
+  const isUnverified = store.verificationStatus === 'ai_suggested' && store.confidenceScore < 0.3;
+  const isClosed = store.verificationStatus === 'historically_closed';
+
   return (
-    <div className="bg-white rounded-[32px] shadow-lg shadow-stone-900/5 border border-stone-100 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group h-full flex flex-col relative">
+    <div className={`bg-white rounded-[32px] shadow-lg shadow-stone-900/5 border overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group h-full flex flex-col relative ${
+      isClosed ? 'border-stone-300 opacity-75' : isUnverified ? 'border-amber-200' : 'border-stone-100'
+    }`}>
       <div className="h-48 bg-stone-50 relative overflow-hidden">
         <img 
           src={imageUrl} 
           alt={store.name} 
-          className="w-full h-full object-cover group-hover:scale-110 transition duration-700 brightness-95 group-hover:brightness-100"
+          className={`w-full h-full object-cover group-hover:scale-110 transition duration-700 brightness-95 group-hover:brightness-100 ${isClosed ? 'grayscale' : ''}`}
           loading="lazy"
           onError={(e) => {
             (e.target as HTMLImageElement).src = `https://placehold.co/400x300/065f46/ffffff?text=${encodeURIComponent(store.name)}`;
@@ -53,6 +55,11 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggl
           <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transform transition-transform ${store.type === 'Sovereign' ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white'}`}>
             {store.type}
           </span>
+          <VerificationBadge 
+            status={store.verificationStatus} 
+            confidenceScore={store.confidenceScore} 
+            compact 
+          />
         </div>
 
         <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
@@ -80,6 +87,18 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggl
           <span className="text-lg">📍</span>
           <span className="truncate">{store.address}</span>
         </p>
+
+        {store.verificationStatus === 'ai_suggested' && (
+          <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg mb-3 leading-relaxed">
+            AI-suggested listing; may not exist. {store.evidenceCount > 0 ? `Based on ${store.evidenceCount} source${store.evidenceCount > 1 ? 's' : ''}.` : 'No independent verification.'}
+          </p>
+        )}
+
+        {isClosed && (
+          <p className="text-[10px] text-stone-500 bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-lg mb-3">
+            This location has been marked as historically closed.
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2 mb-6">
           {store.featuredOfferings?.slice(0, 2).map(offering => (

@@ -20,7 +20,13 @@ export const Navbar: React.FC = () => {
           </Link>
           
           {/* Desktop Actions */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center gap-4">
+            <Link 
+              to="/admin/review" 
+              className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
+            >
+              Admin Review
+            </Link>
             <Link 
               to="/owners" 
               className="bg-emerald-500 text-white px-8 py-2.5 rounded-2xl font-black hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-200 hover:-translate-y-0.5 active:translate-y-0 text-sm whitespace-nowrap"
@@ -66,6 +72,13 @@ export const Navbar: React.FC = () => {
                 className="flex items-center justify-center bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-900/10 active:scale-95"
               >
                 Claim Store
+              </Link>
+              <Link 
+                to="/admin/review" 
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
+              >
+                Admin Review
               </Link>
               <Link 
                 to="/" 

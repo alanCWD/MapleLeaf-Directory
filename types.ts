@@ -17,6 +17,15 @@ export enum Province {
 
 export type StoreType = 'Sovereign' | 'Local Gem';
 
+export type VerificationStatus = 'verified' | 'ai_suggested' | 'historically_closed' | 'rejected';
+
+export interface EvidenceSource {
+  type: 'google_maps' | 'google_places' | 'news_article' | 'directory' | 'community_report' | 'indigenous_directory' | 'user_submission' | 'web_search';
+  name: string;
+  url?: string;
+  date?: string;
+}
+
 export interface Review {
   id: string;
   userName: string;
@@ -45,6 +54,31 @@ export interface Store {
   sourceUrl?: string;
   reviews?: Review[];
   hours?: OperatingHours[];
+
+  verificationStatus: VerificationStatus;
+  confidenceScore: number;
+  evidenceSources: EvidenceSource[];
+  evidenceCount: number;
+  flagCount: number;
+  adminReviewed: boolean;
+  adminNotes?: string;
+
+  lat?: number;
+  lng?: number;
+  placesApiMatch: boolean;
+  placesCategory?: string;
+
+  lastVerifiedAt?: string;
+}
+
+export type FlagReason = 'does_not_exist' | 'wrong_location' | 'permanently_closed' | 'duplicate' | 'other';
+
+export interface StoreFlag {
+  id: number;
+  storeId: string;
+  reason: FlagReason;
+  comment?: string;
+  createdAt: string;
 }
 
 export interface UserProfile {

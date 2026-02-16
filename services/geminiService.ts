@@ -30,20 +30,33 @@ export const getVibeRecommendations = async (preferences: any, availableStores: 
   const storeContext = availableStores.map(s => ({ id: s.id, name: s.name, type: s.type, offerings: s.featuredOfferings }));
   
   const response = await getAI().models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: `Based on these user preferences: ${JSON.stringify(preferences)}, 
     select the IDs of the top 3 most relevant sovereign or local gem shops from this list: ${JSON.stringify(storeContext)}.
     
+    IMPORTANT: Only return IDs that exist in the provided list. Do NOT invent new store IDs.
     Return ONLY a JSON array of string IDs.`,
     config: { responseMimeType: "application/json" }
   });
 
   try {
-    return JSON.parse(response.text);
+    const ids = JSON.parse(response.text);
+    return ids.filter((id: string) => availableStores.some(s => s.id === id));
   } catch (e) {
     return [];
   }
 };
+
+const ANTI_HALLUCINATION_PROMPT = `
+CRITICAL RULES - READ CAREFULLY:
+1. ONLY return locations that you can verify exist through Google Maps, Google Search, or other grounding tools.
+2. If you cannot find real evidence for a store, DO NOT include it. Never invent store names or addresses.
+3. Every store MUST have a real, verifiable address. Do not generate plausible-sounding addresses.
+4. If no results can be found with sufficient evidence, return an EMPTY stores array: {"stores": []}
+5. For each store, include a "sourceUrl" linking to a real web page that references this business (a directory listing, news article, social media page, or map link).
+6. Do NOT fabricate URLs or source references.
+7. If you are uncertain whether a location is real, DO NOT include it.
+`;
 
 export const searchStores = async (query: string, userLocation?: { lat: number; lng: number }): Promise<{ 
   stores: Partial<Store>[];
@@ -51,22 +64,25 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
   try {
     const response = await getAI().models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Find niche, independent cannabis shops in Canada for: "${query}". 
-      STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
-      FOCUS ONLY ON: 
-      1. Sovereign Indigenous dispensaries (often located on First Nations land).
-      2. Independent "Local Gems" that operate outside the standard corporate retail model.
-      
-      Provide a JSON code block containing an array called "stores".
-      Each object in "stores" must have:
-      - name: string
-      - type: "Sovereign" or "Local Gem"
-      - address: string
-      - province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
-      - website: string
-      - sourceUrl: string
-      - rating: number
-      - featuredOfferings: string[]`,
+      contents: `${ANTI_HALLUCINATION_PROMPT}
+
+Find niche, independent cannabis shops in Canada for: "${query}". 
+STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
+FOCUS ONLY ON: 
+1. Sovereign Indigenous dispensaries (often located on First Nations land).
+2. Independent "Local Gems" that operate outside the standard corporate retail model.
+
+Return a JSON code block with a "stores" array. If NO verifiable stores are found, return {"stores": []}.
+Each object in "stores" must have:
+- name: string (exact real business name as found in evidence)
+- type: "Sovereign" or "Local Gem"
+- address: string (real, verified street address)
+- province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
+- website: string (real URL if found, empty string if not)
+- sourceUrl: string (URL to evidence page that confirms this business exists)
+- rating: number (real rating if found, 0 if unknown)
+- featuredOfferings: string[] (only if verifiable)
+- hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`,
       config: {
         tools: [{ googleMaps: {} }, { googleSearch: {} }],
         toolConfig: {
@@ -78,9 +94,16 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
     });
 
     const data = extractJson(response.text || "");
-    return { 
-      stores: data?.stores || []
-    };
+    if (!data?.stores || !Array.isArray(data.stores)) {
+      return { stores: [] };
+    }
+    
+    const validStores = data.stores.filter((s: any) => 
+      s.name && s.name.trim() !== '' && 
+      s.address && s.address.trim() !== ''
+    );
+    
+    return { stores: validStores };
   } catch (error) {
     console.error("Gemini Search Error:", error);
     throw error;
@@ -89,7 +112,7 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
 
 export const getMajorCities = async (province: Province): Promise<string[]> => {
   const response = await getAI().models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash",
     contents: `List the top 5 most populous cities or regions in ${province}, Canada as a JSON array of strings.`,
     config: { responseMimeType: "application/json" }
   });
@@ -104,33 +127,54 @@ export const bulkSyncProvince = async (province: Province, subRegion?: string): 
   const locationTag = subRegion ? `${subRegion}, ${province}` : province;
   const response = await getAI().models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `Identify niche, independent cannabis shops in ${locationTag}. 
-    MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores. 
-    Focus strictly on Sovereign/Indigenous shops and independent local gems.
-    
-    Return as JSON with a "stores" array.
-    Required fields: name, type ("Sovereign" or "Local Gem"), address, featuredOfferings (string[]), rating (number), website (string), sourceUrl (string), hours (array of {day, time}).
-    
-    Format response strictly as a JSON block.`,
+    contents: `${ANTI_HALLUCINATION_PROMPT}
+
+Identify niche, independent cannabis shops in ${locationTag}. 
+MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores. 
+Focus strictly on Sovereign/Indigenous shops and independent local gems.
+
+Return a JSON code block with a "stores" array. If NO verifiable stores exist, return {"stores": []}.
+Required fields per store:
+- name: string (exact real business name)
+- type: "Sovereign" or "Local Gem"
+- address: string (real verified address)
+- featuredOfferings: string[] (only verifiable items)
+- rating: number (real rating or 0)
+- website: string (real URL or empty string)
+- sourceUrl: string (URL to evidence confirming this business)
+- hours: array of {day: string, time: string} (verifiable hours or empty array)
+
+Do NOT include any store you cannot verify through the grounding tools.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
     }
   });
 
   const data = extractJson(response.text || "");
-  return data?.stores || [];
+  if (!data?.stores || !Array.isArray(data.stores)) {
+    return [];
+  }
+  
+  return data.stores.filter((s: any) => 
+    s.name && s.name.trim() !== '' && 
+    s.address && s.address.trim() !== ''
+  );
 };
 
 export const getStoreInsights = async (storeName: string): Promise<any> => {
   const response = await getAI().models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: `Analyze the niche Canadian cannabis store: "${storeName}". This is an independent or sovereign shop. Return JSON with: 
-    - atmosphere: string
-    - community: string
-    - specialties: string
-    - sovereignty: string (explain the indigenous roots or independent status)
-    - proTip: string
-    - hours: array of {day: string, time: string}`,
+    model: "gemini-2.5-flash",
+    contents: `Analyze the niche Canadian cannabis store: "${storeName}". This is an independent or sovereign shop. 
+    
+IMPORTANT: Only provide information you can verify. If you cannot find real information about this store, return null values for unknown fields.
+
+Return JSON with: 
+- atmosphere: string (or null if unknown)
+- community: string (or null if unknown)
+- specialties: string (or null if unknown)
+- sovereignty: string (explain the indigenous roots or independent status, or null if unknown)
+- proTip: string (or null if unknown)
+- hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`,
     config: { responseMimeType: "application/json" }
   });
   try {

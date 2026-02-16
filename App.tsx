@@ -11,9 +11,11 @@ import { AdminSync } from './components/AdminSync';
 import { StoreDetail } from './components/StoreDetail';
 import { PersonalScout } from './components/PersonalScout';
 import { LeadBanner } from './components/LeadBanner';
-import { Store, Province, StoreType, UserProfile } from './types';
+import { AdminReviewQueue } from './components/AdminReviewQueue';
+import { VerificationFilter } from './components/VerificationFilter';
+import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
+import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore } from './services/api';
 
-const STORAGE_KEY = 'mapleleaf_db_v2';
 const FAVORITES_KEY = 'mapleleaf_favs_v2';
 const PROFILE_KEY = 'mapleleaf_user_profile';
 
@@ -34,12 +36,24 @@ const App: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | undefined>();
   const [vibeRecommendedIds, setVibeRecommendedIds] = useState<string[] | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [hideUnverified, setHideUnverified] = useState(false);
+  const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadStores = async () => {
+    try {
+      const data = await fetchStores();
+      setStores(data);
+    } catch (err) {
+      console.error('Failed to load stores from API:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const savedStores = localStorage.getItem(STORAGE_KEY);
-    if (savedStores) {
-      setStores(JSON.parse(savedStores));
-    }
+    loadStores();
+
     const savedFavs = localStorage.getItem(FAVORITES_KEY);
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
 
@@ -55,16 +69,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (stores.length > 0) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stores));
-      } catch (e) {
-        console.error("Local Storage Quota Exceeded");
-      }
-    }
-  }, [stores]);
-
-  useEffect(() => {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   }, [favorites]);
 
@@ -72,24 +76,34 @@ const App: React.FC = () => {
     setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
   };
 
-  const handleSyncStores = (newStores: Store[]) => {
-    setStores(prev => {
-      const storeMap = new Map<string, Store>(prev.map(s => [s.id, s]));
-      newStores.forEach(ns => {
-        const existing = storeMap.get(ns.id);
-        if (!existing) {
+  const handleSyncStores = async (newStores: Store[]) => {
+    try {
+      const result = await bulkUpsertStores(newStores);
+      setStores(prev => {
+        const storeMap = new Map<string, Store>(prev.map(s => [s.id, s]));
+        result.stores.forEach(ns => {
           storeMap.set(ns.id, ns);
-        } else {
-          const merged: Store = { ...existing, ...ns };
-          storeMap.set(ns.id, merged);
-        }
+        });
+        return Array.from(storeMap.values());
       });
-      return Array.from(storeMap.values());
-    });
+      return result.stores;
+    } catch (err) {
+      console.error('Failed to sync stores:', err);
+      setStores(prev => {
+        const storeMap = new Map<string, Store>(prev.map(s => [s.id, s]));
+        newStores.forEach(ns => {
+          if (!storeMap.has(ns.id)) {
+            storeMap.set(ns.id, ns);
+          }
+        });
+        return Array.from(storeMap.values());
+      });
+      return newStores;
+    }
   };
 
-  const handleSearchResults = (newStores: Store[]) => {
-    handleSyncStores(newStores);
+  const handleSearchResults = async (newStores: Store[]) => {
+    await handleSyncStores(newStores);
     setSelectedProvince(null);
     setSelectedType(null);
     setShowOnlyFavorites(false);
@@ -101,8 +115,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateStore = (updatedStore: Store) => {
-    setStores(prev => prev.map(s => s.id === updatedStore.id ? updatedStore : s));
+  const handleUpdateStore = async (updatedStore: Store) => {
+    try {
+      const saved = await apiUpdateStore(updatedStore.id, updatedStore);
+      setStores(prev => prev.map(s => s.id === saved.id ? saved : s));
+    } catch (err) {
+      console.error('Failed to update store:', err);
+      setStores(prev => prev.map(s => s.id === updatedStore.id ? updatedStore : s));
+    }
   };
 
   const filteredStores = stores.filter(s => {
@@ -110,7 +130,10 @@ const App: React.FC = () => {
     const typeMatch = !selectedType || s.type === selectedType;
     const favoriteMatch = !showOnlyFavorites || favorites.includes(s.id);
     const vibeMatch = !vibeRecommendedIds || vibeRecommendedIds.includes(s.id);
-    return provinceMatch && typeMatch && favoriteMatch && vibeMatch;
+    const verificationMatch = !verificationFilter || s.verificationStatus === verificationFilter;
+    const unverifiedMatch = !hideUnverified || s.verificationStatus === 'verified' || s.confidenceScore >= 0.6;
+    const notRejected = s.verificationStatus !== 'rejected';
+    return provinceMatch && typeMatch && favoriteMatch && vibeMatch && verificationMatch && unverifiedMatch && notRejected;
   });
 
   return (
@@ -159,6 +182,13 @@ const App: React.FC = () => {
                     setSelectedType(t);
                     setVibeRecommendedIds(null);
                   }} />
+
+                  <VerificationFilter
+                    selected={verificationFilter}
+                    onSelect={setVerificationFilter}
+                    hideUnverified={hideUnverified}
+                    onToggleHideUnverified={() => setHideUnverified(!hideUnverified)}
+                  />
                   
                   <div className="mt-12">
                     <div className="flex justify-between items-end mb-8">
@@ -176,7 +206,12 @@ const App: React.FC = () => {
                       <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{filteredStores.length} stores mapped</p>
                     </div>
 
-                    {filteredStores.length === 0 ? (
+                    {isLoading ? (
+                      <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
+                        <div className="text-6xl mb-6 animate-spin">⏳</div>
+                        <p className="text-stone-400 font-bold text-lg">Loading directory...</p>
+                      </div>
+                    ) : filteredStores.length === 0 ? (
                       <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
                         <div className="text-6xl mb-6">🏜️</div>
                         <p className="text-stone-400 font-bold text-lg">No stores found matching your criteria.</p>
@@ -205,7 +240,6 @@ const App: React.FC = () => {
                   setVibeRecommendedIds(ids);
                   const el = document.getElementById('listings-container');
                   el?.scrollIntoView({ behavior: 'smooth' });
-                  // Sync profile state after recommendation
                   const savedProfile = localStorage.getItem(PROFILE_KEY);
                   if (savedProfile) setUserProfile(JSON.parse(savedProfile));
                 }} />
@@ -214,6 +248,7 @@ const App: React.FC = () => {
             <Route path="/store/:id" element={<StoreDetail stores={stores} onUpdateStore={handleUpdateStore} />} />
             <Route path="/owners" element={<OwnerPortal />} />
             <Route path="/admin/sync" element={<AdminSync onSync={handleSyncStores} />} />
+            <Route path="/admin/review" element={<AdminReviewQueue />} />
           </Routes>
         </main>
         <footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">
@@ -224,7 +259,7 @@ const App: React.FC = () => {
                   <ul className="space-y-4 text-sm font-medium">
                     <li><Link to="/" className="hover:text-emerald-400 transition">Find Dispensaries</Link></li>
                     <li><Link to="/admin/sync" className="hover:text-emerald-400 transition">Database Engine</Link></li>
-                    <li><Link to="/owners" className="hover:text-emerald-400 transition">Industry News</Link></li>
+                    <li><Link to="/admin/review" className="hover:text-emerald-400 transition">Review Queue</Link></li>
                   </ul>
                </div>
                <div>
@@ -245,7 +280,7 @@ const App: React.FC = () => {
                </div>
             </div>
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <p className="text-xs text-emerald-100/30 font-medium">© 2024 MapleLeaf Directory. Data sourced via Gemini AI Hybrid Grounding. For educational and informational purposes only.</p>
+              <p className="text-xs text-emerald-100/30 font-medium">© 2024 MapleLeaf Directory. Data sourced via Gemini AI with real-world verification. For educational and informational purposes only.</p>
               <div className="flex gap-4">
                 <div className="w-8 h-8 bg-emerald-900 rounded-full flex items-center justify-center hover:bg-emerald-600 transition cursor-pointer">
                   <span className="text-white text-[10px] font-black">FB</span>
