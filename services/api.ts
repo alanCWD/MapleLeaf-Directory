@@ -92,3 +92,18 @@ export async function adminReviewStore(
     body: JSON.stringify({ action, notes }),
   });
 }
+
+export async function submitCommunityStore(data: {
+  name: string;
+  address: string;
+  province: string;
+  type: 'Sovereign' | 'Local Gem';
+  website?: string;
+  sourceUrl?: string;
+  submitterNote?: string;
+}): Promise<Store> {
+  return apiFetch<Store>('/stores/community-submit', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}

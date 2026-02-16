@@ -83,6 +83,7 @@ The app implements a multi-layered verification pipeline:
 - `PATCH /api/stores/:id` - Update store
 - `POST /api/stores/:id/verify` - Run verification pipeline
 - `POST /api/stores/bulk-verify` - Bulk verify
+- `POST /api/stores/community-submit` - Community store submission with auto-verification
 - `POST /api/stores/:id/flag` - Flag a store
 - `GET /api/stores/:id/flags` - Get flags
 - `GET /api/admin/review-queue` - Stores needing review
@@ -91,11 +92,19 @@ The app implements a multi-layered verification pipeline:
 ## Routes
 - `/` - Home page with search, filters, and directory
 - `/store/:id` - Individual store details with evidence panel
+- `/submit` - Community store submission form
 - `/owners` - Owner portal
 - `/admin/sync` - Admin sync page with auto-verification
 - `/admin/review` - Admin review queue for unverified stores
 
 ## Recent Changes
+- 2026-02-16: Reduced verification restrictiveness for sovereign/trading post shops
+  - Lowered verification threshold for Sovereign type (0.3 vs 0.6 for Local Gem)
+  - Added community_report evidence type with automatic boost for sovereign stores
+  - Updated Gemini AI prompts to explicitly include unlicensed trading posts, sovereign shops, and informal dispensaries
+  - AI now accepts social media, news articles, community forums as valid evidence sources
+  - Added community store submission form (/submit) for users to report known stores
+  - Descriptive locations now accepted (e.g. "Highway 97A near Enderby, BC")
 - 2026-02-16: Implemented full anti-hallucination verification system
   - Added PostgreSQL database with verification metadata
   - Created Express backend API with verification pipeline

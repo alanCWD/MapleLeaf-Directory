@@ -118,6 +118,11 @@ export interface VerificationResult {
   lastVerifiedAt: string;
 }
 
+function getVerificationThreshold(storeType?: string): number {
+  if (storeType === 'Sovereign') return 0.3;
+  return 0.6;
+}
+
 export async function verifyStore(store: Partial<Store>): Promise<VerificationResult> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   const evidenceSources: EvidenceSource[] = [];
@@ -127,6 +132,7 @@ export async function verifyStore(store: Partial<Store>): Promise<VerificationRe
   let lat: number | undefined;
   let lng: number | undefined;
   let placesCategory: string | undefined;
+  const isSovereign = store.type === 'Sovereign';
 
   if (apiKey && store.name && store.address) {
     const city = extractCity(store.address);
@@ -187,12 +193,24 @@ export async function verifyStore(store: Partial<Store>): Promise<VerificationRe
     confidenceScore += 0.1;
   }
 
+  if (isSovereign && !placesApiMatch) {
+    confidenceScore += 0.15;
+    evidenceSources.push({
+      type: 'community_report',
+      name: 'Sovereign/Indigenous community presence',
+      date: new Date().toISOString().split('T')[0],
+    });
+  }
+
+  const threshold = getVerificationThreshold(store.type);
   let verificationStatus: 'verified' | 'ai_suggested';
-  if (confidenceScore >= 0.6) {
+  if (confidenceScore >= threshold) {
     verificationStatus = 'verified';
   } else {
     verificationStatus = 'ai_suggested';
   }
+
+  console.log(`[Verification] ${store.name}: score=${confidenceScore.toFixed(2)}, threshold=${threshold}, status=${verificationStatus}, type=${store.type || 'unknown'}`);
 
   return {
     verificationStatus,

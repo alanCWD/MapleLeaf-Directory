@@ -159,6 +159,75 @@ router.post('/stores/bulk-verify', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/stores/community-submit', async (req, res) => {
+  try {
+    const { name, address, province, type, website, sourceUrl, submitterNote } = req.body;
+    if (!name || !address || !province || !type) {
+      res.status(400).json({ error: 'Name, address, province, and type are required' });
+      return;
+    }
+
+    const evidenceSources = [];
+    if (submitterNote) {
+      evidenceSources.push({
+        type: 'community_report',
+        name: `Community submission: ${submitterNote.substring(0, 100)}`,
+        date: new Date().toISOString().split('T')[0],
+      });
+    } else {
+      evidenceSources.push({
+        type: 'community_report',
+        name: 'Community submission',
+        date: new Date().toISOString().split('T')[0],
+      });
+    }
+
+    const storeData: any = {
+      name,
+      address,
+      province,
+      type,
+      website: website || '',
+      sourceUrl: sourceUrl || '',
+      verificationStatus: 'ai_suggested',
+      confidenceScore: 0,
+      evidenceSources: [],
+      evidenceCount: 0,
+      adminReviewed: false,
+    };
+
+    const store = await upsertStore(storeData);
+
+    if (store) {
+      const verificationResult = await verifyStore(store);
+      const communityBoost = submitterNote ? 0.15 : 0.1;
+      const combinedScore = Math.min(1, verificationResult.confidenceScore + communityBoost);
+      const threshold = type === 'Sovereign' ? 0.3 : 0.6;
+      const finalStatus = combinedScore >= threshold ? 'verified' : 'ai_suggested';
+      const allEvidence = [...evidenceSources, ...verificationResult.evidenceSources];
+
+      const updated = await updateStore(store.id, {
+        verificationStatus: finalStatus,
+        confidenceScore: Math.round(combinedScore * 100) / 100,
+        evidenceSources: allEvidence,
+        evidenceCount: allEvidence.length,
+        placesApiMatch: verificationResult.placesApiMatch,
+        googlePlaceId: verificationResult.googlePlaceId,
+        lat: verificationResult.lat,
+        lng: verificationResult.lng,
+        placesCategory: verificationResult.placesCategory,
+        lastVerifiedAt: verificationResult.lastVerifiedAt,
+      });
+      res.status(201).json(updated);
+    } else {
+      res.status(201).json(store);
+    }
+  } catch (error) {
+    console.error('Error submitting community store:', error);
+    res.status(500).json({ error: 'Failed to submit store' });
+  }
+});
+
 router.post('/stores/:id/flag', async (req, res) => {
   try {
     const { reason, comment } = req.body;

@@ -49,13 +49,20 @@ export const getVibeRecommendations = async (preferences: any, availableStores: 
 
 const ANTI_HALLUCINATION_PROMPT = `
 CRITICAL RULES - READ CAREFULLY:
-1. ONLY return locations that you can verify exist through Google Maps, Google Search, or other grounding tools.
-2. If you cannot find real evidence for a store, DO NOT include it. Never invent store names or addresses.
-3. Every store MUST have a real, verifiable address. Do not generate plausible-sounding addresses.
+1. ONLY return locations that you can verify exist through Google Maps, Google Search, social media, news articles, community forums, or other grounding tools.
+2. If you cannot find ANY real evidence for a store, DO NOT include it. Never invent store names or addresses.
+3. Every store MUST have a real, verifiable address or identifiable location description (e.g. "Highway 97A, Enderby, BC" is acceptable for informal shops).
 4. If no results can be found with sufficient evidence, return an EMPTY stores array: {"stores": []}
-5. For each store, include a "sourceUrl" linking to a real web page that references this business (a directory listing, news article, social media page, or map link).
+5. For each store, include a "sourceUrl" linking to a real web page that references this business. Acceptable sources include: directory listings, news articles, social media pages (Facebook, Instagram), Google Maps links, community forums, Reddit posts, or blog mentions.
 6. Do NOT fabricate URLs or source references.
 7. If you are uncertain whether a location is real, DO NOT include it.
+
+IMPORTANT - SOVEREIGN & UNLICENSED SHOPS:
+- Many sovereign Indigenous shops and trading posts are NOT on Google Maps and may NOT have websites.
+- These shops are STILL REAL and should be included if you find ANY evidence (news articles, social media, community reports, blog posts, Reddit threads, etc.).
+- Unlicensed dispensaries, trading posts, and smoke shops on First Nations land are a KEY part of this directory.
+- Do NOT exclude a shop just because it lacks a Google Maps listing or website. Social media presence or news coverage is sufficient evidence.
+- For sovereign shops without formal addresses, use descriptive locations (e.g. "Highway 97A near Enderby, BC").
 `;
 
 export const searchStores = async (query: string, userLocation?: { lat: number; lng: number }): Promise<{ 
@@ -69,17 +76,19 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
 Find niche, independent cannabis shops in Canada for: "${query}". 
 STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
 FOCUS ONLY ON: 
-1. Sovereign Indigenous dispensaries (often located on First Nations land).
+1. Sovereign Indigenous dispensaries, trading posts, and smoke shops (often located on First Nations land or reserves). These may be unlicensed and operate under Indigenous sovereignty.
 2. Independent "Local Gems" that operate outside the standard corporate retail model.
+3. Unlicensed trading posts and informal dispensaries that are known in local communities.
+NOTE: Many of these shops will NOT appear on Google Maps. Search news articles, social media, Reddit, community forums, and local blogs for evidence.
 
 Return a JSON code block with a "stores" array. If NO verifiable stores are found, return {"stores": []}.
 Each object in "stores" must have:
 - name: string (exact real business name as found in evidence)
 - type: "Sovereign" or "Local Gem"
-- address: string (real, verified street address)
+- address: string (real street address if known, OR a descriptive location like "Highway 97A near Enderby, BC" for informal/sovereign shops)
 - province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
-- website: string (real URL if found, empty string if not)
-- sourceUrl: string (URL to evidence page that confirms this business exists)
+- website: string (real URL, social media page URL, or empty string if not found)
+- sourceUrl: string (URL to evidence page - news articles, social media, forums, community posts all count)
 - rating: number (real rating if found, 0 if unknown)
 - featuredOfferings: string[] (only if verifiable)
 - hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`,
@@ -131,20 +140,27 @@ export const bulkSyncProvince = async (province: Province, subRegion?: string): 
 
 Identify niche, independent cannabis shops in ${locationTag}. 
 MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores. 
-Focus strictly on Sovereign/Indigenous shops and independent local gems.
+Focus strictly on:
+1. Sovereign/Indigenous shops, trading posts, and smoke shops (including unlicensed ones operating on First Nations land)
+2. Independent local gems operating outside the corporate retail model
+3. Unlicensed dispensaries and trading posts known in local communities
+
+IMPORTANT: Many sovereign and trading post shops will NOT appear on Google Maps. 
+Search news articles, social media (Facebook, Instagram), Reddit, community forums, and local blogs.
+A Facebook page, news article, or community mention is sufficient evidence for inclusion.
 
 Return a JSON code block with a "stores" array. If NO verifiable stores exist, return {"stores": []}.
 Required fields per store:
 - name: string (exact real business name)
 - type: "Sovereign" or "Local Gem"
-- address: string (real verified address)
+- address: string (real verified address, or descriptive location like "Highway 97A near Enderby, BC" for informal shops)
 - featuredOfferings: string[] (only verifiable items)
 - rating: number (real rating or 0)
-- website: string (real URL or empty string)
-- sourceUrl: string (URL to evidence confirming this business)
+- website: string (real URL, social media page URL, or empty string)
+- sourceUrl: string (URL to evidence confirming this business - news articles, social media, forums all count)
 - hours: array of {day: string, time: string} (verifiable hours or empty array)
 
-Do NOT include any store you cannot verify through the grounding tools.`,
+Do NOT include any store you cannot find ANY evidence for through the grounding tools.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
     }

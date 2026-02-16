@@ -12,6 +12,7 @@ import { StoreDetail } from './components/StoreDetail';
 import { PersonalScout } from './components/PersonalScout';
 import { LeadBanner } from './components/LeadBanner';
 import { AdminReviewQueue } from './components/AdminReviewQueue';
+import { CommunitySubmit } from './components/CommunitySubmit';
 import { VerificationFilter } from './components/VerificationFilter';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore } from './services/api';
@@ -249,6 +250,7 @@ const App: React.FC = () => {
             <Route path="/owners" element={<OwnerPortal />} />
             <Route path="/admin/sync" element={<AdminSync onSync={handleSyncStores} />} />
             <Route path="/admin/review" element={<AdminReviewQueue />} />
+            <Route path="/submit" element={<CommunitySubmit />} />
           </Routes>
         </main>
         <footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">
