@@ -14,25 +14,35 @@ async function searchGooglePlaces(
   apiKey: string
 ): Promise<PlacesResult | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
-    const response = await fetch(url);
+    const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+      },
+      body: JSON.stringify({ textQuery: query }),
+    });
+
     if (!response.ok) {
-      console.error(`Google Places API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`Google Places API error: ${response.status} - ${errorText}`);
       return null;
     }
 
     const data = await response.json();
-    if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+    if (!data.places || data.places.length === 0) {
+      console.log('[Verification] No Places results found');
       return null;
     }
 
-    const place = data.results[0];
+    const place = data.places[0];
     return {
-      placeId: place.place_id,
-      name: place.name,
-      address: place.formatted_address,
-      lat: place.geometry?.location?.lat,
-      lng: place.geometry?.location?.lng,
+      placeId: place.id,
+      name: place.displayName?.text || '',
+      address: place.formattedAddress || '',
+      lat: place.location?.latitude,
+      lng: place.location?.longitude,
       types: place.types || [],
     };
   } catch (error) {
