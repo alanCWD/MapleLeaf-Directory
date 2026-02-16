@@ -65,6 +65,101 @@ IMPORTANT - SOVEREIGN & UNLICENSED SHOPS:
 - For sovereign shops without formal addresses, use descriptive locations (e.g. "Highway 97A near Enderby, BC").
 `;
 
+const STORE_FIELDS_PROMPT = `Return a JSON code block with a "stores" array. If NO verifiable stores are found, return {"stores": []}.
+Each object in "stores" must have:
+- name: string (exact real business name as found in evidence)
+- type: "Sovereign" or "Local Gem"
+- address: string (real street address if known, OR a descriptive location like "Highway 97A near Enderby, BC" for informal/sovereign shops)
+- province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
+- website: string (real URL, social media page URL, or empty string if not found)
+- sourceUrl: string (URL to evidence page - news articles, social media, forums, community posts all count)
+- rating: number (real rating if found, 0 if unknown)
+- featuredOfferings: string[] (only if verifiable)
+- hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`;
+
+const STORE_FIELDS_NO_PROVINCE_PROMPT = `Return a JSON code block with a "stores" array. If NO verifiable stores exist, return {"stores": []}.
+Required fields per store:
+- name: string (exact real business name)
+- type: "Sovereign" or "Local Gem"
+- address: string (real verified address, or descriptive location like "Highway 97A near Enderby, BC" for informal shops)
+- featuredOfferings: string[] (only verifiable items)
+- rating: number (real rating or 0)
+- website: string (real URL, social media page URL, or empty string)
+- sourceUrl: string (URL to evidence confirming this business - news articles, social media, forums all count)
+- hours: array of {day: string, time: string} (verifiable hours or empty array)`;
+
+const INDIGENOUS_HOTSPOTS: Record<string, string[]> = {
+  "British Columbia": [
+    "Splatsin First Nation, Enderby, Highway 97A corridor",
+    "Six Nations territory near Kamloops area",
+    "Tk'emlúps te Secwépemc, Kamloops",
+    "Westbank First Nation, Kelowna area",
+    "Musqueam, Squamish, Tsleil-Waututh, Vancouver area",
+    "Songhees and Esquimalt Nations, Victoria area",
+    "Cowichan Tribes, Duncan area",
+    "Sto:lo Nation, Chilliwack/Fraser Valley",
+    "Lytton First Nation area",
+    "Adams Lake Band, Chase area",
+  ],
+  "Ontario": [
+    "Six Nations of the Grand River, Ohsweken/Caledonia/Hagersville",
+    "Tyendinaga Mohawk Territory, Highway 49/401 corridor near Belleville/Deseronto",
+    "Alderville First Nation, Roseneath area",
+    "Wahta Mohawk Territory, Bala/Muskoka area",
+    "Curve Lake First Nation, Peterborough area",
+    "Rama First Nation, Orillia area",
+    "Oneida Nation of the Thames, London area",
+    "Akwesasne, Cornwall/international border area",
+    "Nipissing First Nation, North Bay area",
+    "Wikwemikong, Manitoulin Island",
+    "Garden River First Nation, Sault Ste. Marie area",
+    "Fort William First Nation, Thunder Bay area",
+    "Kettle and Stony Point First Nation, Ipperwash/Forest area",
+  ],
+  "Quebec": [
+    "Kahnawake Mohawk Territory, south shore Montreal",
+    "Kanesatake, Oka area",
+    "Akwesasne (Quebec side), near Cornwall",
+    "Wendake, Quebec City area",
+    "Listuguj Mi'gmaq, Restigouche area",
+    "Kitigan Zibi, Maniwaki area",
+  ],
+  "Alberta": [
+    "Siksika Nation, east of Calgary",
+    "Enoch Cree Nation, west Edmonton",
+    "Stoney Nakoda, Morley area near Canmore",
+    "Tsuut'ina Nation, southwest Calgary",
+    "Samson Cree Nation, Hobbema/Maskwacis",
+  ],
+  "Manitoba": [
+    "Long Plain First Nation, Portage la Prairie area",
+    "Peguis First Nation",
+    "Sagkeeng First Nation, Pine Falls area",
+    "Brokenhead Ojibway Nation, Scanterbury area",
+    "Roseau River, near Dominion City",
+  ],
+  "Saskatchewan": [
+    "Whitecap Dakota First Nation, near Saskatoon",
+    "Muskoday First Nation, near Prince Albert",
+    "Beardy's and Okemasis Cree Nation",
+    "Nekaneet First Nation, Maple Creek area",
+  ],
+  "New Brunswick": [
+    "Elsipogtog First Nation, Richibucto area",
+    "Tobique First Nation, Perth-Andover area",
+    "Esgenoôpetitj (Burnt Church), Miramichi area",
+  ],
+  "Nova Scotia": [
+    "Millbrook First Nation, Truro area",
+    "Membertou First Nation, Sydney area",
+    "Sipekne'katik, Indian Brook area",
+  ],
+};
+
+export const getIndigenousHotspots = (province: Province): string[] => {
+  return INDIGENOUS_HOTSPOTS[province] || [];
+};
+
 export const searchStores = async (query: string, userLocation?: { lat: number; lng: number }): Promise<{ 
   stores: Partial<Store>[];
 }> => {
@@ -80,18 +175,9 @@ FOCUS ONLY ON:
 2. Independent "Local Gems" that operate outside the standard corporate retail model.
 3. Unlicensed trading posts and informal dispensaries that are known in local communities.
 NOTE: Many of these shops will NOT appear on Google Maps. Search news articles, social media, Reddit, community forums, and local blogs for evidence.
+IMPORTANT: If the query mentions a specific area, highway, or First Nations community, search thoroughly for ALL shops in that corridor/area, not just the most well-known ones. Multiple shops often cluster along the same road or reserve.
 
-Return a JSON code block with a "stores" array. If NO verifiable stores are found, return {"stores": []}.
-Each object in "stores" must have:
-- name: string (exact real business name as found in evidence)
-- type: "Sovereign" or "Local Gem"
-- address: string (real street address if known, OR a descriptive location like "Highway 97A near Enderby, BC" for informal/sovereign shops)
-- province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
-- website: string (real URL, social media page URL, or empty string if not found)
-- sourceUrl: string (URL to evidence page - news articles, social media, forums, community posts all count)
-- rating: number (real rating if found, 0 if unknown)
-- featuredOfferings: string[] (only if verifiable)
-- hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`,
+${STORE_FIELDS_PROMPT}`,
       config: {
         tools: [{ googleMaps: {} }, { googleSearch: {} }],
         toolConfig: {
@@ -148,17 +234,9 @@ Focus strictly on:
 IMPORTANT: Many sovereign and trading post shops will NOT appear on Google Maps. 
 Search news articles, social media (Facebook, Instagram), Reddit, community forums, and local blogs.
 A Facebook page, news article, or community mention is sufficient evidence for inclusion.
+IMPORTANT: Search for ALL shops in this area, not just the most well-known ones. Multiple sovereign shops often cluster along the same highway or reserve. Look for every one you can find evidence for.
 
-Return a JSON code block with a "stores" array. If NO verifiable stores exist, return {"stores": []}.
-Required fields per store:
-- name: string (exact real business name)
-- type: "Sovereign" or "Local Gem"
-- address: string (real verified address, or descriptive location like "Highway 97A near Enderby, BC" for informal shops)
-- featuredOfferings: string[] (only verifiable items)
-- rating: number (real rating or 0)
-- website: string (real URL, social media page URL, or empty string)
-- sourceUrl: string (URL to evidence confirming this business - news articles, social media, forums all count)
-- hours: array of {day: string, time: string} (verifiable hours or empty array)
+${STORE_FIELDS_NO_PROVINCE_PROMPT}
 
 Do NOT include any store you cannot find ANY evidence for through the grounding tools.`,
     config: {
@@ -174,6 +252,90 @@ Do NOT include any store you cannot find ANY evidence for through the grounding 
   return data.stores.filter((s: any) => 
     s.name && s.name.trim() !== '' && 
     s.address && s.address.trim() !== ''
+  );
+};
+
+export const deepDiveArea = async (areaDescription: string, province: Province, existingNames: string[]): Promise<Partial<Store>[]> => {
+  const excludeList = existingNames.length > 0 
+    ? `\nIMPORTANT: I already know about these stores, so DO NOT include them again: ${existingNames.join(', ')}. Only return NEW stores not in this list.`
+    : '';
+
+  const response = await getAI().models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: `${ANTI_HALLUCINATION_PROMPT}
+
+I need a THOROUGH search for sovereign Indigenous cannabis shops, trading posts, smoke shops, and dispensaries in this specific area:
+"${areaDescription}" in ${province}, Canada.
+${excludeList}
+
+This is a DEEP DIVE search. Look beyond the obvious results:
+- Search for news articles about unlicensed cannabis shops in this area
+- Look for social media posts mentioning smoke shops or trading posts on this reserve/territory
+- Check Reddit threads about cannabis shopping in this region
+- Search for any blog posts or forum discussions mentioning specific shop names
+- Look for Google Maps reviews or listings even if shops are informal
+- Check local news coverage about sovereign cannabis retail in this community
+- Look for shops described by landmarks ("the shack on the highway", "the shed near the gas station") 
+- Multiple shops often operate along the same highway corridor - search for EACH ONE individually
+
+MANDATORY: EXCLUDE all provincially licensed/regulated corporate stores.
+
+${STORE_FIELDS_PROMPT}
+
+Do NOT include any store you cannot find ANY evidence for through the grounding tools.`,
+    config: {
+      tools: [{ googleMaps: {} }, { googleSearch: {} }],
+    }
+  });
+
+  const data = extractJson(response.text || "");
+  if (!data?.stores || !Array.isArray(data.stores)) {
+    return [];
+  }
+  
+  return data.stores.filter((s: any) => 
+    s.name && s.name.trim() !== '' && 
+    s.address && s.address.trim() !== '' &&
+    !existingNames.some(n => n.toLowerCase() === (s.name || '').toLowerCase())
+  );
+};
+
+export const neighborhoodExpand = async (foundStoreNames: string[], area: string, province: Province): Promise<Partial<Store>[]> => {
+  if (foundStoreNames.length === 0) return [];
+
+  const response = await getAI().models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: `${ANTI_HALLUCINATION_PROMPT}
+
+I found these sovereign/independent cannabis shops in ${area}, ${province}: ${foundStoreNames.join(', ')}.
+
+There are likely MORE shops nearby that I missed. Search specifically for:
+1. Other sovereign cannabis shops, trading posts, or smoke shops on the same reserve or nearby reserves
+2. Shops along the same highway or road corridor
+3. Any other unlicensed or independent cannabis retailers in the immediate area
+4. Shops that may be mentioned alongside the ones I already found in news articles or social media
+
+Do NOT include these stores I already know about: ${foundStoreNames.join(', ')}
+
+Search news articles, Reddit, social media, and Google Maps for any additional shops I may have missed.
+
+${STORE_FIELDS_PROMPT}
+
+Do NOT include any store you cannot find ANY evidence for through the grounding tools.`,
+    config: {
+      tools: [{ googleMaps: {} }, { googleSearch: {} }],
+    }
+  });
+
+  const data = extractJson(response.text || "");
+  if (!data?.stores || !Array.isArray(data.stores)) {
+    return [];
+  }
+  
+  return data.stores.filter((s: any) => 
+    s.name && s.name.trim() !== '' && 
+    s.address && s.address.trim() !== '' &&
+    !foundStoreNames.some(n => n.toLowerCase() === (s.name || '').toLowerCase())
   );
 };
 

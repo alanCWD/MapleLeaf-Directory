@@ -98,6 +98,13 @@ The app implements a multi-layered verification pipeline:
 - `/admin/review` - Admin review queue for unverified stores
 
 ## Recent Changes
+- 2026-02-16: Enhanced discovery engine to find more sovereign shops
+  - Added Indigenous community hotspot database (known First Nations reserves/corridors across 8 provinces)
+  - Multi-pass discovery: initial scan → hotspot deep-dives → neighborhood expansion around found stores
+  - Added "Targeted Area Search" to admin panel for drilling into specific areas/reserves/highways
+  - deepDiveArea() searches thoroughly for ALL shops in a corridor with exclusion of already-found stores
+  - neighborhoodExpand() finds additional shops near already-discovered ones
+  - Improved prompts to emphasize finding ALL shops in an area, not just the most prominent
 - 2026-02-16: Reduced verification restrictiveness for sovereign/trading post shops
   - Lowered verification threshold for Sovereign type (0.3 vs 0.6 for Local Gem)
   - Added community_report evidence type with automatic boost for sovereign stores
