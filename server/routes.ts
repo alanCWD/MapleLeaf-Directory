@@ -51,6 +51,11 @@ router.get('/stores/:id', async (req: Request, res: Response) => {
 
 router.post('/stores', async (req, res) => {
   try {
+    const { name, address } = req.body;
+    if (!name || name === 'Unknown' || !address || address.trim() === '') {
+      res.status(400).json({ error: 'Valid name and address are required' });
+      return;
+    }
     const store = await upsertStore(req.body);
     res.status(201).json(store);
   } catch (error) {
@@ -66,8 +71,12 @@ router.post('/stores/bulk', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Expected an array of stores' });
       return;
     }
+    const validStores = stores.filter((s: any) => 
+      s.name && s.name.trim() !== '' && s.name !== 'Unknown' &&
+      s.address && s.address.trim() !== ''
+    );
     const results = [];
-    for (const storeData of stores) {
+    for (const storeData of validStores) {
       const store = await upsertStore(storeData);
       results.push(store);
     }

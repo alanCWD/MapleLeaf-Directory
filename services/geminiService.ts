@@ -164,41 +164,88 @@ export const searchStores = async (query: string, userLocation?: { lat: number; 
   stores: Partial<Store>[];
 }> => {
   try {
+    const latLngConfig = userLocation ? { latitude: userLocation.lat, longitude: userLocation.lng } : undefined;
+
     const response = await getAI().models.generateContent({
       model: "gemini-2.5-flash",
       contents: `${ANTI_HALLUCINATION_PROMPT}
 
-Find niche, independent cannabis shops in Canada for: "${query}". 
-STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores).
-FOCUS ONLY ON: 
-1. Sovereign Indigenous dispensaries, trading posts, and smoke shops (often located on First Nations land or reserves). These may be unlicensed and operate under Indigenous sovereignty.
+Find ALL sovereign Indigenous cannabis shops, trading posts, smoke shops, and independent dispensaries near: "${query}".
+
+STRICT REQUIREMENT: EXCLUDE all government-licensed corporate dispensaries (e.g., OCS-authorized, BCCS, SQDC corporate stores, Tokyo Smoke, Tweed, etc.).
+
+FOCUS ONLY ON:
+1. Sovereign Indigenous dispensaries, trading posts, and smoke shops (often on First Nations land or reserves). These may be unlicensed and operate under Indigenous sovereignty.
 2. Independent "Local Gems" that operate outside the standard corporate retail model.
-3. Unlicensed trading posts and informal dispensaries that are known in local communities.
-NOTE: Many of these shops will NOT appear on Google Maps. Search news articles, social media, Reddit, community forums, and local blogs for evidence.
-IMPORTANT: If the query mentions a specific area, highway, or First Nations community, search thoroughly for ALL shops in that corridor/area, not just the most well-known ones. Multiple shops often cluster along the same road or reserve.
+3. Unlicensed trading posts and informal dispensaries known in local communities.
+
+SEARCH STRATEGY - DO ALL OF THESE:
+- Search Google Maps for cannabis/dispensary/smoke shop businesses in this area
+- Search Google for news articles about unlicensed/sovereign cannabis shops in this area
+- Search for Reddit threads, blog posts, or forum discussions mentioning shops in this location
+- Search for any First Nations reserves or territories near this location and look for sovereign shops on them
+- If this is near a highway corridor, search for ALL shops along that road, not just the closest one
+- Look for shops known by informal names ("the shack", "the shed", etc.)
+- Multiple sovereign shops often cluster together on the same reserve or highway - find ALL of them
 
 ${STORE_FIELDS_PROMPT}`,
       config: {
         tools: [{ googleMaps: {} }, { googleSearch: {} }],
         toolConfig: {
-          retrievalConfig: {
-            latLng: userLocation ? { latitude: userLocation.lat, longitude: userLocation.lng } : undefined
-          }
+          retrievalConfig: { latLng: latLngConfig }
         }
       }
     });
 
     const data = extractJson(response.text || "");
-    if (!data?.stores || !Array.isArray(data.stores)) {
-      return { stores: [] };
-    }
-    
-    const validStores = data.stores.filter((s: any) => 
-      s.name && s.name.trim() !== '' && 
+    const pass1Stores: Partial<Store>[] = (data?.stores || []).filter((s: any) =>
+      s.name && s.name.trim() !== '' &&
       s.address && s.address.trim() !== ''
     );
-    
-    return { stores: validStores };
+
+    if (pass1Stores.length > 0) {
+      const foundNames = pass1Stores.map(s => s.name).filter(Boolean);
+      try {
+        const pass2Response = await getAI().models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `${ANTI_HALLUCINATION_PROMPT}
+
+I searched for sovereign/independent cannabis shops near "${query}" and found these: ${foundNames.join(', ')}.
+
+There are likely MORE shops in this area that I missed. Search specifically for:
+1. Other sovereign cannabis shops, trading posts, or smoke shops on the same reserve or nearby reserves
+2. Shops along the same highway or road corridor
+3. Any other unlicensed or independent cannabis retailers in the immediate area
+4. Shops mentioned alongside the ones above in news articles, Reddit threads, or social media
+
+DO NOT include these stores I already found: ${foundNames.join(', ')}. Only return NEW, ADDITIONAL stores.
+
+Search news articles, Reddit, social media, Google Maps, and community forums for any additional shops.
+
+${STORE_FIELDS_PROMPT}`,
+          config: {
+            tools: [{ googleMaps: {} }, { googleSearch: {} }],
+            toolConfig: {
+              retrievalConfig: { latLng: latLngConfig }
+            }
+          }
+        });
+
+        const pass2Data = extractJson(pass2Response.text || "");
+        const pass2Stores: Partial<Store>[] = (pass2Data?.stores || []).filter((s: any) =>
+          s.name && s.name.trim() !== '' &&
+          s.address && s.address.trim() !== '' &&
+          !foundNames.some(n => n?.toLowerCase() === s.name?.toLowerCase())
+        );
+
+        return { stores: [...pass1Stores, ...pass2Stores] };
+      } catch (pass2Error) {
+        console.error("Pass 2 search error (non-fatal):", pass2Error);
+        return { stores: pass1Stores };
+      }
+    }
+
+    return { stores: pass1Stores };
   } catch (error) {
     console.error("Gemini Search Error:", error);
     throw error;
