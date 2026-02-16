@@ -61,3 +61,8 @@ externalPort = 3000
 deploymentTarget = "autoscale"
 run = ["npx", "serve", "dist", "-l", "5000"]
 build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+GEMINI_API_KEY = "AIzaSyArpf2ktQGdeUfDFY_xLXNFMsQOuVfFhNE"

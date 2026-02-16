@@ -93,6 +93,13 @@ export async function adminReviewStore(
   });
 }
 
+export async function searchStoresAPI(query: string, userLocation?: { lat: number; lng: number }): Promise<{ stores: Partial<Store>[] }> {
+  return apiFetch<{ stores: Partial<Store>[] }>('/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, userLocation }),
+  });
+}
+
 export async function submitCommunityStore(data: {
   name: string;
   address: string;

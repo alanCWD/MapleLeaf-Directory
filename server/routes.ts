@@ -11,6 +11,7 @@ import {
   adminReview,
 } from './db.ts';
 import { verifyStore } from './verification.ts';
+import { serverSearchStores } from './search.ts';
 
 const router = Router();
 
@@ -18,6 +19,24 @@ function paramId(params: any): string {
   const id = params.id;
   return Array.isArray(id) ? id[0] : id;
 }
+
+router.post('/search', async (req: Request, res: Response) => {
+  try {
+    const { query, userLocation } = req.body;
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      res.status(400).json({ error: 'Search query is required' });
+      return;
+    }
+    console.log(`[API] Search request: "${query}"`);
+    const result = await serverSearchStores(query.trim(), userLocation);
+    console.log(`[API] Search returned ${result.stores.length} stores`);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[API] Search error:', error?.message || error);
+    console.error('[API] Search error stack:', error?.stack);
+    res.status(500).json({ error: 'Search failed', details: error?.message });
+  }
+});
 
 router.get('/stores', async (req: Request, res: Response) => {
   try {

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { searchStores } from '../services/geminiService';
+import { searchStoresAPI } from '../services/api';
 import { Store, StoreType } from '../types';
 
 interface HeroProps {
@@ -11,15 +11,17 @@ interface HeroProps {
 export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsSearching(true);
+    setSearchError(null);
     
     try {
-      const result = await searchStores(query, userLocation);
+      const result = await searchStoresAPI(query, userLocation);
       
       if (result.stores && result.stores.length > 0) {
         const processedStores: Store[] = result.stores.map((s: any) => {
@@ -38,9 +40,12 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
         });
         
         onSearchResults(processedStores);
+      } else {
+        setSearchError('No sovereign or independent shops found for that area. Try a different search.');
       }
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Search error:', error);
+      setSearchError(error?.message || 'Search failed. Please try again.');
     } finally {
       setIsSearching(false);
     }
@@ -109,6 +114,9 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
             ) : 'Explore Gems'}
           </button>
         </form>
+        {searchError && (
+          <p className="mt-4 text-rose-500 text-sm font-bold animate-fade-in">{searchError}</p>
+        )}
       </div>
     </div>
   );
