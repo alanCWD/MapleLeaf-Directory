@@ -60,7 +60,7 @@ externalPort = 3000
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "NODE_ENV=production npx tsx server/index.ts"]
-build = ["bash", "-c", "npm install && npm run build"]
+build = ["bash", "-c", "npx vite build"]
 
 [userenv]
 
