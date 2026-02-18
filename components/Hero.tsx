@@ -25,7 +25,7 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
       
       if (result.stores && result.stores.length > 0) {
         const processedStores: Store[] = result.stores.map((s: any) => {
-          const safeId = btoa((s.name || '') + (s.address || ''))
+          const safeId = btoa(unescape(encodeURIComponent((s.name || '') + (s.address || ''))))
             .replace(/[^a-zA-Z0-9]/g, '')
             .substring(0, 12);
             

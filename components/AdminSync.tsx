@@ -32,7 +32,7 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
     }
 
     const processedStores: Store[] = rawStores.map(s => {
-      const safeId = btoa((s.name || '') + (s.address || ''))
+      const safeId = btoa(unescape(encodeURIComponent((s.name || '') + (s.address || ''))))
         .replace(/[^a-zA-Z0-9]/g, '')
         .substring(0, 12);
 
