@@ -4,12 +4,14 @@ import { Link } from 'react-router-dom';
 import { bulkSyncProvince, getMajorCities, getIndigenousHotspots, deepDiveArea, neighborhoodExpand } from '../services/geminiService';
 import { Province, Store, VerificationStatus } from '../types';
 import { bulkVerifyStores } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 interface AdminSyncProps {
   onSync: (stores: Store[]) => Promise<Store[]> | void;
 }
 
 export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
+  const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDeepDiscovery, setIsDeepDiscovery] = useState(false);
   const [autoVerify, setAutoVerify] = useState(true);
@@ -20,6 +22,27 @@ export const AdminSync: React.FC<AdminSyncProps> = ({ onSync }) => {
   const [logs, setLogs] = useState<string[]>([]);
   const [targetArea, setTargetArea] = useState('');
   const [targetProvince, setTargetProvince] = useState<Province>(Province.BC);
+
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center">
+        <div className="text-6xl mb-6">🔐</div>
+        <h2 className="text-2xl font-black text-stone-900 mb-4">Admin Access Required</h2>
+        <a href="/api/login" className="inline-block bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition">Sign In</a>
+      </div>
+    );
+  }
+
+  if (!authLoading && !isAdmin) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center">
+        <div className="text-6xl mb-6">⛔</div>
+        <h2 className="text-2xl font-black text-stone-900 mb-4">Access Denied</h2>
+        <p className="text-stone-500 font-medium mb-8">You need admin privileges to access this page.</p>
+        <Link to="/" className="inline-block bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition">Back to Directory</Link>
+      </div>
+    );
+  }
 
   const addLog = (message: string) => {
     setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev.slice(0, 199)]);

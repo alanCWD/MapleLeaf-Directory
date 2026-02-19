@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, RequestHandler } from 'express';
 import {
   getAllStores,
   getStoreById,
@@ -12,6 +12,20 @@ import {
 } from './db.ts';
 import { verifyStore } from './verification.ts';
 import { serverSearchStores } from './search.ts';
+import { isAuthenticated } from './replit_integrations/auth/index.ts';
+import { authStorage } from './replit_integrations/auth/index.ts';
+import {
+  getUserFavorites,
+  addUserFavorite,
+  removeUserFavorite,
+  syncUserFavorites,
+  createStoreClaim,
+  getStoreClaimsByUser,
+  getPendingClaims,
+  reviewClaim,
+  getClaimedStoresForOwner,
+  getUserRole,
+} from './userDb.ts';
 
 const router = Router();
 
@@ -19,6 +33,26 @@ function paramId(params: any): string {
   const id = params.id;
   return Array.isArray(id) ? id[0] : id;
 }
+
+function getUserId(req: any): string | null {
+  return req.user?.claims?.sub || null;
+}
+
+const requireAdmin: RequestHandler = async (req: any, res, next) => {
+  const userId = getUserId(req);
+  if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const role = await getUserRole(userId);
+  if (role !== 'admin') { res.status(403).json({ error: 'Admin access required' }); return; }
+  next();
+};
+
+const requireOwnerOrAdmin: RequestHandler = async (req: any, res, next) => {
+  const userId = getUserId(req);
+  if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const role = await getUserRole(userId);
+  if (role !== 'admin' && role !== 'owner') { res.status(403).json({ error: 'Owner or admin access required' }); return; }
+  next();
+};
 
 router.post('/search', async (req: Request, res: Response) => {
   try {
@@ -33,7 +67,6 @@ router.post('/search', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     console.error('[API] Search error:', error?.message || error);
-    console.error('[API] Search error stack:', error?.stack);
     res.status(500).json({ error: 'Search failed', details: error?.message });
   }
 });
@@ -68,7 +101,7 @@ router.get('/stores/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/stores', async (req, res) => {
+router.post('/stores', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const { name, address } = req.body;
     if (!name || name === 'Unknown' || !address || address.trim() === '') {
@@ -83,7 +116,7 @@ router.post('/stores', async (req, res) => {
   }
 });
 
-router.post('/stores/bulk', async (req: Request, res: Response) => {
+router.post('/stores/bulk', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res: Response) => {
   try {
     const stores = req.body.stores || req.body;
     if (!Array.isArray(stores)) {
@@ -106,7 +139,7 @@ router.post('/stores/bulk', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/stores/:id', async (req, res) => {
+router.patch('/stores/:id', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const store = await updateStore(paramId(req.params), req.body);
     if (!store) {
@@ -120,7 +153,7 @@ router.patch('/stores/:id', async (req, res) => {
   }
 });
 
-router.post('/stores/:id/verify', async (req, res) => {
+router.post('/stores/:id/verify', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const storeId = paramId(req.params);
     const store = await getStoreById(storeId);
@@ -128,7 +161,6 @@ router.post('/stores/:id/verify', async (req, res) => {
       res.status(404).json({ error: 'Store not found' });
       return;
     }
-
     const verificationResult = await verifyStore(store);
     const updated = await updateStore(storeId, {
       verificationStatus: verificationResult.verificationStatus,
@@ -142,7 +174,6 @@ router.post('/stores/:id/verify', async (req, res) => {
       placesCategory: verificationResult.placesCategory,
       lastVerifiedAt: verificationResult.lastVerifiedAt,
     });
-
     res.json({ store: updated, verification: verificationResult });
   } catch (error) {
     console.error('Error verifying store:', error);
@@ -150,19 +181,17 @@ router.post('/stores/:id/verify', async (req, res) => {
   }
 });
 
-router.post('/stores/bulk-verify', async (req: Request, res: Response) => {
+router.post('/stores/bulk-verify', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res: Response) => {
   try {
     const storeIds: string[] = req.body.storeIds || [];
     if (!Array.isArray(storeIds) || storeIds.length === 0) {
       res.status(400).json({ error: 'Expected an array of store IDs' });
       return;
     }
-
     const results = [];
     for (const id of storeIds) {
       const store = await getStoreById(id);
       if (!store) continue;
-
       const verificationResult = await verifyStore(store);
       const updated = await updateStore(id, {
         verificationStatus: verificationResult.verificationStatus,
@@ -176,10 +205,8 @@ router.post('/stores/bulk-verify', async (req: Request, res: Response) => {
         placesCategory: verificationResult.placesCategory,
         lastVerifiedAt: verificationResult.lastVerifiedAt,
       });
-
       results.push({ store: updated, verification: verificationResult });
     }
-
     res.json({ count: results.length, results });
   } catch (error) {
     console.error('Error bulk verifying stores:', error);
@@ -187,14 +214,14 @@ router.post('/stores/bulk-verify', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/stores/community-submit', async (req, res) => {
+router.post('/stores/community-submit', isAuthenticated as RequestHandler, async (req: any, res) => {
   try {
     const { name, address, province, type, website, sourceUrl, submitterNote } = req.body;
     if (!name || !address || !province || !type) {
       res.status(400).json({ error: 'Name, address, province, and type are required' });
       return;
     }
-
+    const userId = getUserId(req);
     const evidenceSources = [];
     if (submitterNote) {
       evidenceSources.push({
@@ -209,12 +236,8 @@ router.post('/stores/community-submit', async (req, res) => {
         date: new Date().toISOString().split('T')[0],
       });
     }
-
     const storeData: any = {
-      name,
-      address,
-      province,
-      type,
+      name, address, province, type,
       website: website || '',
       sourceUrl: sourceUrl || '',
       verificationStatus: 'ai_suggested',
@@ -223,9 +246,7 @@ router.post('/stores/community-submit', async (req, res) => {
       evidenceCount: 0,
       adminReviewed: false,
     };
-
     const store = await upsertStore(storeData);
-
     if (store) {
       const verificationResult = await verifyStore(store);
       const communityBoost = submitterNote ? 0.15 : 0.1;
@@ -233,7 +254,6 @@ router.post('/stores/community-submit', async (req, res) => {
       const threshold = type === 'Sovereign' ? 0.3 : 0.6;
       const finalStatus = combinedScore >= threshold ? 'verified' : 'ai_suggested';
       const allEvidence = [...evidenceSources, ...verificationResult.evidenceSources];
-
       const updated = await updateStore(store.id, {
         verificationStatus: finalStatus,
         confidenceScore: Math.round(combinedScore * 100) / 100,
@@ -256,7 +276,7 @@ router.post('/stores/community-submit', async (req, res) => {
   }
 });
 
-router.post('/stores/:id/flag', async (req, res) => {
+router.post('/stores/:id/flag', isAuthenticated as RequestHandler, async (req: any, res) => {
   try {
     const { reason, comment } = req.body;
     if (!reason) {
@@ -281,7 +301,128 @@ router.get('/stores/:id/flags', async (req, res) => {
   }
 });
 
-router.get('/admin/review-queue', async (_req, res) => {
+router.get('/user/favorites', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const favorites = await getUserFavorites(userId);
+    res.json(favorites);
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+});
+
+router.post('/user/favorites/:storeId', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    await addUserFavorite(userId, req.params.storeId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error adding favorite:', error);
+    res.status(500).json({ error: 'Failed to add favorite' });
+  }
+});
+
+router.delete('/user/favorites/:storeId', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    await removeUserFavorite(userId, req.params.storeId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing favorite:', error);
+    res.status(500).json({ error: 'Failed to remove favorite' });
+  }
+});
+
+router.post('/user/favorites/sync', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const { storeIds } = req.body;
+    if (!Array.isArray(storeIds)) {
+      res.status(400).json({ error: 'storeIds array required' });
+      return;
+    }
+    const result = await syncUserFavorites(userId, storeIds);
+    res.json(result);
+  } catch (error) {
+    console.error('Error syncing favorites:', error);
+    res.status(500).json({ error: 'Failed to sync favorites' });
+  }
+});
+
+router.post('/user/claims', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const { storeId, message } = req.body;
+    if (!storeId) {
+      res.status(400).json({ error: 'storeId is required' });
+      return;
+    }
+    const claim = await createStoreClaim(userId, storeId, message);
+    res.status(201).json(claim);
+  } catch (error) {
+    console.error('Error creating claim:', error);
+    res.status(500).json({ error: 'Failed to create claim' });
+  }
+});
+
+router.get('/user/claims', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const claims = await getStoreClaimsByUser(userId);
+    res.json(claims);
+  } catch (error) {
+    console.error('Error fetching claims:', error);
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+router.get('/user/owned-stores', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const storeIds = await getClaimedStoresForOwner(userId);
+    const stores = [];
+    for (const id of storeIds) {
+      const store = await getStoreById(id);
+      if (store) stores.push(store);
+    }
+    res.json(stores);
+  } catch (error) {
+    console.error('Error fetching owned stores:', error);
+    res.status(500).json({ error: 'Failed to fetch owned stores' });
+  }
+});
+
+router.patch('/owner/stores/:id', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const storeId = paramId(req.params);
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const allowedFields = ['phone', 'website', 'hours', 'featuredOfferings', 'address'];
+    const updates: any = {};
+    for (const field of allowedFields) {
+      if (field in req.body) updates[field] = req.body[field];
+    }
+    const store = await updateStore(storeId, updates);
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json(store);
+  } catch (error) {
+    console.error('Error updating owned store:', error);
+    res.status(500).json({ error: 'Failed to update store' });
+  }
+});
+
+router.get('/admin/review-queue', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
   try {
     const stores = await getReviewQueue();
     res.json(stores);
@@ -291,7 +432,7 @@ router.get('/admin/review-queue', async (_req, res) => {
   }
 });
 
-router.patch('/admin/stores/:id/review', async (req, res) => {
+router.patch('/admin/stores/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req, res) => {
   try {
     const { action, notes } = req.body;
     if (!action || !['approve', 'reject', 'mark_closed'].includes(action)) {
@@ -307,6 +448,31 @@ router.patch('/admin/stores/:id/review', async (req, res) => {
   } catch (error) {
     console.error('Error reviewing store:', error);
     res.status(500).json({ error: 'Failed to review store' });
+  }
+});
+
+router.get('/admin/claims', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
+  try {
+    const claims = await getPendingClaims();
+    res.json(claims);
+  } catch (error) {
+    console.error('Error fetching claims:', error);
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+router.patch('/admin/claims/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req, res) => {
+  try {
+    const { action, notes } = req.body;
+    if (!action || !['approve', 'reject'].includes(action)) {
+      res.status(400).json({ error: 'Valid action required: approve or reject' });
+      return;
+    }
+    const claim = await reviewClaim(parseInt(paramId(req.params)), action, notes);
+    res.json(claim);
+  } catch (error) {
+    console.error('Error reviewing claim:', error);
+    res.status(500).json({ error: 'Failed to review claim' });
   }
 });
 

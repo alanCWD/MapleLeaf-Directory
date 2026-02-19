@@ -5,11 +5,12 @@ const API_BASE = '/api';
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'API request failed');
+    throw new Error(err.error || err.message || 'API request failed');
   }
   return res.json();
 }
@@ -112,5 +113,57 @@ export async function submitCommunityStore(data: {
   return apiFetch<Store>('/stores/community-submit', {
     method: 'POST',
     body: JSON.stringify(data),
+  });
+}
+
+export async function getUserFavoritesAPI(): Promise<string[]> {
+  return apiFetch<string[]>('/user/favorites');
+}
+
+export async function addFavoriteAPI(storeId: string): Promise<void> {
+  await apiFetch(`/user/favorites/${storeId}`, { method: 'POST' });
+}
+
+export async function removeFavoriteAPI(storeId: string): Promise<void> {
+  await apiFetch(`/user/favorites/${storeId}`, { method: 'DELETE' });
+}
+
+export async function syncFavoritesAPI(storeIds: string[]): Promise<string[]> {
+  return apiFetch('/user/favorites/sync', {
+    method: 'POST',
+    body: JSON.stringify({ storeIds }),
+  });
+}
+
+export async function createClaimAPI(storeId: string, message?: string): Promise<any> {
+  return apiFetch('/user/claims', {
+    method: 'POST',
+    body: JSON.stringify({ storeId, message }),
+  });
+}
+
+export async function getUserClaimsAPI(): Promise<any[]> {
+  return apiFetch('/user/claims');
+}
+
+export async function getOwnedStoresAPI(): Promise<Store[]> {
+  return apiFetch<Store[]>('/user/owned-stores');
+}
+
+export async function updateOwnedStoreAPI(id: string, updates: Partial<Store>): Promise<Store> {
+  return apiFetch<Store>(`/owner/stores/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function getAdminClaimsAPI(): Promise<any[]> {
+  return apiFetch('/admin/claims');
+}
+
+export async function reviewClaimAPI(claimId: number, action: 'approve' | 'reject', notes?: string): Promise<any> {
+  return apiFetch(`/admin/claims/${claimId}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action, notes }),
   });
 }

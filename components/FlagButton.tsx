@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import type { FlagReason } from '../types';
 import { flagStore } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 interface FlagButtonProps {
   storeId: string;
@@ -22,6 +23,7 @@ export const FlagButton: React.FC<FlagButtonProps> = ({ storeId, onFlagged }) =>
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   const handleSubmit = async () => {
     if (!selectedReason) return;
@@ -54,7 +56,13 @@ export const FlagButton: React.FC<FlagButtonProps> = ({ storeId, onFlagged }) =>
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isAuthenticated) {
+            window.location.href = '/api/login';
+            return;
+          }
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center gap-2 text-stone-400 hover:text-red-500 text-xs font-bold uppercase tracking-widest transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

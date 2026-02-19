@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Province } from '../types';
 import { submitCommunityStore } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 export const CommunitySubmit: React.FC = () => {
   const [name, setName] = useState('');
@@ -13,6 +14,29 @@ export const CommunitySubmit: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-stone-50 pt-8">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-white rounded-[32px] border border-stone-200 p-12 text-center shadow-sm">
+            <div className="text-6xl mb-6">🔐</div>
+            <h2 className="text-2xl font-black text-stone-900 mb-4">Sign In Required</h2>
+            <p className="text-stone-500 font-medium mb-8">
+              Please sign in to submit a store. This helps us track contributions and build trust in our community data.
+            </p>
+            <a
+              href="/api/login"
+              className="inline-block bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition shadow-lg shadow-emerald-200"
+            >
+              Sign In to Continue
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

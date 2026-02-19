@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
 
 const app = express();
@@ -11,21 +12,31 @@ const PORT = isProduction ? 5000 : 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-app.use('/api', router);
+async function startServer() {
+  await setupAuth(app);
+  registerAuthRoutes(app);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+  app.use('/api', router);
 
-if (isProduction) {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const distPath = path.resolve(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
-  app.use((_req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  if (isProduction) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const distPath = path.resolve(__dirname, '..', 'dist');
+    app.use(express.static(distPath));
+    app.use((_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Server] Express API server running on port ${PORT} (${isProduction ? 'production' : 'development'})`);
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Server] Express API server running on port ${PORT} (${isProduction ? 'production' : 'development'})`);
+startServer().catch((err) => {
+  console.error('[Server] Failed to start:', err);
+  process.exit(1);
 });

@@ -15,7 +15,8 @@ import { AdminReviewQueue } from './components/AdminReviewQueue';
 import { CommunitySubmit } from './components/CommunitySubmit';
 import { VerificationFilter } from './components/VerificationFilter';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
-import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore } from './services/api';
+import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
+import { useAuth } from './hooks/useAuth';
 
 const FAVORITES_KEY = 'mapleleaf_favs_v2';
 const PROFILE_KEY = 'mapleleaf_user_profile';
@@ -40,6 +41,8 @@ const App: React.FC = () => {
   const [hideUnverified, setHideUnverified] = useState(false);
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated } = useAuth();
+  const [favsSynced, setFavsSynced] = useState(false);
 
   const loadStores = async () => {
     try {
@@ -70,11 +73,51 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-  }, [favorites]);
+    if (!isAuthenticated) {
+      setFavsSynced(false);
+      return;
+    }
+    if (favsSynced) return;
+    const localFavs = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+    if (localFavs.length > 0) {
+      syncFavoritesAPI(localFavs).then((serverFavs) => {
+        setFavorites(serverFavs);
+        localStorage.removeItem(FAVORITES_KEY);
+        setFavsSynced(true);
+      }).catch(() => {
+        getUserFavoritesAPI().then(setFavorites).catch(() => {});
+        setFavsSynced(true);
+      });
+    } else {
+      getUserFavoritesAPI().then((serverFavs) => {
+        setFavorites(serverFavs);
+        setFavsSynced(true);
+      }).catch(() => setFavsSynced(true));
+    }
+  }, [isAuthenticated, favsSynced, user]);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    }
+  }, [favorites, isAuthenticated]);
+
+  const toggleFavorite = async (id: string) => {
+    const isFav = favorites.includes(id);
+    setFavorites(prev => isFav ? prev.filter(fid => fid !== id) : [...prev, id]);
+
+    if (isAuthenticated) {
+      try {
+        if (isFav) {
+          await removeFavoriteAPI(id);
+        } else {
+          await addFavoriteAPI(id);
+        }
+      } catch (err) {
+        console.error('Failed to update favorite:', err);
+        setFavorites(prev => isFav ? [...prev, id] : prev.filter(fid => fid !== id));
+      }
+    }
   };
 
   const handleSyncStores = async (newStores: Store[]) => {
@@ -164,6 +207,24 @@ const App: React.FC = () => {
                     </div>
                   )}
 
+                  {isAuthenticated && user && (
+                    <div className="mb-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-fade-in">
+                      {user.profileImageUrl ? (
+                        <img src={user.profileImageUrl} alt="" className="w-10 h-10 rounded-full border-2 border-emerald-200" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black">
+                          {(user.firstName?.[0] || 'U').toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-emerald-900 font-bold text-sm">
+                          Welcome{user.firstName ? `, ${user.firstName}` : ''}! Your favorites sync across all your devices.
+                        </p>
+                        <p className="text-emerald-600 text-xs">Signed in as {user.email || 'user'}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <ProvinceSelector selected={selectedProvince} onSelect={(p) => {
                       setSelectedProvince(p);
@@ -222,7 +283,7 @@ const App: React.FC = () => {
                       <>
                         <StoreList stores={filteredStores.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
                         
-                        {filteredStores.length > 4 && !userProfile?.email && (
+                        {filteredStores.length > 4 && !isAuthenticated && (
                           <div className="my-16">
                             <LeadBanner />
                           </div>
@@ -260,8 +321,7 @@ const App: React.FC = () => {
                   <h4 className="text-white font-black uppercase tracking-widest text-sm mb-6">Directory</h4>
                   <ul className="space-y-4 text-sm font-medium">
                     <li><Link to="/" className="hover:text-emerald-400 transition">Find Dispensaries</Link></li>
-                    <li><Link to="/admin/sync" className="hover:text-emerald-400 transition">Database Engine</Link></li>
-                    <li><Link to="/admin/review" className="hover:text-emerald-400 transition">Review Queue</Link></li>
+                    <li><Link to="/submit" className="hover:text-emerald-400 transition">Submit a Store</Link></li>
                   </ul>
                </div>
                <div>
