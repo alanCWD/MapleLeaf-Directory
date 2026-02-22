@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, type AuthUser } from '../hooks/useAuth';
 
 const UserMenu: React.FC<{ user: AuthUser; onClose: () => void }> = ({ user, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -13,6 +14,11 @@ const UserMenu: React.FC<{ user: AuthUser; onClose: () => void }> = ({ user, onC
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [onClose]);
+
+  const goTo = (path: string) => {
+    onClose();
+    navigate(path);
+  };
 
   return (
     <div ref={menuRef} className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in">
@@ -25,21 +31,21 @@ const UserMenu: React.FC<{ user: AuthUser; onClose: () => void }> = ({ user, onC
       </div>
       <div className="p-2">
         {(user.role === 'owner' || user.role === 'admin') && (
-          <Link to="/owners" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+          <button onClick={() => goTo('/owners')} className="w-full text-left block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
             My Stores
-          </Link>
+          </button>
         )}
         {user.role === 'admin' && (
           <>
-            <Link to="/admin/review" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+            <button onClick={() => goTo('/admin/review')} className="w-full text-left block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               Admin Review
-            </Link>
-            <Link to="/admin/users" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+            </button>
+            <button onClick={() => goTo('/admin/users')} className="w-full text-left block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               User Management
-            </Link>
-            <Link to="/admin/sync" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+            </button>
+            <button onClick={() => goTo('/admin/sync')} className="w-full text-left block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               Database Engine
-            </Link>
+            </button>
           </>
         )}
         <div className="border-t border-stone-100 mt-1 pt-1">
@@ -77,14 +83,6 @@ export const Navbar: React.FC = () => {
             >
               Submit a Store
             </Link>
-            {isAuthenticated && user?.role === 'admin' && (
-              <Link 
-                to="/admin/review" 
-                className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
-              >
-                Admin Review
-              </Link>
-            )}
             <Link 
               to="/owners" 
               className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
@@ -182,31 +180,6 @@ export const Navbar: React.FC = () => {
               >
                 Submit a Store
               </Link>
-              {isAuthenticated && user?.role === 'admin' && (
-                <>
-                  <Link 
-                    to="/admin/review" 
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
-                  >
-                    Admin Review
-                  </Link>
-                  <Link 
-                    to="/admin/users" 
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
-                  >
-                    User Management
-                  </Link>
-                  <Link 
-                    to="/admin/sync" 
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
-                  >
-                    Database Engine
-                  </Link>
-                </>
-              )}
               <Link 
                 to="/" 
                 onClick={() => setIsMenuOpen(false)}
