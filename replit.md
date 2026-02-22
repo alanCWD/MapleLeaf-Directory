@@ -11,7 +11,7 @@ MapleLeaf Directory is a React-based web application for discovering niche, inde
 - **Styling**: Tailwind CSS (via CDN)
 - **AI Integration**: Google Gemini AI (@google/genai)
 - **Routing**: React Router DOM (HashRouter)
-- **Auth**: Replit Auth integration (adapted for raw PostgreSQL)
+- **Auth**: Multi-provider: Email/Password + Google OAuth + Replit Auth (all using Passport.js with PostgreSQL sessions)
 
 ## Architecture
 The app uses a split frontend/backend architecture:
@@ -151,7 +151,19 @@ Multi-layered verification pipeline:
 - `/admin/review` - Admin review queue (admin only)
 - `/admin/users` - Admin user management (admin only)
 
+## Routes
+- `/auth` - Sign in / Register page (Email/Password + Google OAuth)
+
 ## Recent Changes
+- 2026-02-22: Added multi-provider authentication (Email/Password + Google OAuth)
+  - Email/Password registration and login with bcrypt password hashing
+  - Google OAuth sign-in via Passport.js Google strategy
+  - Dedicated auth page at /auth with clean sign-in/register forms
+  - Email case normalization to prevent duplicate accounts
+  - Pre-existing users (e.g., manually added admins) can set a password on first email login
+  - Google sign-in links existing accounts by email match
+  - Replit Auth kept as fallback at /api/login
+  - Session format unified across all three auth providers
 - 2026-02-22: Added Admin User Management panel
   - View all registered users with role badges, join date, favorites/claims counts
   - Change user roles (user/owner/admin) via dropdown

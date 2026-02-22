@@ -71,7 +71,7 @@ export const Navbar: React.FC = () => {
               </div>
             ) : (
               <a 
-                href="/api/login"
+                href="#/auth"
                 className="bg-emerald-500 text-white px-6 py-2.5 rounded-2xl font-black hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-200 hover:-translate-y-0.5 active:translate-y-0 text-sm whitespace-nowrap"
               >
                 Sign In
@@ -85,7 +85,7 @@ export const Navbar: React.FC = () => {
                 {avatar}
               </div>
             ) : !isLoading ? (
-              <a href="/api/login" className="text-sm font-bold text-emerald-600 hover:text-emerald-500">Sign In</a>
+              <a href="#/auth" className="text-sm font-bold text-emerald-600 hover:text-emerald-500">Sign In</a>
             ) : null}
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
