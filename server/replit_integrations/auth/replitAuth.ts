@@ -113,11 +113,15 @@ export async function setupAuth(app: Express) {
   };
 
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    const domains = (process.env.REPLIT_DOMAINS || '').split(',').filter(Boolean);
+    const devDomain = process.env.REPLIT_DEV_DOMAIN || '';
+    const primaryDomain = domains[0] || devDomain || 'localhost';
+    const googleCallbackURL = `https://${primaryDomain}/api/auth/google/callback`;
+    console.log(`[Auth] Google OAuth callback URL: ${googleCallbackURL}`);
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
-      proxy: true,
+      callbackURL: googleCallbackURL,
     }, async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
       try {
         const email = normalizeEmail(profile.emails?.[0]?.value || '');
