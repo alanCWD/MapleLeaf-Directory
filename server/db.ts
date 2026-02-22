@@ -75,7 +75,7 @@ export async function getAllStores(filters: {
     params.push(filters.verificationStatus);
   }
   if (filters.hideUnverified) {
-    conditions.push(`verification_status != 'ai_suggested' OR confidence_score >= 0.3`);
+    conditions.push(`(verification_status != 'ai_suggested')`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

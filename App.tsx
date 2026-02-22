@@ -177,7 +177,7 @@ const App: React.FC = () => {
     const favoriteMatch = !showOnlyFavorites || favorites.includes(s.id);
     const vibeMatch = !vibeRecommendedIds || vibeRecommendedIds.includes(s.id);
     const verificationMatch = !verificationFilter || s.verificationStatus === verificationFilter;
-    const unverifiedMatch = !hideUnverified || s.verificationStatus === 'verified' || s.confidenceScore >= 0.6;
+    const unverifiedMatch = !hideUnverified || s.verificationStatus === 'verified' || s.verificationStatus === 'historically_closed';
     const notRejected = s.verificationStatus !== 'rejected';
     return provinceMatch && typeMatch && favoriteMatch && vibeMatch && verificationMatch && unverifiedMatch && notRejected;
   });
