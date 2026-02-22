@@ -1,109 +1,32 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, type AuthUser } from '../hooks/useAuth';
+import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const avatarRef = useRef<HTMLDivElement>(null);
-
-  const closeMenu = useCallback(() => setShowUserMenu(false), []);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!showUserMenu) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        menuRef.current && !menuRef.current.contains(target) &&
-        avatarRef.current && !avatarRef.current.contains(target)
-      ) {
-        closeMenu();
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
       }
     };
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [showUserMenu, closeMenu]);
+    setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => document.removeEventListener('click', handler);
+  }, [showUserMenu]);
 
-  const goTo = (path: string) => {
-    setShowUserMenu(false);
-    setIsMenuOpen(false);
-    navigate(path);
-  };
-
-  const toggleUserMenu = () => setShowUserMenu(prev => !prev);
-
-  const renderAvatar = (size: string = 'w-8 h-8') => {
-    if (user?.profileImageUrl) {
-      return <img src={user.profileImageUrl} alt="" className={`${size} rounded-full object-cover border-2 border-emerald-200`} />;
-    }
-    return (
-      <div className={`${size} rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-sm`}>
-        {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
-      </div>
-    );
-  };
-
-  const renderUserMenu = () => {
-    if (!showUserMenu || !user) return null;
-    return (
-      <div
-        ref={menuRef}
-        onClick={(e) => e.stopPropagation()}
-        className="fixed md:absolute right-4 md:right-0 top-16 md:top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in"
-      >
-        <div className="p-4 border-b border-stone-100 bg-stone-50">
-          <p className="font-bold text-stone-900 text-sm truncate">
-            {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}
-          </p>
-          {user.email && <p className="text-xs text-stone-500 truncate">{user.email}</p>}
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700">
-            {user.role}
-          </span>
-        </div>
-        <div className="p-2">
-          {(user.role === 'owner' || user.role === 'admin') && (
-            <div
-              onClick={() => goTo('/owners')}
-              className="px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
-            >
-              My Stores
-            </div>
-          )}
-          {user.role === 'admin' && (
-            <>
-              <div
-                onClick={() => goTo('/admin/review')}
-                className="px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
-              >
-                Admin Review
-              </div>
-              <div
-                onClick={() => goTo('/admin/users')}
-                className="px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
-              >
-                User Management
-              </div>
-              <div
-                onClick={() => goTo('/admin/sync')}
-                className="px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
-              >
-                Database Engine
-              </div>
-            </>
-          )}
-          <div className="border-t border-stone-100 mt-1 pt-1">
-            <a href="/api/logout" className="block px-3 py-2 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition">
-              Sign Out
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const avatar = user?.profileImageUrl ? (
+    <img src={user.profileImageUrl} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />
+  ) : (
+    <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-sm">
+      {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+    </div>
+  );
 
   return (
     <nav className="sticky top-4 z-50 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -135,17 +58,16 @@ export const Navbar: React.FC = () => {
             {isLoading ? (
               <div className="w-9 h-9 rounded-full bg-stone-200 animate-pulse" />
             ) : isAuthenticated && user ? (
-              <div className="relative" ref={avatarRef}>
-                <div 
-                  onClick={toggleUserMenu}
-                  className="flex items-center gap-2 pl-3 pr-1 py-1 rounded-full hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-200 cursor-pointer"
-                >
+              <div
+                className="cursor-pointer"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+              >
+                <div className="flex items-center gap-2 pl-3 pr-1 py-1 rounded-full hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-200">
                   <span className="text-sm font-bold text-stone-700 max-w-[100px] truncate">
                     {user.firstName || 'Account'}
                   </span>
-                  {renderAvatar()}
+                  {avatar}
                 </div>
-                {renderUserMenu()}
               </div>
             ) : (
               <a 
@@ -159,8 +81,8 @@ export const Navbar: React.FC = () => {
 
           <div className="md:hidden flex items-center gap-3">
             {!isLoading && isAuthenticated && user ? (
-              <div ref={avatarRef} onClick={toggleUserMenu} className="cursor-pointer">
-                {renderAvatar()}
+              <div onClick={() => setShowUserMenu(!showUserMenu)} className="cursor-pointer">
+                {avatar}
               </div>
             ) : !isLoading ? (
               <a href="/api/login" className="text-sm font-bold text-emerald-600 hover:text-emerald-500">Sign In</a>
@@ -188,9 +110,45 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {showUserMenu && isAuthenticated && user && (
-        <div className="md:hidden">
-          {renderUserMenu()}
+      {showUserMenu && user && (
+        <div
+          ref={dropdownRef}
+          className="absolute right-4 sm:right-8 top-[72px] w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in"
+        >
+          <div className="p-4 border-b border-stone-100 bg-stone-50">
+            <p className="font-bold text-stone-900 text-sm truncate">
+              {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}
+            </p>
+            {user.email && <p className="text-xs text-stone-500 truncate">{user.email}</p>}
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700">
+              {user.role}
+            </span>
+          </div>
+          <div className="p-2">
+            {(user.role === 'owner' || user.role === 'admin') && (
+              <a href="#/owners" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                My Stores
+              </a>
+            )}
+            {user.role === 'admin' && (
+              <>
+                <a href="#/admin/review" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  Admin Review
+                </a>
+                <a href="#/admin/users" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  User Management
+                </a>
+                <a href="#/admin/sync" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  Database Engine
+                </a>
+              </>
+            )}
+            <div className="border-t border-stone-100 mt-1 pt-1">
+              <a href="/api/logout" className="block px-3 py-2 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition">
+                Sign Out
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
