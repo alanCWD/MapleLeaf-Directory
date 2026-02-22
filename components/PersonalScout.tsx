@@ -8,7 +8,7 @@ interface PersonalScoutProps {
   onRecommendation: (storeIds: string[]) => void;
 }
 
-const PROFILE_KEY = 'mapleleaf_user_profile';
+const PROFILE_KEY = 'legacyleaf_user_profile';
 
 export const PersonalScout: React.FC<PersonalScoutProps> = ({ stores, onRecommendation }) => {
   const [step, setStep] = useState(0);

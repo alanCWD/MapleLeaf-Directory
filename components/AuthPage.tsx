@@ -57,7 +57,7 @@ export const AuthPage: React.FC = () => {
             {mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h1>
           <p className="text-stone-500 mt-2">
-            {mode === 'login' ? 'Sign in to your MapleLeaf account' : 'Join the MapleLeaf community'}
+            {mode === 'login' ? 'Sign in to your LegacyLeaf account' : 'Join the LegacyLeaf community'}
           </p>
         </div>
 

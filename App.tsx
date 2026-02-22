@@ -20,8 +20,8 @@ import { Store, Province, StoreType, UserProfile, VerificationStatus } from './t
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
 import { useAuth } from './hooks/useAuth';
 
-const FAVORITES_KEY = 'mapleleaf_favs_v2';
-const PROFILE_KEY = 'mapleleaf_user_profile';
+const FAVORITES_KEY = 'legacyleaf_favs_v2';
+const PROFILE_KEY = 'legacyleaf_user_profile';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -339,14 +339,14 @@ const App: React.FC = () => {
                <div>
                   <h4 className="text-white font-black uppercase tracking-widest text-sm mb-6">Company</h4>
                   <ul className="space-y-4 text-sm font-medium">
-                    <li><a href="#" className="hover:text-emerald-400 transition">About MapleLeaf</a></li>
+                    <li><a href="#" className="hover:text-emerald-400 transition">About LegacyLeaf</a></li>
                     <li><a href="#" className="hover:text-emerald-400 transition">Privacy Policy</a></li>
                     <li><a href="#" className="hover:text-emerald-400 transition">Contact Support</a></li>
                   </ul>
                </div>
             </div>
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-              <p className="text-xs text-emerald-100/30 font-medium">© 2024 MapleLeaf Directory. Data sourced via Gemini AI with real-world verification. For educational and informational purposes only.</p>
+              <p className="text-xs text-emerald-100/30 font-medium">© 2024 LegacyLeaf Directory. Data sourced via Gemini AI with real-world verification. For educational and informational purposes only.</p>
               <div className="flex gap-4">
                 <div className="w-8 h-8 bg-emerald-900 rounded-full flex items-center justify-center hover:bg-emerald-600 transition cursor-pointer">
                   <span className="text-white text-[10px] font-black">FB</span>

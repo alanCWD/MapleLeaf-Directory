@@ -1,7 +1,7 @@
-# MapleLeaf Directory
+# LegacyLeaf Directory
 
 ## Overview
-MapleLeaf Directory is a React-based web application for discovering niche, independent, and sovereign cannabis shops across Canada. It focuses on finding non-corporate dispensaries including Indigenous sovereign shops and independent "Local Gem" stores. The app includes a full anti-hallucination verification pipeline and a comprehensive authentication system with user accounts, store ownership claims, and role-based access control.
+LegacyLeaf Directory is a React-based web application for discovering niche, independent, and sovereign cannabis shops across Canada. It focuses on finding non-corporate dispensaries including Indigenous sovereign shops and independent "Local Gem" stores. The app includes a full anti-hallucination verification pipeline and a comprehensive authentication system with user accounts, store ownership claims, and role-based access control.
 
 ## Technology Stack
 - **Frontend**: React 19 with TypeScript

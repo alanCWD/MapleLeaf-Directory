@@ -34,10 +34,10 @@ export const Navbar: React.FC = () => {
         <div className="flex justify-between h-16 items-center gap-x-12">
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
             <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300 shadow-lg shadow-emerald-200">
-              <span className="text-white font-black text-xl">M</span>
+              <span className="text-white font-black text-xl">L</span>
             </div>
             <span className="text-xl font-extrabold tracking-tight text-stone-900 whitespace-nowrap">
-              MapleLeaf <span className="text-emerald-500">Directory</span>
+              LegacyLeaf <span className="text-emerald-500">Directory</span>
             </span>
           </Link>
           

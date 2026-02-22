@@ -196,23 +196,6 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/auth/google/debug", (_req, res) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID || '';
-    const secret = process.env.GOOGLE_CLIENT_SECRET || '';
-    const maskedId = clientId.length > 28 ? clientId.substring(0, 8) + '...' + clientId.substring(clientId.length - 20) : clientId.substring(0, 4) + '...';
-    const doms = (process.env.REPLIT_DOMAINS || '').split(',').filter(Boolean);
-    const devDom = process.env.REPLIT_DEV_DOMAIN || '';
-    const cbUrl = `https://${doms[0] || devDom || 'localhost'}/api/auth/google/callback`;
-    res.json({
-      clientIdFormat: maskedId,
-      clientIdLength: clientId.length,
-      endsWithGoogleusercontent: clientId.endsWith('.apps.googleusercontent.com'),
-      callbackURL: cbUrl,
-      hasSecret: secret.length > 0,
-      secretLength: secret.length,
-    });
-  });
-
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     app.get("/api/auth/google", (req, res, next) => {
       console.log('[Auth] Starting Google OAuth flow...');
