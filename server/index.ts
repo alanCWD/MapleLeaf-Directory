@@ -32,6 +32,21 @@ async function startServer() {
     }
   });
 
+  app.get('/api/setup-admins', async (_req, res) => {
+    try {
+      const { pool } = await import('./db.ts');
+      const adminEmails = ['alanb613@gmail.com', 'alan@citywidedigital.ca', 'trunorthprokopetz@gmail.com'];
+      const result = await pool.query(
+        `UPDATE users SET role = 'admin' WHERE LOWER(email) = ANY($1) RETURNING email, role`,
+        [adminEmails]
+      );
+      await pool.query('DELETE FROM sessions');
+      res.json({ updated: result.rows, sessionsCleared: true, message: 'Admin roles set. Please sign in again.' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   if (isProduction) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const distPath = path.resolve(__dirname, '..', 'dist');
