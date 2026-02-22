@@ -123,9 +123,9 @@ export const Navbar: React.FC = () => {
 
           <div className="md:hidden flex items-center gap-3">
             {!isLoading && isAuthenticated && user ? (
-              <button 
+              <div 
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="relative"
+                className="relative cursor-pointer"
               >
                 {user.profileImageUrl ? (
                   <img src={user.profileImageUrl} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />
@@ -135,7 +135,7 @@ export const Navbar: React.FC = () => {
                   </div>
                 )}
                 {showUserMenu && <UserMenu user={user} onClose={() => setShowUserMenu(false)} />}
-              </button>
+              </div>
             ) : !isLoading ? (
               <a href="/api/login" className="text-sm font-bold text-emerald-600 hover:text-emerald-500">Sign In</a>
             ) : null}
