@@ -22,6 +22,16 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  app.get('/api/debug/users', async (_req, res) => {
+    try {
+      const { pool } = await import('./db.ts');
+      const result = await pool.query('SELECT id, email, role, auth_provider, password_hash IS NOT NULL as has_password FROM users');
+      res.json({ count: result.rows.length, users: result.rows, db_url_prefix: (process.env.DATABASE_URL || '').substring(0, 30) });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   if (isProduction) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const distPath = path.resolve(__dirname, '..', 'dist');
