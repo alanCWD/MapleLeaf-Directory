@@ -158,6 +158,85 @@ export async function setupAuth(app: Express) {
     res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
   });
 
+  app.get("/api/auth/google/redirect", (req, res) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      res.status(400).send('Google sign-in not configured');
+      return;
+    }
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const redirectUri = `${protocol}://${req.hostname}/api/auth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'online',
+      prompt: 'select_account',
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  });
+
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const { code } = req.query;
+      if (!code || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        res.redirect('/#/auth?error=google_failed');
+        return;
+      }
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const redirectUri = `${protocol}://${req.hostname}/api/auth/google/callback`;
+      const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri);
+      const { tokens } = await googleClient.getToken(code as string);
+      if (!tokens.id_token) {
+        res.redirect('/#/auth?error=google_failed');
+        return;
+      }
+      const ticket = await googleClient.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        res.redirect('/#/auth?error=google_failed');
+        return;
+      }
+      const email = normalizeEmail(payload.email);
+      const firstName = payload.given_name || '';
+      const lastName = payload.family_name || '';
+      const profileImageUrl = payload.picture || null;
+      const existingByEmail = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
+      let userId: string;
+      if (existingByEmail.rows.length > 0) {
+        userId = existingByEmail.rows[0].id;
+        await pool.query(
+          `UPDATE users SET first_name = COALESCE(NULLIF($1, ''), first_name), last_name = COALESCE(NULLIF($2, ''), last_name),
+           profile_image_url = COALESCE($3, profile_image_url), auth_provider = COALESCE(auth_provider, 'google'), updated_at = now() WHERE id = $4`,
+          [firstName, lastName, profileImageUrl, userId]
+        );
+      } else {
+        const result = await pool.query(
+          `INSERT INTO users (email, first_name, last_name, profile_image_url, auth_provider)
+           VALUES ($1, $2, $3, $4, 'google') RETURNING id`,
+          [email, firstName, lastName, profileImageUrl]
+        );
+        userId = result.rows[0].id;
+      }
+      const sessionUser = makeSessionUser(userId, 'google');
+      req.login(sessionUser, (err) => {
+        if (err) {
+          console.error('[Auth] Google redirect login error:', err);
+          res.redirect('/#/auth?error=google_failed');
+          return;
+        }
+        console.log('[Auth] Google redirect login successful for:', email);
+        res.redirect('/');
+      });
+    } catch (err: any) {
+      console.error('[Auth] Google callback error:', err.message);
+      res.redirect('/#/auth?error=google_failed');
+    }
+  });
+
   app.post("/api/auth/google/token", async (req, res) => {
     try {
       const { credential } = req.body;
