@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
+import { seedStoresFromFile } from './db.ts';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -22,30 +23,32 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.get('/api/debug/users', async (_req, res) => {
-    try {
-      const { pool } = await import('./db.ts');
-      const result = await pool.query('SELECT id, email, role, auth_provider, password_hash IS NOT NULL as has_password FROM users');
-      res.json({ count: result.rows.length, users: result.rows, db_url_prefix: (process.env.DATABASE_URL || '').substring(0, 30) });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  if (!isProduction) {
+    app.get('/api/debug/users', async (_req, res) => {
+      try {
+        const { pool } = await import('./db.ts');
+        const result = await pool.query('SELECT id, email, role, auth_provider, password_hash IS NOT NULL as has_password FROM users');
+        res.json({ count: result.rows.length, users: result.rows, db_url_prefix: (process.env.DATABASE_URL || '').substring(0, 30) });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
 
-  app.get('/api/setup-admins', async (_req, res) => {
-    try {
-      const { pool } = await import('./db.ts');
-      const adminEmails = ['alanb613@gmail.com', 'alan@citywidedigital.ca', 'trunorthprokopetz@gmail.com'];
-      const result = await pool.query(
-        `UPDATE users SET role = 'admin' WHERE LOWER(email) = ANY($1) RETURNING email, role`,
-        [adminEmails]
-      );
-      await pool.query('DELETE FROM sessions');
-      res.json({ updated: result.rows, sessionsCleared: true, message: 'Admin roles set. Please sign in again.' });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+    app.get('/api/setup-admins', async (_req, res) => {
+      try {
+        const { pool } = await import('./db.ts');
+        const adminEmails = ['alanb613@gmail.com', 'alan@citywidedigital.ca', 'trunorthprokopetz@gmail.com'];
+        const result = await pool.query(
+          `UPDATE users SET role = 'admin' WHERE LOWER(email) = ANY($1) RETURNING email, role`,
+          [adminEmails]
+        );
+        await pool.query('DELETE FROM sessions');
+        res.json({ updated: result.rows, sessionsCleared: true, message: 'Admin roles set. Please sign in again.' });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+  }
 
   if (isProduction) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,8 +68,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`[Server] Express API server running on port ${PORT} (${isProduction ? 'production' : 'development'})`);
+    try {
+      await seedStoresFromFile();
+    } catch (err) {
+      console.error('[Seed] Error during store seeding:', err);
+    }
   });
 }
 

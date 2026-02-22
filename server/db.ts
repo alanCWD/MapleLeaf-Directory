@@ -291,4 +291,92 @@ export async function adminReview(
   return snakeToCamel(result.rows[0]);
 }
 
+export async function seedStoresFromFile(): Promise<number> {
+  const { rows: [{ count }] } = await pool.query('SELECT COUNT(*) FROM stores');
+  const existingCount = parseInt(count);
+  
+  if (existingCount >= 200) {
+    console.log(`[Seed] Database already has ${existingCount} stores, skipping seed.`);
+    return 0;
+  }
+
+  console.log(`[Seed] Database has only ${existingCount} stores. Seeding from backup...`);
+  
+  const fs = await import('fs');
+  const path = await import('path');
+  const { fileURLToPath } = await import('url');
+  const currentDir = import.meta.dirname || path.dirname(fileURLToPath(import.meta.url));
+  const seedPath = path.join(currentDir, 'seed_stores.json');
+  
+  if (!fs.existsSync(seedPath)) {
+    console.log('[Seed] No seed file found at', seedPath);
+    return 0;
+  }
+
+  const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+  let imported = 0;
+
+  for (const store of seedData) {
+    try {
+      await pool.query(
+        `INSERT INTO stores (
+          id, name, type, province, address, rating, featured_offerings,
+          is_claimed, google_place_id, phone, website, source_url,
+          hours, reviews, verification_status, confidence_score,
+          evidence_sources, evidence_count, flag_count, admin_reviewed,
+          admin_notes, lat, lng, places_api_match, places_category,
+          last_verified_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          name = COALESCE(EXCLUDED.name, stores.name),
+          type = COALESCE(EXCLUDED.type, stores.type),
+          province = COALESCE(EXCLUDED.province, stores.province),
+          address = COALESCE(EXCLUDED.address, stores.address),
+          rating = COALESCE(EXCLUDED.rating, stores.rating),
+          featured_offerings = COALESCE(EXCLUDED.featured_offerings, stores.featured_offerings),
+          is_claimed = COALESCE(EXCLUDED.is_claimed, stores.is_claimed),
+          google_place_id = COALESCE(EXCLUDED.google_place_id, stores.google_place_id),
+          phone = COALESCE(EXCLUDED.phone, stores.phone),
+          website = COALESCE(EXCLUDED.website, stores.website),
+          source_url = COALESCE(EXCLUDED.source_url, stores.source_url),
+          hours = COALESCE(EXCLUDED.hours, stores.hours),
+          reviews = COALESCE(EXCLUDED.reviews, stores.reviews),
+          verification_status = COALESCE(EXCLUDED.verification_status, stores.verification_status),
+          confidence_score = COALESCE(EXCLUDED.confidence_score, stores.confidence_score),
+          evidence_sources = COALESCE(EXCLUDED.evidence_sources, stores.evidence_sources),
+          evidence_count = COALESCE(EXCLUDED.evidence_count, stores.evidence_count),
+          flag_count = COALESCE(EXCLUDED.flag_count, stores.flag_count),
+          admin_reviewed = COALESCE(EXCLUDED.admin_reviewed, stores.admin_reviewed),
+          admin_notes = COALESCE(EXCLUDED.admin_notes, stores.admin_notes),
+          lat = COALESCE(EXCLUDED.lat, stores.lat),
+          lng = COALESCE(EXCLUDED.lng, stores.lng),
+          places_api_match = COALESCE(EXCLUDED.places_api_match, stores.places_api_match),
+          places_category = COALESCE(EXCLUDED.places_category, stores.places_category),
+          last_verified_at = COALESCE(EXCLUDED.last_verified_at, stores.last_verified_at)`,
+        [
+          store.id, store.name, store.type, store.province, store.address,
+          store.rating, store.featured_offerings, store.is_claimed,
+          store.google_place_id, store.phone, store.website, store.source_url,
+          store.hours ? JSON.stringify(store.hours) : '[]',
+          store.reviews ? JSON.stringify(store.reviews) : '[]',
+          store.verification_status, store.confidence_score,
+          store.evidence_sources ? JSON.stringify(store.evidence_sources) : '[]',
+          store.evidence_count, store.flag_count, store.admin_reviewed,
+          store.admin_notes, store.lat, store.lng, store.places_api_match,
+          store.places_category, store.last_verified_at
+        ]
+      );
+      imported++;
+    } catch (err: any) {
+      console.error(`[Seed] Error importing store ${store.id}:`, err.message);
+    }
+  }
+
+  console.log(`[Seed] Successfully imported ${imported} stores.`);
+  return imported;
+}
+
 export { pool };
