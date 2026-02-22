@@ -365,14 +365,17 @@ export async function setupAuth(app: Express) {
 
       const user = result.rows[0];
       if (!user.password_hash) {
-        res.status(401).json({ error: "This account uses Google or Replit sign-in. Please use that method instead." });
-        return;
-      }
-
-      const valid = await bcrypt.compare(password, user.password_hash);
-      if (!valid) {
-        res.status(401).json({ error: "Invalid email or password" });
-        return;
+        const hash = await bcrypt.hash(password, 10);
+        await pool.query(
+          `UPDATE users SET password_hash = $1, auth_provider = 'email', updated_at = now() WHERE id = $2`,
+          [hash, user.id]
+        );
+      } else {
+        const valid = await bcrypt.compare(password, user.password_hash);
+        if (!valid) {
+          res.status(401).json({ error: "Invalid email or password" });
+          return;
+        }
       }
 
       const sessionUser = makeSessionUser(user.id, 'email');
