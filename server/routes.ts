@@ -25,6 +25,9 @@ import {
   reviewClaim,
   getClaimedStoresForOwner,
   getUserRole,
+  setUserRole,
+  getAllUsers,
+  deleteUser,
 } from './userDb.ts';
 
 const router = Router();
@@ -473,6 +476,55 @@ router.patch('/admin/claims/:id/review', isAuthenticated as RequestHandler, requ
   } catch (error) {
     console.error('Error reviewing claim:', error);
     res.status(500).json({ error: 'Failed to review claim' });
+  }
+});
+
+router.get('/admin/users', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.patch('/admin/users/:id/role', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const targetId = paramId(req.params);
+    const currentUserId = getUserId(req);
+    if (targetId === currentUserId) {
+      res.status(400).json({ error: 'You cannot change your own role' });
+      return;
+    }
+    const { role } = req.body;
+    if (!role || !['user', 'owner', 'admin'].includes(role)) {
+      res.status(400).json({ error: 'Valid role required: user, owner, or admin' });
+      return;
+    }
+    await setUserRole(targetId, role);
+    const users = await getAllUsers();
+    const updatedUser = users.find(u => u.id === targetId);
+    res.json(updatedUser || { id: targetId, role });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+router.delete('/admin/users/:id', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const targetId = paramId(req.params);
+    const currentUserId = getUserId(req);
+    if (targetId === currentUserId) {
+      res.status(400).json({ error: 'You cannot delete your own account' });
+      return;
+    }
+    await deleteUser(targetId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

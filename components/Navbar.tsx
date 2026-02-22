@@ -34,6 +34,9 @@ const UserMenu: React.FC<{ user: AuthUser; onClose: () => void }> = ({ user, onC
             <Link to="/admin/review" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               Admin Review
             </Link>
+            <Link to="/admin/users" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+              User Management
+            </Link>
             <Link to="/admin/sync" onClick={onClose} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               Database Engine
             </Link>
@@ -187,6 +190,13 @@ export const Navbar: React.FC = () => {
                     className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
                   >
                     Admin Review
+                  </Link>
+                  <Link 
+                    to="/admin/users" 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
+                  >
+                    User Management
                   </Link>
                   <Link 
                     to="/admin/sync" 

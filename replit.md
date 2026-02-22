@@ -53,6 +53,7 @@ The app uses a split frontend/backend architecture:
 │   ├── OwnerPortal.tsx         # Store claiming + owned store management
 │   ├── AdminSync.tsx           # Admin-only discovery engine
 │   ├── AdminReviewQueue.tsx    # Admin-only review queue + claim reviews
+│   ├── AdminUsers.tsx          # Admin-only user management panel
 │   ├── CommunitySubmit.tsx     # Login-gated store submissions
 │   ├── PersonalScout.tsx
 │   ├── VibeScout.tsx
@@ -137,6 +138,9 @@ Multi-layered verification pipeline:
 - `PATCH /api/admin/stores/:id/review` - Approve/reject/close store
 - `GET /api/admin/claims` - All pending claims
 - `PATCH /api/admin/claims/:id/review` - Approve/reject claim
+- `GET /api/admin/users` - List all users with stats
+- `PATCH /api/admin/users/:id/role` - Change user role
+- `DELETE /api/admin/users/:id` - Delete user account
 
 ## Routes
 - `/` - Home page with search, filters, and directory
@@ -145,8 +149,16 @@ Multi-layered verification pipeline:
 - `/owners` - Owner portal with claim workflow
 - `/admin/sync` - Admin discovery engine (admin only)
 - `/admin/review` - Admin review queue (admin only)
+- `/admin/users` - Admin user management (admin only)
 
 ## Recent Changes
+- 2026-02-22: Added Admin User Management panel
+  - View all registered users with role badges, join date, favorites/claims counts
+  - Change user roles (user/owner/admin) via dropdown
+  - Delete users with confirmation dialog (cascading cleanup of favorites, claims, sessions)
+  - Search users by name/email, filter by role
+  - Self-modification prevention (admin cannot change own role or delete own account)
+  - Accessible from admin user menu and mobile nav
 - 2026-02-19: Implemented full authentication system
   - Added Replit Auth integration adapted for raw PostgreSQL (no Drizzle ORM)
   - Built user role hierarchy: guest → user → owner → admin

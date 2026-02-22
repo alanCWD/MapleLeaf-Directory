@@ -167,3 +167,31 @@ export async function reviewClaimAPI(claimId: number, action: 'approve' | 'rejec
     body: JSON.stringify({ action, notes }),
   });
 }
+
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+  favoritesCount: number;
+  claimsCount: number;
+}
+
+export async function getAdminUsersAPI(): Promise<AdminUser[]> {
+  return apiFetch<AdminUser[]>('/admin/users');
+}
+
+export async function updateUserRoleAPI(userId: string, role: string): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function deleteUserAPI(userId: string): Promise<void> {
+  await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+}

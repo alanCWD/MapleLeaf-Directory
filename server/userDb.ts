@@ -145,6 +145,64 @@ export async function setUserRole(userId: string, role: string): Promise<void> {
   await pool.query('UPDATE users SET role = $1, updated_at = now() WHERE id = $2', [role, userId]);
 }
 
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+  favoritesCount: number;
+  claimsCount: number;
+}
+
+export async function getAllUsers(): Promise<AdminUser[]> {
+  const result = await pool.query(
+    `SELECT u.*,
+       COALESCE(fav.cnt, 0) as favorites_count,
+       COALESCE(cl.cnt, 0) as claims_count
+     FROM users u
+     LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM user_favorites GROUP BY user_id) fav ON fav.user_id = u.id
+     LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM store_claims GROUP BY user_id) cl ON cl.user_id = u.id
+     ORDER BY u.created_at DESC`
+  );
+  return result.rows.map(formatUser);
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM user_favorites WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM store_claims WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+function formatUser(row: any): AdminUser {
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    profileImageUrl: row.profile_image_url,
+    role: row.role,
+    createdAt: row.created_at?.toISOString() || new Date().toISOString(),
+    updatedAt: row.updated_at?.toISOString() || new Date().toISOString(),
+    favoritesCount: parseInt(row.favorites_count) || 0,
+    claimsCount: parseInt(row.claims_count) || 0,
+  };
+}
+
 function formatClaim(row: any): StoreClaim {
   return {
     id: row.id,
