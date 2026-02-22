@@ -1,7 +1,7 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 
 import passport from "passport";
 import session from "express-session";
@@ -112,52 +112,10 @@ export async function setupAuth(app: Express) {
     }
   };
 
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    const domains = (process.env.REPLIT_DOMAINS || '').split(',').filter(Boolean);
-    const devDomain = process.env.REPLIT_DEV_DOMAIN || '';
-    const primaryDomain = domains[0] || devDomain || 'localhost';
-    const googleCallbackURL = `https://${primaryDomain}/api/auth/google/callback`;
-    console.log(`[Auth] Google OAuth callback URL: ${googleCallbackURL}`);
-    passport.use(new GoogleStrategy({
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: googleCallbackURL,
-      userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo',
-    }, async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
-      try {
-        const email = normalizeEmail(profile.emails?.[0]?.value || '');
-        if (!email) { done(new Error('No email from Google')); return; }
-        const firstName = profile.name?.givenName || profile.displayName?.split(' ')[0] || '';
-        const lastName = profile.name?.familyName || '';
-        const profileImageUrl = profile.photos?.[0]?.value || null;
-
-        const existingByEmail = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
-        let userId: string;
-
-        if (existingByEmail.rows.length > 0) {
-          userId = existingByEmail.rows[0].id;
-          await pool.query(
-            `UPDATE users SET first_name = COALESCE(NULLIF($1, ''), first_name), last_name = COALESCE(NULLIF($2, ''), last_name),
-             profile_image_url = COALESCE($3, profile_image_url), auth_provider = COALESCE(auth_provider, 'google'), updated_at = now() WHERE id = $4`,
-            [firstName, lastName, profileImageUrl, userId]
-          );
-        } else {
-          const result = await pool.query(
-            `INSERT INTO users (email, first_name, last_name, profile_image_url, auth_provider)
-             VALUES ($1, $2, $3, $4, 'google') RETURNING id`,
-            [email, firstName, lastName, profileImageUrl]
-          );
-          userId = result.rows[0].id;
-        }
-
-        done(null, makeSessionUser(userId, 'google'));
-      } catch (err) {
-        done(err);
-      }
-    }));
-    console.log('[Auth] Google OAuth strategy configured');
+  if (process.env.GOOGLE_CLIENT_ID) {
+    console.log('[Auth] Google Identity Services configured (client-side flow)');
   } else {
-    console.log('[Auth] Google OAuth not configured (missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)');
+    console.log('[Auth] Google sign-in not configured (missing GOOGLE_CLIENT_ID)');
   }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
@@ -196,37 +154,68 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    app.get("/api/auth/google", (req, res, next) => {
-      console.log('[Auth] Starting Google OAuth flow...');
-      passport.authenticate("google", {
-        scope: ["openid", "profile", "email"],
-        accessType: "offline",
-        prompt: "consent",
-      })(req, res, next);
-    });
+  app.get("/api/auth/google/client-id", (_req, res) => {
+    res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
+  });
 
-    app.get("/api/auth/google/callback", (req, res, next) => {
-      console.log('[Auth] Google OAuth callback received');
-      if (req.query.error) {
-        console.error('[Auth] Google OAuth error:', req.query.error, req.query.error_description);
-        res.redirect("/#/auth");
+  app.post("/api/auth/google/token", async (req, res) => {
+    try {
+      const { credential } = req.body;
+      if (!credential || !process.env.GOOGLE_CLIENT_ID) {
+        res.status(400).json({ error: 'Missing credential or Google not configured' });
         return;
       }
-      passport.authenticate("google", {
-        failureRedirect: "/#/auth",
-        failureMessage: true,
-      })(req, res, (err: any) => {
+
+      const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        res.status(400).json({ error: 'Invalid Google token' });
+        return;
+      }
+
+      const email = normalizeEmail(payload.email);
+      const firstName = payload.given_name || '';
+      const lastName = payload.family_name || '';
+      const profileImageUrl = payload.picture || null;
+
+      const existingByEmail = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [email]);
+      let userId: string;
+
+      if (existingByEmail.rows.length > 0) {
+        userId = existingByEmail.rows[0].id;
+        await pool.query(
+          `UPDATE users SET first_name = COALESCE(NULLIF($1, ''), first_name), last_name = COALESCE(NULLIF($2, ''), last_name),
+           profile_image_url = COALESCE($3, profile_image_url), auth_provider = COALESCE(auth_provider, 'google'), updated_at = now() WHERE id = $4`,
+          [firstName, lastName, profileImageUrl, userId]
+        );
+      } else {
+        const result = await pool.query(
+          `INSERT INTO users (email, first_name, last_name, profile_image_url, auth_provider)
+           VALUES ($1, $2, $3, $4, 'google') RETURNING id`,
+          [email, firstName, lastName, profileImageUrl]
+        );
+        userId = result.rows[0].id;
+      }
+
+      const sessionUser = makeSessionUser(userId, 'google');
+      req.login(sessionUser, (err) => {
         if (err) {
-          console.error('[Auth] Google OAuth authentication error:', err);
-          res.redirect("/#/auth");
+          console.error('[Auth] Google session creation error:', err);
+          res.status(500).json({ error: 'Failed to create session' });
           return;
         }
-        console.log('[Auth] Google OAuth login successful');
-        res.redirect("/");
+        console.log('[Auth] Google Identity Services login successful for:', email);
+        res.json({ success: true, user: sessionUser });
       });
-    });
-  }
+    } catch (err: any) {
+      console.error('[Auth] Google token verification error:', err.message);
+      res.status(401).json({ error: 'Invalid Google credential' });
+    }
+  });
 
   app.post("/api/auth/register", async (req, res) => {
     try {
