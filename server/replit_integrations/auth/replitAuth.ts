@@ -122,6 +122,7 @@ export async function setupAuth(app: Express) {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: googleCallbackURL,
+      userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo',
     }, async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
       try {
         const email = normalizeEmail(profile.emails?.[0]?.value || '');
