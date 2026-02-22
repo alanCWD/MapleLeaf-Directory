@@ -51,7 +51,7 @@ export const AuthPage: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200">
-            <span className="text-white font-black text-3xl">M</span>
+            <span className="text-white font-black text-3xl">L</span>
           </div>
           <h1 className="text-3xl font-black text-stone-900 tracking-tight">
             {mode === 'login' ? 'Welcome Back' : 'Create Account'}
