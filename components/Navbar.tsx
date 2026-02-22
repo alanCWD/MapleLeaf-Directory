@@ -15,7 +15,7 @@ const UserMenu: React.FC<{ user: AuthUser; onClose: () => void }> = ({ user, onC
   }, [onClose]);
 
   return (
-    <div ref={menuRef} className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-50 animate-fade-in">
+    <div ref={menuRef} className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in">
       <div className="p-4 border-b border-stone-100 bg-stone-50">
         <p className="font-bold text-stone-900 text-sm truncate">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}</p>
         {user.email && <p className="text-xs text-stone-500 truncate">{user.email}</p>}
@@ -59,7 +59,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav className="sticky top-4 z-50 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div className="glass mt-2 rounded-3xl border border-white/40 shadow-xl shadow-emerald-900/5 px-8">
+      <div className="glass mt-2 rounded-3xl border border-white/40 shadow-xl shadow-emerald-900/5 px-8 overflow-visible">
         <div className="flex justify-between h-16 items-center gap-x-12">
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
             <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300 shadow-lg shadow-emerald-200">
