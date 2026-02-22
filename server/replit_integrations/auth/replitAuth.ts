@@ -196,16 +196,35 @@ export async function setupAuth(app: Express) {
   });
 
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    app.get("/api/auth/google", passport.authenticate("google", {
-      scope: ["profile", "email"],
-    }));
+    app.get("/api/auth/google", (req, res, next) => {
+      console.log('[Auth] Starting Google OAuth flow...');
+      passport.authenticate("google", {
+        scope: ["profile", "email"],
+        accessType: "offline",
+        prompt: "consent",
+      })(req, res, next);
+    });
 
-    app.get("/api/auth/google/callback",
-      passport.authenticate("google", { failureRedirect: "/#/auth" }),
-      (_req, res) => {
-        res.redirect("/");
+    app.get("/api/auth/google/callback", (req, res, next) => {
+      console.log('[Auth] Google OAuth callback received');
+      if (req.query.error) {
+        console.error('[Auth] Google OAuth error:', req.query.error, req.query.error_description);
+        res.redirect("/#/auth");
+        return;
       }
-    );
+      passport.authenticate("google", {
+        failureRedirect: "/#/auth",
+        failureMessage: true,
+      })(req, res, (err: any) => {
+        if (err) {
+          console.error('[Auth] Google OAuth authentication error:', err);
+          res.redirect("/#/auth");
+          return;
+        }
+        console.log('[Auth] Google OAuth login successful');
+        res.redirect("/");
+      });
+    });
   }
 
   app.post("/api/auth/register", async (req, res) => {
