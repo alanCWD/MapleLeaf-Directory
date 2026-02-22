@@ -197,10 +197,24 @@ export async function setupAuth(app: Express) {
   });
 
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    app.get("/api/auth/google/debug", (_req, res) => {
+      const clientId = process.env.GOOGLE_CLIENT_ID || '';
+      const maskedId = clientId.substring(0, 8) + '...' + clientId.substring(clientId.length - 20);
+      res.json({
+        clientIdFormat: maskedId,
+        clientIdLength: clientId.length,
+        endsWithGoogleusercontent: clientId.endsWith('.apps.googleusercontent.com'),
+        callbackURL: googleCallbackURL,
+        hasSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+        secretLength: (process.env.GOOGLE_CLIENT_SECRET || '').length,
+      });
+    });
+
     app.get("/api/auth/google", (req, res, next) => {
-      console.log('[Auth] Starting Google OAuth flow...');
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(process.env.GOOGLE_CLIENT_ID!)}&redirect_uri=${encodeURIComponent(googleCallbackURL)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&access_type=offline&prompt=consent`;
+      console.log('[Auth] Google OAuth redirect URL:', authUrl);
       passport.authenticate("google", {
-        scope: ["profile", "email"],
+        scope: ["openid", "profile", "email"],
         accessType: "offline",
         prompt: "consent",
       })(req, res, next);
