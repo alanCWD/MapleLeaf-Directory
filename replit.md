@@ -155,6 +155,12 @@ Multi-layered verification pipeline:
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-02-23: Added JSON-LD structured data to index.html for AI citation optimization
+  - Organization schema with knowsAbout property listing 14 core cannabis directory topics
+  - WebSite schema with SearchAction for AI-discoverable search functionality
+  - WebApplication schema marking the site as a free business application
+  - All schemas use @graph format with cross-references via @id
+  - URLs set to legacyleaf.ca (update when custom domain is finalized)
 - 2026-02-22: Added multi-provider authentication (Email/Password + Google OAuth)
   - Email/Password registration and login with bcrypt password hashing
   - Google OAuth sign-in via Passport.js Google strategy
