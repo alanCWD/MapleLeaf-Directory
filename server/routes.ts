@@ -9,6 +9,7 @@ import {
   getFlags,
   getReviewQueue,
   adminReview,
+  searchStoresInDb,
 } from './db.ts';
 import { verifyStore } from './verification.ts';
 import { serverSearchStores } from './search.ts';
@@ -64,10 +65,33 @@ router.post('/search', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Search query is required' });
       return;
     }
-    console.log(`[API] Search request: "${query}"`);
-    const result = await serverSearchStores(query.trim(), userLocation);
-    console.log(`[API] Search returned ${result.stores.length} stores`);
-    res.json(result);
+    const trimmedQuery = query.trim();
+    console.log(`[API] Search request: "${trimmedQuery}"`);
+
+    const DB_RESULT_THRESHOLD = 3;
+
+    const dbStores = await searchStoresInDb(trimmedQuery);
+    console.log(`[API] Database search returned ${dbStores.length} stores`);
+
+    if (dbStores.length >= DB_RESULT_THRESHOLD) {
+      console.log(`[API] Sufficient results from database (${dbStores.length} >= ${DB_RESULT_THRESHOLD}), skipping AI search`);
+      res.json({ stores: dbStores, source: 'database' });
+      return;
+    }
+
+    console.log(`[API] Only ${dbStores.length} database results, supplementing with AI search...`);
+    const aiResult = await serverSearchStores(trimmedQuery, userLocation);
+    console.log(`[API] AI search returned ${aiResult.stores.length} stores`);
+
+    const dbIds = new Set(dbStores.map(s => s.id));
+    const dbNames = new Set(dbStores.map(s => s.name.toLowerCase()));
+    const newAiStores = aiResult.stores.filter((s: any) =>
+      !dbIds.has(s.id) && !dbNames.has((s.name || '').toLowerCase())
+    );
+
+    const combined = [...dbStores, ...newAiStores];
+    console.log(`[API] Combined results: ${dbStores.length} from DB + ${newAiStores.length} new from AI = ${combined.length} total`);
+    res.json({ stores: combined, source: 'combined' });
   } catch (error: any) {
     console.error('[API] Search error:', error?.message || error);
     res.status(500).json({ error: 'Search failed', details: error?.message });

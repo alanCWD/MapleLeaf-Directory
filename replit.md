@@ -155,6 +155,14 @@ Multi-layered verification pipeline:
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-02-25: Implemented database-first search to reduce Gemini API usage
+  - Search queries now check PostgreSQL first before calling Gemini AI
+  - If database returns 3+ matching results, AI call is skipped entirely
+  - If fewer than 3 database results, AI supplements and results are merged (deduped by name)
+  - Database search matches on name, address, province, and featured offerings
+  - Supports province abbreviations (BC, ON, etc.) and type keywords (sovereign, indigenous, independent)
+  - Manually input store data is included in database search results
+  - Response includes `source` field: "database" or "combined" for transparency
 - 2026-02-23: Added JSON-LD structured data to index.html for AI citation optimization
   - Organization schema with knowsAbout property listing 14 core cannabis directory topics
   - WebSite schema with SearchAction for AI-discoverable search functionality

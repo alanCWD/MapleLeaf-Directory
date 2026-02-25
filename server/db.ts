@@ -379,4 +379,86 @@ export async function seedStoresFromFile(): Promise<number> {
   return imported;
 }
 
+export async function searchStoresInDb(query: string): Promise<Store[]> {
+  const searchTerms = query.trim().toLowerCase();
+  
+  const provinceMap: Record<string, string> = {
+    'bc': 'British Columbia', 'british columbia': 'British Columbia',
+    'ab': 'Alberta', 'alberta': 'Alberta',
+    'sk': 'Saskatchewan', 'saskatchewan': 'Saskatchewan',
+    'mb': 'Manitoba', 'manitoba': 'Manitoba',
+    'on': 'Ontario', 'ontario': 'Ontario',
+    'qc': 'Quebec', 'quebec': 'Quebec', 'québec': 'Quebec',
+    'nb': 'New Brunswick', 'new brunswick': 'New Brunswick',
+    'ns': 'Nova Scotia', 'nova scotia': 'Nova Scotia',
+    'pe': 'Prince Edward Island', 'prince edward island': 'Prince Edward Island', 'pei': 'Prince Edward Island',
+    'nl': 'Newfoundland and Labrador', 'newfoundland': 'Newfoundland and Labrador', 'newfoundland and labrador': 'Newfoundland and Labrador',
+    'nt': 'Northwest Territories', 'northwest territories': 'Northwest Territories', 'nwt': 'Northwest Territories',
+    'nu': 'Nunavut', 'nunavut': 'Nunavut',
+    'yt': 'Yukon', 'yukon': 'Yukon',
+  };
+
+  let matchedProvince: string | null = null;
+  for (const [key, value] of Object.entries(provinceMap)) {
+    if (searchTerms.includes(key)) {
+      matchedProvince = value;
+      break;
+    }
+  }
+
+  const typeKeywords: Record<string, string> = {
+    'sovereign': 'Sovereign',
+    'indigenous': 'Sovereign',
+    'first nations': 'Sovereign',
+    'trading post': 'Sovereign',
+    'local gem': 'Local Gem',
+    'independent': 'Local Gem',
+  };
+
+  let matchedType: string | null = null;
+  for (const [key, value] of Object.entries(typeKeywords)) {
+    if (searchTerms.includes(key)) {
+      matchedType = value;
+      break;
+    }
+  }
+
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  conditions.push(`verification_status != 'rejected'`);
+
+  if (matchedProvince) {
+    conditions.push(`province = $${idx++}`);
+    params.push(matchedProvince);
+  }
+
+  if (matchedType) {
+    conditions.push(`type = $${idx++}`);
+    params.push(matchedType);
+  }
+
+  const likeParam = `%${searchTerms}%`;
+  conditions.push(`(
+    LOWER(name) LIKE $${idx} OR 
+    LOWER(address) LIKE $${idx} OR 
+    LOWER(province) LIKE $${idx} OR
+    LOWER(COALESCE(array_to_string(featured_offerings, ' '), '')) LIKE $${idx}
+    ${matchedProvince ? ` OR province = $${idx - (matchedType ? 2 : 1)}` : ''}
+  )`);
+  params.push(likeParam);
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const sql = `SELECT * FROM stores ${where} ORDER BY 
+    CASE WHEN verification_status = 'verified' THEN 0 
+         WHEN verification_status = 'ai_suggested' THEN 1 
+         ELSE 2 END,
+    confidence_score DESC, name ASC
+    LIMIT 50`;
+
+  const result = await pool.query(sql, params);
+  return result.rows.map(snakeToCamel);
+}
+
 export { pool };
