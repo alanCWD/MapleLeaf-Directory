@@ -69,6 +69,14 @@ export interface Store {
   placesCategory?: string;
 
   lastVerifiedAt?: string;
+
+  storeInsights?: {
+    atmosphere?: string;
+    community?: string;
+    specialties?: string;
+    sovereignty?: string;
+    proTip?: string;
+  } | null;
 }
 
 export type FlagReason = 'does_not_exist' | 'wrong_location' | 'permanently_closed' | 'duplicate' | 'other';

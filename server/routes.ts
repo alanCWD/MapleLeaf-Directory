@@ -128,6 +128,55 @@ router.get('/stores/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.patch('/stores/:id/insights', async (req: Request, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const { storeInsights, hours } = req.body;
+
+    if (!storeInsights || typeof storeInsights !== 'object') {
+      res.status(400).json({ error: 'Valid storeInsights object required' });
+      return;
+    }
+
+    const allowedKeys = ['atmosphere', 'community', 'specialties', 'sovereignty', 'proTip'];
+    const sanitized: Record<string, string> = {};
+    for (const key of allowedKeys) {
+      if (typeof storeInsights[key] === 'string' && storeInsights[key].length <= 2000) {
+        sanitized[key] = storeInsights[key];
+      }
+    }
+
+    if (Object.keys(sanitized).length === 0) {
+      res.status(400).json({ error: 'At least one valid insight field required' });
+      return;
+    }
+
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+
+    if (existing.storeInsights && Object.values(existing.storeInsights).some(v => v != null && v !== '')) {
+      console.log(`[API] Insights already cached for store: ${existing.name}, skipping overwrite`);
+      res.json(existing);
+      return;
+    }
+
+    const updates: any = { storeInsights: sanitized };
+    if (Array.isArray(hours)) {
+      updates.hours = hours;
+    }
+
+    const store = await updateStore(storeId, updates);
+    console.log(`[API] Cached insights for store: ${store!.name}`);
+    res.json(store);
+  } catch (error) {
+    console.error('Error saving store insights:', error);
+    res.status(500).json({ error: 'Failed to save insights' });
+  }
+});
+
 router.post('/stores', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const { name, address } = req.body;

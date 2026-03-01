@@ -39,6 +39,7 @@ function snakeToCamel(row: Record<string, any>): Store {
     placesApiMatch: row.places_api_match ?? false,
     placesCategory: row.places_category || undefined,
     lastVerifiedAt: row.last_verified_at ? row.last_verified_at.toISOString() : undefined,
+    storeInsights: row.store_insights || null,
   };
 }
 
@@ -196,12 +197,13 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
     placesApiMatch: 'places_api_match',
     placesCategory: 'places_category',
     lastVerifiedAt: 'last_verified_at',
+    storeInsights: 'store_insights',
   };
 
   for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
     if (jsKey in updates) {
       const val = (updates as any)[jsKey];
-      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources') {
+      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources' || dbKey === 'store_insights') {
         setClauses.push(`${dbKey} = $${idx++}`);
         params.push(JSON.stringify(val));
       } else if (dbKey === 'featured_offerings') {

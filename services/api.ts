@@ -55,6 +55,15 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
   });
 }
 
+export async function saveStoreInsights(id: string, storeInsights: any, hours?: any[]): Promise<Store> {
+  const body: any = { storeInsights };
+  if (hours) body.hours = hours;
+  return apiFetch<Store>(`/stores/${id}/insights`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function verifyStore(id: string): Promise<{ store: Store; verification: any }> {
   return apiFetch<{ store: Store; verification: any }>(`/stores/${id}/verify`, {
     method: 'POST',

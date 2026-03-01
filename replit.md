@@ -95,7 +95,7 @@ Multi-layered verification pipeline:
 8. **Admin Review Queue**: Low-confidence and flagged stores require manual approval
 
 ## Database Schema
-- `stores` table: Store data with verification metadata
+- `stores` table: Store data with verification metadata and cached AI insights (store_insights JSONB column)
 - `store_flags` table: User reports about listings
 - `users` table: User accounts from Replit Auth
 - `sessions` table: Session management
@@ -106,7 +106,8 @@ Multi-layered verification pipeline:
 ### Public (no auth required)
 - `GET /api/stores` - List stores (filterable)
 - `GET /api/stores/:id` - Single store
-- `POST /api/search` - AI-powered search
+- `POST /api/search` - AI-powered search (database-first)
+- `PATCH /api/stores/:id/insights` - Cache store insights
 
 ### Auth
 - `GET /api/login` - Initiate Replit Auth login
@@ -155,6 +156,12 @@ Multi-layered verification pipeline:
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-01: Added store insights caching to eliminate repeated AI calls
+  - New `store_insights` JSONB column on stores table caches atmosphere, community, specialties, sovereignty, proTip
+  - First view of a store generates insights via Gemini, then saves to database
+  - Subsequent views load cached insights instantly — zero AI calls
+  - New public `PATCH /api/stores/:id/insights` endpoint (no auth required to cache)
+  - StoreDetail checks for cached insights before calling Gemini
 - 2026-02-25: Implemented database-first search to reduce Gemini API usage
   - Search queries now check PostgreSQL first before calling Gemini AI
   - If database returns 3+ matching results, AI call is skipped entirely

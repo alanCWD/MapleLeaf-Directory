@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Store, Review } from '../types';
 import { getStoreInsights } from '../services/geminiService';
+import { saveStoreInsights } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { EvidencePanel } from './EvidencePanel';
 import { FlagButton } from './FlagButton';
@@ -31,18 +32,25 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
 
+  const hasCachedInsights = (s: Store | null): boolean => {
+    if (!s?.storeInsights) return false;
+    return Object.values(s.storeInsights).some(v => v != null && v !== '');
+  };
+
   useEffect(() => {
     const found = stores.find(s => s.id === id);
     if (found) {
       setStore(found);
-      if (found.hours && !insights) {
+      if (hasCachedInsights(found)) {
+        setInsights({ ...found.storeInsights!, hours: found.hours });
+      } else if (found.hours && !insights) {
         setInsights(prev => prev ? prev : { hours: found.hours });
       }
     }
   }, [id, stores]);
 
   useEffect(() => {
-    if (store && !insights?.atmosphere) {
+    if (store && !hasCachedInsights(store) && !insights?.atmosphere) {
       fetchInsights();
     }
   }, [store]);
@@ -132,11 +140,21 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       const data = await getStoreInsights(store.name);
       setInsights(data);
       
-      if (Array.isArray(data.hours) && JSON.stringify(data.hours) !== JSON.stringify(store.hours)) {
-        onUpdateStore({
-          ...store,
-          hours: data.hours
-        });
+      const insightsToSave: Record<string, any> = {};
+      if (data.atmosphere) insightsToSave.atmosphere = data.atmosphere;
+      if (data.community) insightsToSave.community = data.community;
+      if (data.specialties) insightsToSave.specialties = data.specialties;
+      if (data.sovereignty) insightsToSave.sovereignty = data.sovereignty;
+      if (data.proTip) insightsToSave.proTip = data.proTip;
+
+      const newHours = Array.isArray(data.hours) && JSON.stringify(data.hours) !== JSON.stringify(store.hours)
+        ? data.hours : undefined;
+
+      try {
+        const saved = await saveStoreInsights(store.id, insightsToSave, newHours);
+        onUpdateStore(saved);
+      } catch (saveErr) {
+        console.error("Failed to cache insights", saveErr);
       }
     } catch (err) {
       console.error("Failed to load insights", err);
