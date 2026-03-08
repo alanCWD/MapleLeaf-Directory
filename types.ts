@@ -106,3 +106,32 @@ export interface ServicePackage {
   category: 'Digital' | 'Logistics' | 'Growth';
   icon: string;
 }
+
+export type MediaStatus = 'uploading' | 'processing' | 'encoding' | 'ready' | 'failed';
+export type MediaType = 'video' | 'walkthrough' | 'review';
+
+export interface StoreMedia {
+  id: number;
+  storeId: string;
+  userId: string | null;
+  bunnyVideoId: string;
+  bunnyLibraryId: string;
+  title: string;
+  description: string | null;
+  status: MediaStatus;
+  thumbnailUrl: string | null;
+  embedUrl: string | null;
+  mediaType: MediaType;
+  durationSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UploadCredentials {
+  videoId: string;
+  libraryId: string;
+  expirationTime: number;
+  signature: string;
+  mediaId: number;
+  embedUrl: string;
+}
