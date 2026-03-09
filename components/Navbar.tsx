@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { BadgeIcon } from './BadgeIcon';
 
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -123,6 +124,13 @@ export const Navbar: React.FC = () => {
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700">
               {user.role}
             </span>
+            {user.badges && user.badges.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {user.badges.map((b) => (
+                  <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={false} />
+                ))}
+              </div>
+            )}
           </div>
           <div className="p-2">
             {(user.role === 'owner' || user.role === 'admin') && (
@@ -143,6 +151,9 @@ export const Navbar: React.FC = () => {
                 </a>
               </>
             )}
+            <a href="#/badges" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+              My Badges
+            </a>
             <div className="border-t border-stone-100 mt-1 pt-1">
               <a href="/api/logout" className="block px-3 py-2 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition">
                 Sign Out

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { UserBadge } from '../services/api';
 
 export interface AuthUser {
   id: string;
@@ -9,6 +10,7 @@ export interface AuthUser {
   role: string;
   createdAt: string | null;
   updatedAt: string | null;
+  badges: UserBadge[];
 }
 
 export function useAuth() {

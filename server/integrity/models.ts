@@ -86,6 +86,24 @@ export async function ensureIntegrityTables(): Promise<void> {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_store_media_store ON store_media(store_id)
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_badges (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(500) NOT NULL,
+      badge_type VARCHAR(50) NOT NULL,
+      awarded_at TIMESTAMP DEFAULT NOW(),
+      metadata JSONB,
+      UNIQUE(user_id, badge_type)
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_badges_type ON user_badges(badge_type)
+  `);
 }
 
 export async function createStoreMedia(data: {
@@ -217,5 +235,98 @@ export async function flagReview(reviewId: number, flagged: boolean = true): Pro
     [reviewId, flagged]
   );
   if (result.rows.length === 0) return null;
-  return reviewSnakeToCamel(result.rows[0]);
+  const review = reviewSnakeToCamel(result.rows[0]);
+
+  import('./badges').then(({ evaluateUserBadges }) => {
+    evaluateUserBadges(review.userId).catch((err: any) =>
+      console.error('[Badges] Error evaluating badges after flag:', err)
+    );
+  });
+
+  return review;
+}
+
+export interface UserBadge {
+  id: number;
+  userId: string;
+  badgeType: string;
+  awardedAt: string;
+  metadata: Record<string, any> | null;
+}
+
+function badgeSnakeToCamel(row: Record<string, any>): UserBadge {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    badgeType: row.badge_type,
+    awardedAt: row.awarded_at ? row.awarded_at.toISOString() : new Date().toISOString(),
+    metadata: row.metadata || null,
+  };
+}
+
+export async function awardBadge(
+  userId: string,
+  badgeType: string,
+  metadata?: Record<string, any>
+): Promise<UserBadge> {
+  const result = await pool.query(
+    `INSERT INTO user_badges (user_id, badge_type, metadata)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, badge_type) DO UPDATE SET metadata = $3, awarded_at = NOW()
+     RETURNING *`,
+    [userId, badgeType, metadata ? JSON.stringify(metadata) : null]
+  );
+  return badgeSnakeToCamel(result.rows[0]);
+}
+
+export async function revokeBadge(userId: string, badgeType: string): Promise<boolean> {
+  const result = await pool.query(
+    `DELETE FROM user_badges WHERE user_id = $1 AND badge_type = $2`,
+    [userId, badgeType]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function getUserBadges(userId: string): Promise<UserBadge[]> {
+  const result = await pool.query(
+    `SELECT * FROM user_badges WHERE user_id = $1 ORDER BY awarded_at DESC`,
+    [userId]
+  );
+  return result.rows.map(badgeSnakeToCamel);
+}
+
+export async function getUsersWithBadge(badgeType: string): Promise<UserBadge[]> {
+  const result = await pool.query(
+    `SELECT * FROM user_badges WHERE badge_type = $1 ORDER BY awarded_at DESC`,
+    [badgeType]
+  );
+  return result.rows.map(badgeSnakeToCamel);
+}
+
+export async function getReviewsWithBadges(storeId: string): Promise<(WeightedReview & { reviewerBadges: UserBadge[] })[]> {
+  const reviews = await pool.query(
+    `SELECT * FROM integrity_reviews WHERE store_id = $1 ORDER BY created_at DESC`,
+    [storeId]
+  );
+
+  const userIds = [...new Set(reviews.rows.map((r: any) => r.user_id))];
+
+  let badgesByUser: Record<string, UserBadge[]> = {};
+  if (userIds.length > 0) {
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+    const badgeResult = await pool.query(
+      `SELECT * FROM user_badges WHERE user_id IN (${placeholders}) ORDER BY awarded_at DESC`,
+      userIds
+    );
+    for (const row of badgeResult.rows) {
+      const badge = badgeSnakeToCamel(row);
+      if (!badgesByUser[badge.userId]) badgesByUser[badge.userId] = [];
+      badgesByUser[badge.userId].push(badge);
+    }
+  }
+
+  return reviews.rows.map((row: any) => ({
+    ...reviewSnakeToCamel(row),
+    reviewerBadges: badgesByUser[row.user_id] || [],
+  }));
 }

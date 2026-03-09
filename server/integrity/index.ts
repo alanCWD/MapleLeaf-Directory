@@ -11,11 +11,22 @@ export {
   getReviewsByStore,
   getReviewsByUser,
   flagReview,
+  awardBadge,
+  revokeBadge,
+  getUserBadges,
+  getUsersWithBadge,
+  getReviewsWithBadges,
 } from './models';
+
+export type { UserBadge } from './models';
+
+export { evaluateUserBadges, checkVerifiedScout, checkLegacyArchivist, checkIntegrityAnchor } from './badges';
 
 export { initUpload, handleWebhook, removeMedia, getStoreMediaList, getSingleMedia, isBunnyConfigured } from './media';
 
 export type {
+  BadgeType,
+  UserBadge as UserBadgeType,
   TrustWeight,
   IntegrityScoreCard,
   ReviewSubmission,
@@ -31,7 +42,7 @@ export async function initIntegrityEngine(): Promise<void> {
   const { ensureIntegrityTables } = await import('./models');
   console.log('[IntegrityEngine] Initializing...');
   await ensureIntegrityTables();
-  console.log('[IntegrityEngine] Tables ensured (store_media, integrity_reviews)');
+  console.log('[IntegrityEngine] Tables ensured (store_media, integrity_reviews, user_badges)');
 
   const { isBunnyConfigured } = await import('../bunnyStream');
   if (isBunnyConfigured()) {

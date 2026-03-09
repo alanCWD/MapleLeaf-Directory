@@ -15,6 +15,7 @@ import { AdminReviewQueue } from './components/AdminReviewQueue';
 import { AdminUsers } from './components/AdminUsers';
 import { CommunitySubmit } from './components/CommunitySubmit';
 import { AuthPage } from './components/AuthPage';
+import { BadgeProgress } from './components/BadgeProgress';
 import { VerificationFilter } from './components/VerificationFilter';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
@@ -316,6 +317,7 @@ const App: React.FC = () => {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/submit" element={<CommunitySubmit />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/badges" element={<BadgeProgress />} />
           </Routes>
         </main>
         <footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">

@@ -41,6 +41,9 @@ import {
   calculateTrustWeight,
   calculateIntegrityScore,
   getMediaById,
+  evaluateUserBadges,
+  getUserBadges,
+  getReviewsWithBadges,
 } from './integrity/index.ts';
 import type { RecorderQuestion } from './integrity/types.ts';
 
@@ -568,7 +571,13 @@ router.patch('/admin/claims/:id/review', isAuthenticated as RequestHandler, requ
 router.get('/admin/users', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
   try {
     const users = await getAllUsers();
-    res.json(users);
+    const usersWithBadges = await Promise.all(
+      users.map(async (u: any) => {
+        const badges = await getUserBadges(u.id);
+        return { ...u, badges };
+      })
+    );
+    res.json(usersWithBadges);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -735,9 +744,12 @@ router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req
       }
     }
 
+    const userBadges = await getUserBadges(userId);
+    const isScout = userBadges.some(b => b.badgeType === 'verified_scout');
+
     const trustWeight = calculateTrustWeight({
       hasVerifiedVideo,
-      isScout: false,
+      isScout,
       geoDeviationDetected: false,
     });
 
@@ -752,6 +764,10 @@ router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req
       disclosures: disclosures || undefined,
     });
 
+    evaluateUserBadges(userId).catch((err: any) =>
+      console.error('[Badges] Error evaluating badges after review:', err)
+    );
+
     res.status(201).json(review);
   } catch (error) {
     console.error('Error submitting review:', error);
@@ -761,11 +777,79 @@ router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req
 
 router.get('/stores/:id/reviews', async (req: Request, res: Response) => {
   try {
-    const reviews = await getReviewsByStore(paramId(req.params));
+    const reviews = await getReviewsWithBadges(paramId(req.params));
     res.json(reviews);
   } catch (error) {
     console.error('Error fetching reviews:', error);
     res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+
+router.get('/users/:userId/badges', async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId;
+    const badges = await getUserBadges(userId as string);
+    res.json(badges);
+  } catch (error) {
+    console.error('Error fetching user badges:', error);
+    res.status(500).json({ error: 'Failed to fetch user badges' });
+  }
+});
+
+router.get('/user/badge-progress', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const { pool } = await import('./db');
+
+    const videoReviewResult = await pool.query(
+      `SELECT COUNT(*) as cnt, COUNT(DISTINCT store_id) as store_cnt
+       FROM integrity_reviews WHERE user_id = $1 AND has_verified_video = true`,
+      [userId]
+    );
+    const videoReviewCount = parseInt(videoReviewResult.rows[0].cnt);
+    const distinctVideoStores = parseInt(videoReviewResult.rows[0].store_cnt);
+
+    const reviewResult = await pool.query(
+      `SELECT COUNT(*) as cnt,
+              AVG((trust_weight->>'final')::numeric) as avg_trust,
+              SUM(CASE WHEN is_flagged THEN 1 ELSE 0 END) as flagged_cnt
+       FROM integrity_reviews WHERE user_id = $1`,
+      [userId]
+    );
+    const totalReviewCount = parseInt(reviewResult.rows[0].cnt);
+    const avgTrustWeight = reviewResult.rows[0].avg_trust ? parseFloat(reviewResult.rows[0].avg_trust) : 0;
+    const flaggedCount = parseInt(reviewResult.rows[0].flagged_cnt);
+
+    const mediaResult = await pool.query(
+      `SELECT COUNT(*) as cnt FROM store_media WHERE user_id = $1`,
+      [userId]
+    );
+    const mediaUploadCount = parseInt(mediaResult.rows[0].cnt);
+
+    let communitySubmissionCount = 0;
+    try {
+      const subResult = await pool.query(
+        `SELECT COUNT(*) as cnt FROM store_claims WHERE user_id = $1 AND status = 'approved'`,
+        [userId]
+      );
+      communitySubmissionCount = parseInt(subResult.rows[0].cnt);
+    } catch {}
+
+    const badges = await getUserBadges(userId);
+
+    res.json({
+      videoReviewCount,
+      distinctVideoStores,
+      totalReviewCount,
+      avgTrustWeight: Math.round(avgTrustWeight * 1000) / 1000,
+      flaggedCount,
+      mediaUploadCount,
+      communitySubmissionCount,
+      badges,
+    });
+  } catch (error) {
+    console.error('Error fetching badge progress:', error);
+    res.status(500).json({ error: 'Failed to fetch badge progress' });
   }
 });
 

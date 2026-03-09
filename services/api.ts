@@ -188,6 +188,7 @@ export interface AdminUser {
   updatedAt: string;
   favoritesCount: number;
   claimsCount: number;
+  badges: UserBadge[];
 }
 
 export async function getAdminUsersAPI(): Promise<AdminUser[]> {
@@ -221,6 +222,14 @@ export interface RecorderQuestion {
   isRequired: boolean;
 }
 
+export interface UserBadge {
+  id: number;
+  userId: string;
+  badgeType: string;
+  awardedAt: string;
+  metadata: Record<string, any> | null;
+}
+
 export interface WeightedReview {
   id: number;
   storeId: string;
@@ -233,6 +242,7 @@ export interface WeightedReview {
   isFlagged: boolean;
   disclosures: Record<string, unknown> | null;
   createdAt: string;
+  reviewerBadges: UserBadge[];
 }
 
 export async function initMediaUpload(
@@ -274,4 +284,23 @@ export async function fetchIntegrityScore(storeId: string): Promise<IntegritySco
 
 export async function fetchRecorderQuestions(storeId: string): Promise<RecorderQuestion[]> {
   return apiFetch<RecorderQuestion[]>(`/stores/${storeId}/recorder-questions`);
+}
+
+export async function fetchUserBadges(userId: string): Promise<UserBadge[]> {
+  return apiFetch<UserBadge[]>(`/users/${userId}/badges`);
+}
+
+export interface BadgeProgress {
+  videoReviewCount: number;
+  distinctVideoStores: number;
+  totalReviewCount: number;
+  avgTrustWeight: number;
+  flaggedCount: number;
+  mediaUploadCount: number;
+  communitySubmissionCount: number;
+  badges: UserBadge[];
+}
+
+export async function fetchBadgeProgress(): Promise<BadgeProgress> {
+  return apiFetch<BadgeProgress>('/user/badge-progress');
 }

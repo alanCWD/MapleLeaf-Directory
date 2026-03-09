@@ -1,5 +1,15 @@
 export type { StoreMedia, MediaStatus, MediaType, UploadCredentials } from '../../types';
 
+export type BadgeType = 'verified_scout' | 'legacy_archivist' | 'integrity_anchor';
+
+export interface UserBadge {
+  id: number;
+  userId: string;
+  badgeType: BadgeType;
+  awardedAt: string;
+  metadata: Record<string, any> | null;
+}
+
 export interface TrustWeight {
   base: number;
   videoBonus: number;

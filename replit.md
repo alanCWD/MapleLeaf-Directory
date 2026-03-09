@@ -61,7 +61,9 @@ The app uses a split frontend/backend architecture:
 │   ├── VideoRecorder.tsx       # Guided in-browser video recorder (VocalVideo-style UX)
 │   ├── VideoUploader.tsx       # File-based video upload with TUS resumable uploads
 │   ├── MediaGallery.tsx        # Video thumbnail grid + Bunny embed player modal
-│   └── IntegrityCard.tsx       # IntegrityScore visual display (compact + full modes)
+│   ├── IntegrityCard.tsx       # IntegrityScore visual display (compact + full modes)
+│   ├── BadgeIcon.tsx           # Badge pill component (Verified Scout, Legacy Archivist, Integrity Anchor)
+│   └── BadgeProgress.tsx       # Badge progress panel with criteria tracking
 ├── hooks/
 │   └── useAuth.ts              # Auth hook (user, isAdmin, isOwner, isAuthenticated)
 ├── services/
@@ -79,7 +81,8 @@ The app uses a split frontend/backend architecture:
     │   ├── index.ts            # Module entry — exports + initIntegrityEngine()
     │   ├── types.ts            # TrustWeight, IntegrityScoreCard, WeightedReview, etc.
     │   ├── scoring.ts          # Trust-weight calculation + IntegrityScore formula
-    │   ├── models.ts           # DB schema + CRUD for store_media, integrity_reviews
+    │   ├── models.ts           # DB schema + CRUD for store_media, integrity_reviews, user_badges
+    │   ├── badges.ts           # Badge evaluation engine (auto-award/revoke based on activity)
     │   └── media.ts            # Video UGC orchestration (wraps bunnyStream.ts)
     └── replit_integrations/
         └── auth/
@@ -115,7 +118,7 @@ The Integrity Engine is a cleanly separated module in `server/integrity/` design
 Each review receives a trust weight calculated as:
 - **Base weight**: 0.5
 - **Video bonus**: +0.2 (if review includes verified video)
-- **Scout status bonus**: +0.3 (placeholder for Phase 3 Culture Lead status)
+- **Scout status bonus**: +0.3 (activated when user earns Verified Scout badge)
 - **Geo-deviation penalty**: -0.4 (placeholder for Phase 3 presence verification)
 - Final weight clamped to 0.0–1.0
 
@@ -136,6 +139,16 @@ Built natively with MediaRecorder API — no third-party service. Four-step flow
 3. Review all clips + star rating + optional text comment
 4. TUS upload + review submission with trust weight display
 
+### Badge System
+Three automatically-awarded badges that serve as trust signals:
+| Badge | Criteria | Trust Impact |
+|-------|----------|--------------|
+| **Verified Scout** (purple) | 3+ video reviews across 2+ stores | +0.3 trust weight on future reviews |
+| **Legacy Archivist** (amber) | 10+ reviews OR 5+ store submissions OR 3+ media uploads | Display-only reputation |
+| **Integrity Anchor** (emerald) | 8+ reviews, avg trust ≥ 0.7, 0 flagged | Display-only reputation |
+
+Badges auto-evaluate after every review submission and flag action. Displayed on reviews, navbar, admin panel, and the `/badges` progress page.
+
 ### Future Extraction
 The `server/integrity/` module is structured for white-label extraction into a standalone service. All database operations, scoring logic, and media orchestration are self-contained with a clean public API via `index.ts`.
 
@@ -148,6 +161,7 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `store_claims` table: Ownership claim requests with status tracking
 - `store_media` table: Video/media uploads linked to stores (id, store_id, bunny_video_id, title, media_type, status, embed_url, thumbnail_url, duration, file_size)
 - `integrity_reviews` table: Trust-weighted reviews (id, store_id, user_id, rating 1-5, content_text, video_asset_id FK, trust_weight JSONB, has_verified_video, is_flagged, disclosures JSONB)
+- `user_badges` table: Earned badges (id, user_id, badge_type, awarded_at, metadata JSONB) — unique on (user_id, badge_type)
 
 ## API Endpoints
 ### Public (no auth required)
@@ -186,6 +200,8 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `GET /api/stores/:id/integrity-score` (public) - Get IntegrityScoreCard
 - `GET /api/stores/:id/recorder-questions` (public) - Get guided recording questions
 - `POST /webhooks/bunny` (outside /api prefix) - Bunny Stream encoding webhook
+- `GET /api/users/:userId/badges` (public) - Get user's badges
+- `GET /api/user/badge-progress` (authenticated) - Get badge progress metrics
 
 ### Admin (admin role only)
 - `POST /api/stores` - Create store
@@ -209,11 +225,20 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/admin/sync` - Admin discovery engine (admin only)
 - `/admin/review` - Admin review queue (admin only)
 - `/admin/users` - Admin user management (admin only)
+- `/badges` - Badge progress and achievements (login required)
 
 ## Routes
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-09: Added Badge System (Verified Scout, Legacy Archivist, Integrity Anchor)
+  - Auto-awarded based on user activity thresholds
+  - Verified Scout activates +0.3 trust weight bonus on reviews
+  - Badge progress page at /badges with criteria tracking
+  - Badges displayed on reviews, navbar dropdown, admin user panel
+  - New table: user_badges
+  - New components: BadgeIcon.tsx, BadgeProgress.tsx
+  - New file: server/integrity/badges.ts (evaluation engine)
 - 2026-03-09: Built Integrity Engine module (`server/integrity/`)
   - Trust-weighted review system with video bonus (+0.2 hard signal)
   - IntegrityScore display (IntegrityCard with circular progress, color-coded)

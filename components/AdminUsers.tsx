@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, type AdminUser } from '../services/api';
+import { BadgeIcon } from './BadgeIcon';
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-red-100 text-red-700 border-red-200',
@@ -204,6 +205,9 @@ export const AdminUsers: React.FC = () => {
                                 You
                               </span>
                             )}
+                            {u.badges && u.badges.length > 0 && u.badges.map((b) => (
+                              <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={true} />
+                            ))}
                           </div>
                           {u.email && u.firstName && (
                             <p className="text-sm text-stone-500 mt-0.5">{u.email}</p>
