@@ -1,12 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Store, Review } from '../types';
+import { Store, Review, StoreMedia } from '../types';
 import { getStoreInsights } from '../services/geminiService';
-import { saveStoreInsights } from '../services/api';
+import { saveStoreInsights, fetchStoreMedia, fetchStoreReviews, fetchIntegrityScore, submitReview } from '../services/api';
+import type { WeightedReview, IntegrityScoreCard } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { EvidencePanel } from './EvidencePanel';
 import { FlagButton } from './FlagButton';
+import { MediaGallery } from './MediaGallery';
+import { VideoRecorder } from './VideoRecorder';
+import { VideoUploader } from './VideoUploader';
+import { IntegrityCard } from './IntegrityCard';
+import { useAuth } from '../hooks/useAuth';
 
 interface StoreDetailProps {
   stores: Store[];
@@ -24,6 +30,7 @@ interface InsightsData {
 
 export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore }) => {
   const { id } = useParams<{ id: string }>();
+  const { user, isAuthenticated, isOwner: isOwnerOrAdmin, isAdmin } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
@@ -31,6 +38,16 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [newReview, setNewReview] = useState({ userName: '', rating: 5, comment: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+
+  const [storeMedia, setStoreMedia] = useState<StoreMedia[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [showVideoRecorder, setShowVideoRecorder] = useState(false);
+  const [showVideoUploader, setShowVideoUploader] = useState(false);
+  const [weightedReviews, setWeightedReviews] = useState<WeightedReview[]>([]);
+  const [integrityScore, setIntegrityScore] = useState<IntegrityScoreCard | null>(null);
+  const [isLoadingIntegrity, setIsLoadingIntegrity] = useState(false);
+  const [reviewVideoMode, setReviewVideoMode] = useState<'none' | 'recorder' | 'uploader'>('none');
+  const [reviewVideoAssetId, setReviewVideoAssetId] = useState<number | undefined>(undefined);
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -54,6 +71,30 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       fetchInsights();
     }
   }, [store]);
+
+  useEffect(() => {
+    if (!id) return;
+    setIsLoadingMedia(true);
+    fetchStoreMedia(id)
+      .then(setStoreMedia)
+      .catch(() => setStoreMedia([]))
+      .finally(() => setIsLoadingMedia(false));
+
+    fetchStoreReviews(id)
+      .then(setWeightedReviews)
+      .catch(() => setWeightedReviews([]));
+
+    setIsLoadingIntegrity(true);
+    fetchIntegrityScore(id)
+      .then(setIntegrityScore)
+      .catch(() => setIntegrityScore(null))
+      .finally(() => setIsLoadingIntegrity(false));
+  }, [id]);
+
+  const loadMedia = () => {
+    if (!id) return;
+    fetchStoreMedia(id).then(setStoreMedia).catch(() => {});
+  };
 
   const getHashCode = (str: string) => {
     let hash = 0;
@@ -91,7 +132,18 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
     const hoursToUse = Array.isArray(insights?.hours) ? insights?.hours : (Array.isArray(store.hours) ? store.hours : []);
 
-    const schemaData = {
+    const readyVideos = storeMedia.filter(m => m.status === 'ready' && m.embedUrl);
+
+    const videoObjects = readyVideos.map(media => ({
+      "@type": "VideoObject" as const,
+      "name": media.title,
+      "thumbnailUrl": media.thumbnailUrl || undefined,
+      "embedUrl": media.embedUrl || undefined,
+      "uploadDate": media.createdAt,
+      "duration": media.durationSeconds ? `PT${media.durationSeconds}S` : undefined
+    }));
+
+    const schemaData: Record<string, any> = {
       "@context": "https://schema.org",
       "@type": "Store",
       "name": store.name,
@@ -123,6 +175,10 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       })
     };
 
+    if (videoObjects.length > 0) {
+      schemaData["video"] = videoObjects;
+    }
+
     script.text = JSON.stringify(schemaData);
 
     return () => {
@@ -131,7 +187,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         existingScript.remove();
       }
     };
-  }, [store, insights, detailHeaderUrl]);
+  }, [store, insights, detailHeaderUrl, storeMedia]);
 
   const fetchInsights = async () => {
     if (!store) return;
@@ -163,32 +219,54 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     }
   };
 
-  const handleAddReview = (e: React.FormEvent) => {
+  const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!store || !newReview.userName || !newReview.comment) return;
+    if (!store || !newReview.comment) return;
 
     setIsSubmittingReview(true);
-    
-    const review: Review = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...newReview,
-      date: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const weightedReview = await submitReview(store.id, {
+        rating: newReview.rating,
+        contentText: newReview.comment,
+        videoAssetId: reviewVideoAssetId,
+      });
+      setWeightedReviews(prev => [weightedReview, ...prev]);
 
-    const updatedReviews = [review, ...(store.reviews || [])];
-    const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
-    const avgRating = parseFloat((totalRating / updatedReviews.length).toFixed(1));
+      if (id) {
+        fetchIntegrityScore(id)
+          .then(setIntegrityScore)
+          .catch(() => {});
+      }
 
-    const updatedStore = {
-      ...store,
-      reviews: updatedReviews,
-      rating: avgRating
-    };
+      setNewReview({ userName: '', rating: 5, comment: '' });
+      setReviewVideoAssetId(undefined);
+      setReviewVideoMode('none');
+      setShowReviewForm(false);
+    } catch (err) {
+      const review: Review = {
+        id: Math.random().toString(36).substr(2, 9),
+        ...newReview,
+        date: new Date().toISOString().split('T')[0]
+      };
 
-    onUpdateStore(updatedStore);
-    setNewReview({ userName: '', rating: 5, comment: '' });
-    setIsSubmittingReview(false);
-    setShowReviewForm(false);
+      const updatedReviews = [review, ...(store.reviews || [])];
+      const totalRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0);
+      const avgRating = parseFloat((totalRating / updatedReviews.length).toFixed(1));
+
+      const updatedStore = {
+        ...store,
+        reviews: updatedReviews,
+        rating: avgRating
+      };
+
+      onUpdateStore(updatedStore);
+      setNewReview({ userName: '', rating: 5, comment: '' });
+      setReviewVideoAssetId(undefined);
+      setReviewVideoMode('none');
+      setShowReviewForm(false);
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   if (!store) {
@@ -355,6 +433,40 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </section>
           )}
 
+          <section>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+              <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
+                <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
+                Raw Content
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {isAuthenticated && (
+                  <button
+                    onClick={() => setShowVideoRecorder(true)}
+                    className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10 flex items-center gap-2 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Share Your Experience
+                  </button>
+                )}
+                {isOwnerOrAdmin && (
+                  <button
+                    onClick={() => setShowVideoUploader(true)}
+                    className="bg-stone-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-stone-700 transition shadow-lg flex items-center gap-2 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload Video
+                  </button>
+                )}
+              </div>
+            </div>
+            <MediaGallery media={storeMedia} isLoading={isLoadingMedia} />
+          </section>
+
           <section id="reviews">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
@@ -412,18 +524,102 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                       onChange={e => setNewReview({...newReview, comment: e.target.value})}
                     />
                   </div>
+                  {isAuthenticated && (
+                    <div>
+                      <label className="block text-sm font-bold text-stone-700 mb-2 uppercase tracking-wider">Attach Video (Optional)</label>
+                      {reviewVideoAssetId ? (
+                        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                          <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm text-emerald-700 font-medium">Video attached — earns +0.2 trust weight</span>
+                          <button
+                            type="button"
+                            onClick={() => setReviewVideoAssetId(undefined)}
+                            className="ml-auto text-stone-400 hover:text-red-500 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReviewVideoMode('recorder')}
+                            className="flex items-center gap-2 bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-purple-100 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Record Video
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReviewVideoMode('uploader')}
+                            className="flex items-center gap-2 bg-stone-50 text-stone-700 border border-stone-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-stone-100 transition"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Upload File
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button 
                     type="submit"
                     disabled={isSubmittingReview}
                     className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/20 disabled:opacity-50"
                   >
-                    {isSubmittingReview ? 'Posting...' : 'Post Review'}
+                    {isSubmittingReview ? 'Posting...' : reviewVideoAssetId ? 'Post Video Review' : 'Post Review'}
                   </button>
                 </form>
               </div>
             )}
 
             <div className="space-y-6">
+              {weightedReviews.length > 0 && weightedReviews.map(wr => (
+                <div key={`wr-${wr.id}`} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-6">
+                  <div className="flex-shrink-0">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${wr.hasVerifiedVideo ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {wr.hasVerifiedVideo ? (
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      ) : (
+                        <span>{wr.userId?.charAt(0)?.toUpperCase() || 'U'}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex gap-1 text-sm text-amber-500">
+                          {[...Array(5)].map((_, i) => (
+                            <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
+                          ))}
+                        </div>
+                        {wr.hasVerifiedVideo && (
+                          <span className="bg-purple-100 text-purple-700 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+                            Verified Video Review
+                          </span>
+                        )}
+                        <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Trust: {((wr.trustWeight?.final ?? 0) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-stone-400 uppercase tracking-widest">
+                        {new Date(wr.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-stone-600 leading-relaxed italic">"{wr.contentText}"</p>
+                  </div>
+                </div>
+              ))}
+
               {store.reviews && store.reviews.length > 0 ? (
                 store.reviews.map(review => (
                   <div key={review.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-6">
@@ -448,16 +644,18 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     </div>
                   </div>
                 ))
-              ) : (
+              ) : weightedReviews.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-3xl border border-stone-200 border-dashed">
                   <p className="text-stone-400 italic">No reviews yet. Be the first to share your experience!</p>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
         </div>
 
         <div className="space-y-8">
+          <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
+
           <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
             <h3 className="text-lg font-black text-stone-900 mb-6 uppercase tracking-wider">Information</h3>
             <div className="space-y-4">
@@ -563,6 +761,85 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           </div>
         </div>
       </div>
+
+      {reviewVideoMode === 'recorder' && store && (
+        <VideoRecorder
+          storeId={store.id}
+          storeName={store.name}
+          storeType={store.type}
+          onComplete={(review) => {
+            setReviewVideoMode('none');
+            if (review.videoAssetId) {
+              setReviewVideoAssetId(review.videoAssetId);
+            }
+            loadMedia();
+          }}
+          onCancel={() => setReviewVideoMode('none')}
+        />
+      )}
+
+      {reviewVideoMode === 'uploader' && store && (
+        <div className="fixed inset-0 z-50 bg-stone-900/80 flex items-center justify-center p-4">
+          <div className="max-w-lg w-full relative">
+            <button
+              onClick={() => setReviewVideoMode('none')}
+              className="absolute -top-12 right-0 text-white/70 hover:text-white transition p-2"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <VideoUploader
+              storeId={store.id}
+              onComplete={(mediaId) => {
+                setReviewVideoMode('none');
+                if (typeof mediaId === 'number') {
+                  setReviewVideoAssetId(mediaId);
+                }
+                loadMedia();
+              }}
+              onCancel={() => setReviewVideoMode('none')}
+            />
+          </div>
+        </div>
+      )}
+
+      {showVideoRecorder && store && (
+        <VideoRecorder
+          storeId={store.id}
+          storeName={store.name}
+          storeType={store.type}
+          onComplete={(review) => {
+            setShowVideoRecorder(false);
+            setWeightedReviews(prev => [review, ...prev]);
+            loadMedia();
+          }}
+          onCancel={() => setShowVideoRecorder(false)}
+        />
+      )}
+
+      {showVideoUploader && store && (
+        <div className="fixed inset-0 z-50 bg-stone-900/80 flex items-center justify-center p-4">
+          <div className="max-w-lg w-full relative">
+            <button
+              onClick={() => setShowVideoUploader(false)}
+              className="absolute -top-12 right-0 text-white/70 hover:text-white transition p-2"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <VideoUploader
+              storeId={store.id}
+              onComplete={() => {
+                setShowVideoUploader(false);
+                loadMedia();
+              }}
+              onCancel={() => setShowVideoUploader(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

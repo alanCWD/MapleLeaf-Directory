@@ -49,27 +49,38 @@ The app uses a split frontend/backend architecture:
 │   ├── FlagButton.tsx          # Login-gated reporting
 │   ├── StoreList.tsx
 │   ├── StoreCard.tsx
-│   ├── StoreDetail.tsx
-│   ├── OwnerPortal.tsx         # Store claiming + owned store management
+│   ├── StoreDetail.tsx         # Includes MediaGallery, IntegrityCard, VideoRecorder/Uploader integration
+│   ├── OwnerPortal.tsx         # Store claiming + owned store management + media management
 │   ├── AdminSync.tsx           # Admin-only discovery engine
 │   ├── AdminReviewQueue.tsx    # Admin-only review queue + claim reviews
 │   ├── AdminUsers.tsx          # Admin-only user management panel
 │   ├── CommunitySubmit.tsx     # Login-gated store submissions
 │   ├── PersonalScout.tsx
 │   ├── VibeScout.tsx
-│   └── LeadBanner.tsx
+│   ├── LeadBanner.tsx
+│   ├── VideoRecorder.tsx       # Guided in-browser video recorder (VocalVideo-style UX)
+│   ├── VideoUploader.tsx       # File-based video upload with TUS resumable uploads
+│   ├── MediaGallery.tsx        # Video thumbnail grid + Bunny embed player modal
+│   └── IntegrityCard.tsx       # IntegrityScore visual display (compact + full modes)
 ├── hooks/
 │   └── useAuth.ts              # Auth hook (user, isAdmin, isOwner, isAuthenticated)
 ├── services/
 │   ├── geminiService.ts
-│   └── api.ts                  # Full API client with auth endpoints
+│   └── api.ts                  # Full API client with auth + integrity endpoints
 └── server/
-    ├── index.ts                # Express server entry
+    ├── index.ts                # Express server entry (calls initIntegrityEngine on boot)
     ├── db.ts                   # PostgreSQL helpers (stores, flags, admin)
     ├── userDb.ts               # User/session/favorites/claims database functions
-    ├── routes.ts               # API route handlers (with auth middleware)
+    ├── routes.ts               # API route handlers (with auth + integrity routes)
     ├── search.ts               # AI search endpoint
     ├── verification.ts         # Verification pipeline
+    ├── bunnyStream.ts          # Bunny Stream API client (create/get/delete video, TUS creds)
+    ├── integrity/              # Portable Integrity Engine module
+    │   ├── index.ts            # Module entry — exports + initIntegrityEngine()
+    │   ├── types.ts            # TrustWeight, IntegrityScoreCard, WeightedReview, etc.
+    │   ├── scoring.ts          # Trust-weight calculation + IntegrityScore formula
+    │   ├── models.ts           # DB schema + CRUD for store_media, integrity_reviews
+    │   └── media.ts            # Video UGC orchestration (wraps bunnyStream.ts)
     └── replit_integrations/
         └── auth/
             ├── replitAuth.ts   # Replit Auth OAuth setup
@@ -82,6 +93,9 @@ The app uses a split frontend/backend architecture:
 - `DATABASE_URL`: PostgreSQL connection string (auto-configured by Replit)
 - `REPLIT_DOMAINS`: Auto-set by Replit for auth callback URLs
 - `REPL_ID`: Auto-set by Replit for auth integration
+- `BUNNY_STREAM_API_KEY`: Bunny.net Stream API key (required for video uploads)
+- `BUNNY_STREAM_LIBRARY_ID`: Bunny.net Stream library ID (required for video uploads)
+- `BUNNY_CDN_HOSTNAME`: Optional custom CDN hostname for Bunny (defaults to vz-{libraryId}.b-cdn.net)
 
 ## Anti-Hallucination System
 Multi-layered verification pipeline:
@@ -94,6 +108,37 @@ Multi-layered verification pipeline:
 7. **User Flagging**: Reports about incorrect listings (login required)
 8. **Admin Review Queue**: Low-confidence and flagged stores require manual approval
 
+## Integrity Engine
+The Integrity Engine is a cleanly separated module in `server/integrity/` designed for future extraction into a standalone IaaS product.
+
+### Trust-Weight Formula
+Each review receives a trust weight calculated as:
+- **Base weight**: 0.5
+- **Video bonus**: +0.2 (if review includes verified video)
+- **Scout status bonus**: +0.3 (placeholder for Phase 3 Culture Lead status)
+- **Geo-deviation penalty**: -0.4 (placeholder for Phase 3 presence verification)
+- Final weight clamped to 0.0–1.0
+
+### IntegrityScore Calculation
+Composite score (0–10) from: 40% weighted average rating + 20% verified presence ratio + 20% review stability + 20% content richness.
+
+### Video UGC Pipeline
+1. Client calls `POST /api/stores/:id/media/init` to get TUS upload credentials
+2. Client uploads via TUS resumable protocol directly to Bunny Stream CDN
+3. Bunny sends encoding webhook to `POST /webhooks/bunny`
+4. Media status updates: created → processing → ready (or failed)
+5. Videos served via Bunny CDN embed player + thumbnails
+
+### Guided Video Recorder (VocalVideo-Style)
+Built natively with MediaRecorder API — no third-party service. Four-step flow:
+1. Welcome screen with camera permission request
+2. Prompted recording (per question) with record/pause/re-record controls
+3. Review all clips + star rating + optional text comment
+4. TUS upload + review submission with trust weight display
+
+### Future Extraction
+The `server/integrity/` module is structured for white-label extraction into a standalone service. All database operations, scoring logic, and media orchestration are self-contained with a clean public API via `index.ts`.
+
 ## Database Schema
 - `stores` table: Store data with verification metadata and cached AI insights (store_insights JSONB column)
 - `store_flags` table: User reports about listings
@@ -101,6 +146,8 @@ Multi-layered verification pipeline:
 - `sessions` table: Session management
 - `user_favorites` table: Database-synced favorites for logged-in users
 - `store_claims` table: Ownership claim requests with status tracking
+- `store_media` table: Video/media uploads linked to stores (id, store_id, bunny_video_id, title, media_type, status, embed_url, thumbnail_url, duration, file_size)
+- `integrity_reviews` table: Trust-weighted reviews (id, store_id, user_id, rating 1-5, content_text, video_asset_id FK, trust_weight JSONB, has_verified_video, is_flagged, disclosures JSONB)
 
 ## API Endpoints
 ### Public (no auth required)
@@ -129,6 +176,17 @@ Multi-layered verification pipeline:
 - `GET /api/user/owned-stores` - Get owned stores
 - `PATCH /api/owner/stores/:id` - Update owned store
 
+### Integrity Engine (media + reviews)
+- `POST /api/stores/:id/media/init` (authenticated) - Initialize video upload, returns TUS credentials
+- `GET /api/stores/:id/media` (public) - List store media
+- `GET /api/stores/:id/media/:mediaId` (public) - Single media details
+- `DELETE /api/stores/:id/media/:mediaId` (authenticated, owner/admin) - Delete media
+- `POST /api/stores/:id/reviews` (authenticated) - Submit trust-weighted review
+- `GET /api/stores/:id/reviews` (public) - Get weighted reviews for store
+- `GET /api/stores/:id/integrity-score` (public) - Get IntegrityScoreCard
+- `GET /api/stores/:id/recorder-questions` (public) - Get guided recording questions
+- `POST /webhooks/bunny` (outside /api prefix) - Bunny Stream encoding webhook
+
 ### Admin (admin role only)
 - `POST /api/stores` - Create store
 - `POST /api/stores/bulk` - Bulk upsert
@@ -156,6 +214,17 @@ Multi-layered verification pipeline:
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-09: Built Integrity Engine module (`server/integrity/`)
+  - Trust-weighted review system with video bonus (+0.2 hard signal)
+  - IntegrityScore display (IntegrityCard with circular progress, color-coded)
+  - Bunny Stream video UGC pipeline (TUS resumable uploads, CDN delivery, encoding webhooks)
+  - Guided in-browser video recorder (VideoRecorder.tsx, MediaRecorder API, VocalVideo-style UX)
+  - File-based video uploader with drag-and-drop (VideoUploader.tsx, TUS resumable)
+  - Media gallery with Bunny embed player (MediaGallery.tsx)
+  - Owner portal media management section (upload, delete, encoding status)
+  - VideoObject schema.org JSON-LD markup for SEO/AI discovery
+  - New tables: store_media, integrity_reviews
+  - Module structured for future white-label extraction
 - 2026-03-01: Added store insights caching to eliminate repeated AI calls
   - New `store_insights` JSONB column on stores table caches atmosphere, community, specialties, sovereignty, proTip
   - First view of a store generates insights via Gemini, then saves to database

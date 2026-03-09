@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI } from '../services/api';
-import type { Store } from '../types';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia } from '../services/api';
+import { VideoUploader } from './VideoUploader';
+import type { Store, StoreMedia } from '../types';
 
 const SERVICES = [
   {
@@ -233,9 +234,210 @@ const OwnedStoresSection: React.FC = () => {
                 </button>
               </div>
             )}
+
+            <StoreMediaSection store={store} />
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+const StatusBadge: React.FC<{ status: StoreMedia['status'] }> = ({ status }) => {
+  const config = {
+    uploading: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Uploading' },
+    processing: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Processing' },
+    encoding: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Encoding' },
+    ready: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Ready' },
+    failed: { bg: 'bg-red-100', text: 'text-red-700', label: 'Failed' },
+  }[status] || { bg: 'bg-stone-100', text: 'text-stone-700', label: status };
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest px-2 py-1 rounded-lg ${config.bg} ${config.text}`}>
+      {(status === 'processing' || status === 'encoding' || status === 'uploading') && (
+        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
+      {status === 'ready' && (
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+        </svg>
+      )}
+      {status === 'failed' && (
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      )}
+      {config.label}
+    </span>
+  );
+};
+
+const StoreMediaSection: React.FC<{ store: Store }> = ({ store }) => {
+  const [media, setMedia] = useState<StoreMedia[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showUploader, setShowUploader] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const loadMedia = async () => {
+    try {
+      const items = await fetchStoreMedia(store.id);
+      setMedia(items);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMedia();
+  }, [store.id]);
+
+  useEffect(() => {
+    const hasProcessing = media.some(m => m.status === 'processing' || m.status === 'encoding' || m.status === 'uploading');
+    if (!hasProcessing) return;
+    const interval = setInterval(loadMedia, 10000);
+    return () => clearInterval(interval);
+  }, [media]);
+
+  const handleDelete = async (mediaId: number) => {
+    setDeletingId(mediaId);
+    try {
+      await deleteMedia(store.id, mediaId);
+      setMedia(prev => prev.filter(m => m.id !== mediaId));
+      setConfirmDeleteId(null);
+    } catch {
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleUploadComplete = () => {
+    setShowUploader(false);
+    loadMedia();
+  };
+
+  return (
+    <div className="border border-stone-200 rounded-2xl p-6 mt-4">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="font-bold text-stone-900 flex items-center gap-2">
+          <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          Media
+          {media.length > 0 && (
+            <span className="text-xs font-bold text-stone-400">({media.length})</span>
+          )}
+        </h4>
+        {!showUploader && (
+          <button
+            onClick={() => setShowUploader(true)}
+            className="text-sm font-bold text-emerald-600 hover:text-emerald-500 transition flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Upload Video
+          </button>
+        )}
+      </div>
+
+      {showUploader && (
+        <div className="mb-6">
+          <VideoUploader
+            storeId={store.id}
+            onComplete={handleUploadComplete}
+            onCancel={() => setShowUploader(false)}
+          />
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <svg className="w-6 h-6 animate-spin text-stone-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : media.length === 0 && !showUploader ? (
+        <div className="text-center py-8">
+          <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg className="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p className="text-sm text-stone-500 font-medium mb-3">No media uploaded yet</p>
+          <button
+            onClick={() => setShowUploader(true)}
+            className="text-sm font-bold text-emerald-600 hover:text-emerald-500 transition"
+          >
+            Upload your first video
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {media.map(item => (
+            <div key={item.id} className="flex items-center gap-4 bg-stone-50 rounded-xl p-3 border border-stone-100">
+              <div className="w-20 h-14 bg-stone-200 rounded-lg overflow-hidden flex-shrink-0">
+                {item.thumbnailUrl ? (
+                  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-stone-900 truncate">{item.title}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <StatusBadge status={item.status} />
+                  <span className="text-xs text-stone-400 capitalize">{item.mediaType}</span>
+                  {item.durationSeconds && (
+                    <span className="text-xs text-stone-400">
+                      {Math.floor(item.durationSeconds / 60)}:{String(item.durationSeconds % 60).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                {confirmDeleteId === item.id ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="text-xs font-bold text-red-600 hover:text-red-500 disabled:opacity-50"
+                    >
+                      {deletingId === item.id ? 'Deleting...' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="text-xs font-bold text-stone-500 hover:text-stone-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(item.id)}
+                    className="text-stone-400 hover:text-red-500 transition p-1"
+                    title="Delete media"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

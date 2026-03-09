@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
 import { seedStoresFromFile } from './db.ts';
+import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -17,7 +18,19 @@ async function startServer() {
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  await initIntegrityEngine();
+
   app.use('/api', router);
+
+  app.post('/webhooks/bunny', async (req, res) => {
+    try {
+      const result = await handleWebhook(req.body);
+      res.json({ success: true, media: result });
+    } catch (err: any) {
+      console.error('[Webhook] Bunny error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

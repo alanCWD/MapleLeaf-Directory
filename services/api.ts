@@ -1,4 +1,4 @@
-import type { Store, StoreFlag, FlagReason } from '../types';
+import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, MediaType } from '../types';
 
 const API_BASE = '/api';
 
@@ -203,4 +203,75 @@ export async function updateUserRoleAPI(userId: string, role: string): Promise<A
 
 export async function deleteUserAPI(userId: string): Promise<void> {
   await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+}
+
+export interface IntegrityScoreCard {
+  score: number;
+  verifiedPresenceRatio: number;
+  reviewStability: number;
+  weightedAvgRating: number;
+  contentRichness: number;
+  lastAuditDate: string | null;
+}
+
+export interface RecorderQuestion {
+  id: string;
+  prompt: string;
+  maxDurationSeconds: number;
+  isRequired: boolean;
+}
+
+export interface WeightedReview {
+  id: number;
+  storeId: string;
+  userId: string;
+  rating: number;
+  contentText: string;
+  videoAssetId: number | null;
+  trustWeight: { base: number; videoBonus: number; scoutBonus: number; geoDeviation: number; final: number };
+  hasVerifiedVideo: boolean;
+  isFlagged: boolean;
+  disclosures: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export async function initMediaUpload(
+  storeId: string,
+  title: string,
+  mediaType: MediaType
+): Promise<UploadCredentials> {
+  return apiFetch<UploadCredentials>(`/stores/${storeId}/media/init`, {
+    method: 'POST',
+    body: JSON.stringify({ title, mediaType }),
+  });
+}
+
+export async function fetchStoreMedia(storeId: string): Promise<StoreMedia[]> {
+  return apiFetch<StoreMedia[]>(`/stores/${storeId}/media`);
+}
+
+export async function deleteMedia(storeId: string, mediaId: number): Promise<void> {
+  await apiFetch(`/stores/${storeId}/media/${mediaId}`, { method: 'DELETE' });
+}
+
+export async function submitReview(
+  storeId: string,
+  data: { rating: number; contentText: string; videoAssetId?: number }
+): Promise<WeightedReview> {
+  return apiFetch<WeightedReview>(`/stores/${storeId}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchStoreReviews(storeId: string): Promise<WeightedReview[]> {
+  return apiFetch<WeightedReview[]>(`/stores/${storeId}/reviews`);
+}
+
+export async function fetchIntegrityScore(storeId: string): Promise<IntegrityScoreCard> {
+  return apiFetch<IntegrityScoreCard>(`/stores/${storeId}/integrity-score`);
+}
+
+export async function fetchRecorderQuestions(storeId: string): Promise<RecorderQuestion[]> {
+  return apiFetch<RecorderQuestion[]>(`/stores/${storeId}/recorder-questions`);
 }

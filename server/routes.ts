@@ -30,6 +30,19 @@ import {
   getAllUsers,
   deleteUser,
 } from './userDb.ts';
+import {
+  initUpload,
+  getStoreMediaList,
+  getSingleMedia,
+  removeMedia,
+  isBunnyConfigured,
+  createReview,
+  getReviewsByStore,
+  calculateTrustWeight,
+  calculateIntegrityScore,
+  getMediaById,
+} from './integrity/index.ts';
+import type { RecorderQuestion } from './integrity/types.ts';
 
 const router = Router();
 
@@ -598,6 +611,217 @@ router.delete('/admin/users/:id', isAuthenticated as RequestHandler, requireAdmi
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+const requireBunny: RequestHandler = (_req, res, next) => {
+  if (!isBunnyConfigured()) {
+    res.status(503).json({ error: 'Video service not configured' });
+    return;
+  }
+  next();
+};
+
+router.post('/stores/:id/media/init', isAuthenticated as RequestHandler, requireBunny, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const { title, mediaType } = req.body;
+    if (!title || typeof title !== 'string') {
+      res.status(400).json({ error: 'Title is required' });
+      return;
+    }
+    const credentials = await initUpload(storeId, userId, title, mediaType || 'video');
+    res.json(credentials);
+  } catch (error: any) {
+    console.error('Error initializing media upload:', error);
+    res.status(500).json({ error: 'Failed to initialize upload' });
+  }
+});
+
+router.get('/stores/:id/media', async (req: Request, res: Response) => {
+  try {
+    const media = await getStoreMediaList(paramId(req.params));
+    res.json(media);
+  } catch (error) {
+    console.error('Error fetching store media:', error);
+    res.status(500).json({ error: 'Failed to fetch media' });
+  }
+});
+
+router.get('/stores/:id/media/:mediaId', async (req: any, res: Response) => {
+  try {
+    const mediaId = parseInt(req.params.mediaId);
+    if (isNaN(mediaId)) {
+      res.status(400).json({ error: 'Invalid media ID' });
+      return;
+    }
+    const media = await getSingleMedia(mediaId);
+    if (!media) {
+      res.status(404).json({ error: 'Media not found' });
+      return;
+    }
+    res.json(media);
+  } catch (error) {
+    console.error('Error fetching media:', error);
+    res.status(500).json({ error: 'Failed to fetch media' });
+  }
+});
+
+router.delete('/stores/:id/media/:mediaId', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const mediaId = parseInt(req.params.mediaId);
+    if (isNaN(mediaId)) {
+      res.status(400).json({ error: 'Invalid media ID' });
+      return;
+    }
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    const media = await getSingleMedia(mediaId);
+    if (!media) {
+      res.status(404).json({ error: 'Media not found' });
+      return;
+    }
+
+    if (media.storeId !== paramId(req.params)) {
+      res.status(404).json({ error: 'Media not found for this store' });
+      return;
+    }
+    const isMediaOwner = media.userId === userId;
+    const isAdmin = role === 'admin';
+    let isStoreOwner = false;
+    if (role === 'owner' || role === 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      isStoreOwner = ownedStores.includes(paramId(req.params));
+    }
+
+    if (!isMediaOwner && !isStoreOwner && !isAdmin) {
+      res.status(403).json({ error: 'Not authorized to delete this media' });
+      return;
+    }
+
+    const deleted = await removeMedia(mediaId, userId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Media not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting media:', error);
+    res.status(500).json({ error: 'Failed to delete media' });
+  }
+});
+
+router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const { rating, contentText, videoAssetId, disclosures } = req.body;
+
+    if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
+      res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
+      return;
+    }
+
+    let hasVerifiedVideo = false;
+    if (videoAssetId) {
+      const videoMedia = await getMediaById(videoAssetId);
+      if (videoMedia && videoMedia.storeId !== storeId) {
+        res.status(400).json({ error: 'Video does not belong to this store' });
+        return;
+      }
+      if (videoMedia && videoMedia.status === 'ready') {
+        hasVerifiedVideo = true;
+      }
+    }
+
+    const trustWeight = calculateTrustWeight({
+      hasVerifiedVideo,
+      isScout: false,
+      geoDeviationDetected: false,
+    });
+
+    const review = await createReview({
+      storeId,
+      userId,
+      rating,
+      contentText: contentText || '',
+      videoAssetId: videoAssetId || undefined,
+      trustWeight,
+      hasVerifiedVideo,
+      disclosures: disclosures || undefined,
+    });
+
+    res.status(201).json(review);
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    res.status(500).json({ error: 'Failed to submit review' });
+  }
+});
+
+router.get('/stores/:id/reviews', async (req: Request, res: Response) => {
+  try {
+    const reviews = await getReviewsByStore(paramId(req.params));
+    res.json(reviews);
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+
+router.get('/stores/:id/integrity-score', async (req: Request, res: Response) => {
+  try {
+    const reviews = await getReviewsByStore(paramId(req.params));
+    const scoreCard = calculateIntegrityScore(reviews);
+    res.json(scoreCard);
+  } catch (error) {
+    console.error('Error calculating integrity score:', error);
+    res.status(500).json({ error: 'Failed to calculate integrity score' });
+  }
+});
+
+router.get('/stores/:id/recorder-questions', async (req: Request, res: Response) => {
+  try {
+    const store = await getStoreById(paramId(req.params));
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+
+    const questions: RecorderQuestion[] = [
+      {
+        id: 'q1',
+        prompt: `What brought you to ${store.name} today?`,
+        maxDurationSeconds: 30,
+        isRequired: true,
+      },
+      {
+        id: 'q2',
+        prompt: 'What makes this spot special or unique?',
+        maxDurationSeconds: 45,
+        isRequired: true,
+      },
+      {
+        id: 'q3',
+        prompt: 'Would you recommend this place to others? Why?',
+        maxDurationSeconds: 30,
+        isRequired: false,
+      },
+    ];
+
+    if (store.type === 'Sovereign') {
+      questions.push({
+        id: 'q4',
+        prompt: 'How does this business connect to its community or culture?',
+        maxDurationSeconds: 45,
+        isRequired: false,
+      });
+    }
+
+    res.json(questions);
+  } catch (error) {
+    console.error('Error fetching recorder questions:', error);
+    res.status(500).json({ error: 'Failed to fetch recorder questions' });
   }
 });
 
