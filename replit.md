@@ -53,6 +53,7 @@ The app uses a split frontend/backend architecture:
 │   ├── OwnerPortal.tsx         # Store claiming + owned store management + media management
 │   ├── AdminSync.tsx           # Admin-only discovery engine
 │   ├── AdminReviewQueue.tsx    # Admin-only review queue + claim reviews
+│   ├── AdminStores.tsx         # Admin-only store management dashboard with edit + audit log
 │   ├── AdminUsers.tsx          # Admin-only user management panel
 │   ├── CommunitySubmit.tsx     # Login-gated store submissions
 │   ├── PersonalScout.tsx
@@ -174,6 +175,7 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `sessions` table: Session management
 - `user_favorites` table: Database-synced favorites for logged-in users
 - `store_claims` table: Ownership claim requests with status tracking
+- `audit_logs` table: Admin action audit trail (admin_user_id, action, target_type, target_id, details JSONB, created_at)
 - `store_media` table: Video/media uploads linked to stores (id, store_id, bunny_video_id, title, media_type, status, embed_url, thumbnail_url, duration, file_size)
 - `integrity_reviews` table: Trust-weighted reviews (id, store_id, user_id, rating 1-5, content_text, video_asset_id FK, trust_weight JSONB, has_verified_video, is_flagged, disclosures JSONB)
 - `user_badges` table: Earned badges (id, user_id, badge_type, awarded_at, metadata JSONB) — unique on (user_id, badge_type)
@@ -227,10 +229,13 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `PATCH /api/stores/:id` - Update any store
 - `POST /api/stores/:id/verify` - Run verification
 - `POST /api/stores/bulk-verify` - Bulk verify
+- `GET /api/admin/stores` - List all stores with filters, pagination, status counts
+- `PATCH /api/admin/stores/:id` - Admin edit store with audit logging
 - `GET /api/admin/review-queue` - Stores needing review
-- `PATCH /api/admin/stores/:id/review` - Approve/reject/close store
+- `PATCH /api/admin/stores/:id/review` - Approve/reject/close store (audit logged)
 - `GET /api/admin/claims` - All pending claims
-- `PATCH /api/admin/claims/:id/review` - Approve/reject claim
+- `PATCH /api/admin/claims/:id/review` - Approve/reject claim (audit logged)
+- `GET /api/admin/audit-logs` - View audit log with filters (store, admin, action, date range)
 - `GET /api/admin/users` - List all users with stats
 - `PATCH /api/admin/users/:id/role` - Change user role
 - `DELETE /api/admin/users/:id` - Delete user account
@@ -242,6 +247,7 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/owners` - Owner portal with claim workflow
 - `/admin/sync` - Admin discovery engine (admin only)
 - `/admin/review` - Admin review queue (admin only)
+- `/admin/stores` - Admin store management with filters, edit, and audit log (admin only)
 - `/admin/users` - Admin user management (admin only)
 - `/badges` - Badge progress and achievements (login required)
 
@@ -249,6 +255,21 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-10: Added Admin Store Management dashboard with audit log
+  - New page at /admin/stores showing all stores in a filterable, sortable table
+  - Status summary cards showing counts for verified, AI suggested, rejected, closed, and claimed
+  - Filters: verification status, province, claimed/unclaimed, text search (name/address)
+  - Sortable columns: name, confidence score, flag count, last updated
+  - Server-side pagination (25 per page)
+  - Inline edit modal for any store: name, address, province, type, phone, website, status, featured offerings, admin notes
+  - Audit log tab showing timeline of all admin actions (store approvals, rejections, edits, claim reviews)
+  - Audit log shows who performed the action, what changed (with before/after diffs), and when
+  - Audit log filterable by action type and by specific store
+  - Existing admin review and claim review actions now create audit entries
+  - New table: audit_logs (admin_user_id, action, target_type, target_id, details JSONB)
+  - New component: AdminStores.tsx
+  - New API endpoints: GET /api/admin/stores, PATCH /api/admin/stores/:id, GET /api/admin/audit-logs
+  - Navigation: "Store Management" link added to admin user menu
 - 2026-03-10: Added Video Auto-Stitching pipeline
   - Server-side FFmpeg processing concatenates multi-question clips into single polished video
   - Intro title card + per-question title cards generated automatically

@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable } from './db.ts';
 import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 
 const app = express();
@@ -19,6 +19,7 @@ async function startServer() {
   registerAuthRoutes(app);
 
   await initIntegrityEngine();
+  await initAuditLogTable();
 
   app.use('/api', router);
 

@@ -40,6 +40,7 @@ function snakeToCamel(row: Record<string, any>): Store {
     placesCategory: row.places_category || undefined,
     lastVerifiedAt: row.last_verified_at ? row.last_verified_at.toISOString() : undefined,
     storeInsights: row.store_insights || null,
+    updatedAt: row.updated_at ? row.updated_at.toISOString() : undefined,
   };
 }
 
@@ -291,6 +292,247 @@ export async function adminReview(
 
   if (result.rows.length === 0) return null;
   return snakeToCamel(result.rows[0]);
+}
+
+export interface AuditLog {
+  id: number;
+  adminUserId: string;
+  adminEmail?: string;
+  adminName?: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  targetName?: string;
+  details: Record<string, any>;
+  createdAt: string;
+}
+
+function formatAuditLog(row: Record<string, any>): AuditLog {
+  return {
+    id: row.id,
+    adminUserId: row.admin_user_id,
+    adminEmail: row.admin_email || undefined,
+    adminName: row.admin_name || undefined,
+    action: row.action,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    targetName: row.target_name || undefined,
+    details: row.details || {},
+    createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
+  };
+}
+
+export async function initAuditLogTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id SERIAL PRIMARY KEY,
+      admin_user_id VARCHAR(255) NOT NULL,
+      action VARCHAR(100) NOT NULL,
+      target_type VARCHAR(50) NOT NULL,
+      target_id VARCHAR(255) NOT NULL,
+      details JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_type, target_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_admin ON audit_logs(admin_user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)`);
+  console.log('[DB] audit_logs table initialized');
+}
+
+export async function createAuditLog(
+  adminUserId: string,
+  action: string,
+  targetType: string,
+  targetId: string,
+  details: Record<string, any> = {}
+): Promise<AuditLog> {
+  const result = await pool.query(
+    `INSERT INTO audit_logs (admin_user_id, action, target_type, target_id, details)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [adminUserId, action, targetType, targetId, JSON.stringify(details)]
+  );
+  return formatAuditLog(result.rows[0]);
+}
+
+export async function getAuditLogs(filters: {
+  storeId?: string;
+  adminUserId?: string;
+  action?: string;
+  targetType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<{ logs: AuditLog[]; total: number }> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  if (filters.storeId) {
+    conditions.push(`(a.target_id = $${idx} OR (a.target_type = 'claim' AND a.details->>'storeId' = $${idx}))`);
+    params.push(filters.storeId);
+    idx++;
+  }
+  if (filters.adminUserId) {
+    conditions.push(`a.admin_user_id = $${idx++}`);
+    params.push(filters.adminUserId);
+  }
+  if (filters.action) {
+    conditions.push(`a.action = $${idx++}`);
+    params.push(filters.action);
+  }
+  if (filters.targetType) {
+    conditions.push(`a.target_type = $${idx++}`);
+    params.push(filters.targetType);
+  }
+  if (filters.startDate) {
+    conditions.push(`a.created_at >= $${idx++}`);
+    params.push(filters.startDate);
+  }
+  if (filters.endDate) {
+    conditions.push(`a.created_at <= $${idx++}`);
+    params.push(filters.endDate);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = filters.limit || 50;
+  const offset = ((filters.page || 1) - 1) * limit;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM audit_logs a ${where}`,
+    params
+  );
+  const total = parseInt(countResult.rows[0].count);
+
+  const logsResult = await pool.query(
+    `SELECT a.*, u.email as admin_email,
+            COALESCE(u.first_name || ' ' || u.last_name, u.email) as admin_name,
+            s.name as target_name
+     FROM audit_logs a
+     LEFT JOIN users u ON a.admin_user_id = u.id
+     LEFT JOIN stores s ON a.target_type = 'store' AND a.target_id = s.id
+     ${where}
+     ORDER BY a.created_at DESC
+     LIMIT $${idx++} OFFSET $${idx++}`,
+    [...params, limit, offset]
+  );
+
+  return {
+    logs: logsResult.rows.map(formatAuditLog),
+    total,
+  };
+}
+
+export async function getAdminAllStores(filters: {
+  status?: string;
+  claimed?: string;
+  search?: string;
+  province?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<{ stores: Store[]; total: number; statusCounts: Record<string, number>; claimedCount: number }> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  if (filters.status) {
+    conditions.push(`verification_status = $${idx++}`);
+    params.push(filters.status);
+  }
+  if (filters.claimed === 'true') {
+    conditions.push(`is_claimed = true`);
+  } else if (filters.claimed === 'false') {
+    conditions.push(`is_claimed = false`);
+  }
+  if (filters.province) {
+    conditions.push(`province = $${idx++}`);
+    params.push(filters.province);
+  }
+  if (filters.search) {
+    conditions.push(`(LOWER(name) LIKE $${idx} OR LOWER(address) LIKE $${idx})`);
+    params.push(`%${filters.search.toLowerCase()}%`);
+    idx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countResult = await pool.query(`SELECT COUNT(*) FROM stores ${where}`, params);
+  const total = parseInt(countResult.rows[0].count);
+
+  const statusResult = await pool.query(
+    `SELECT verification_status, COUNT(*) as cnt FROM stores GROUP BY verification_status`
+  );
+  const statusCounts: Record<string, number> = {};
+  for (const row of statusResult.rows) {
+    statusCounts[row.verification_status] = parseInt(row.cnt);
+  }
+
+  const claimedResult = await pool.query(`SELECT COUNT(*) FROM stores WHERE is_claimed = true`);
+  const claimedCount = parseInt(claimedResult.rows[0].count);
+
+  const allowedSorts: Record<string, string> = {
+    name: 'name',
+    updated_at: 'updated_at',
+    confidence_score: 'confidence_score',
+    flag_count: 'flag_count',
+    verification_status: 'verification_status',
+  };
+  const sortCol = allowedSorts[filters.sortBy || ''] || 'updated_at';
+  const sortDir = filters.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+  const limit = filters.limit || 25;
+  const offset = ((filters.page || 1) - 1) * limit;
+
+  const storesResult = await pool.query(
+    `SELECT * FROM stores ${where} ORDER BY ${sortCol} ${sortDir} NULLS LAST
+     LIMIT $${idx++} OFFSET $${idx++}`,
+    [...params, limit, offset]
+  );
+
+  return {
+    stores: storesResult.rows.map(snakeToCamel),
+    total,
+    statusCounts,
+    claimedCount,
+  };
+}
+
+export async function adminUpdateStore(
+  id: string,
+  updates: Partial<Store>,
+  adminUserId: string
+): Promise<Store | null> {
+  const existing = await getStoreById(id);
+  if (!existing) return null;
+
+  const changes: Record<string, { from: any; to: any }> = {};
+  const trackFields = ['name', 'address', 'province', 'type', 'phone', 'website',
+    'verificationStatus', 'adminNotes', 'featuredOfferings', 'isClaimed'] as const;
+  
+  for (const field of trackFields) {
+    if (field in updates && JSON.stringify((updates as any)[field]) !== JSON.stringify((existing as any)[field])) {
+      changes[field] = { from: (existing as any)[field], to: (updates as any)[field] };
+    }
+  }
+
+  const updated = await updateStore(id, updates);
+
+  if (Object.keys(changes).length > 0) {
+    try {
+      await createAuditLog(adminUserId, 'store_edited', 'store', id, {
+        changes,
+        storeName: existing.name,
+      });
+    } catch (auditErr) {
+      console.error('Failed to write audit log:', auditErr);
+    }
+  }
+
+  return updated;
 }
 
 export async function seedStoresFromFile(): Promise<number> {

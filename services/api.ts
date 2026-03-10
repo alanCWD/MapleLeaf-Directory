@@ -409,3 +409,81 @@ export async function fetchStoreCheckins(storeId: string): Promise<StoreCheckinS
 export async function fetchUserCheckins(): Promise<PresenceCheckin[]> {
   return apiFetch<PresenceCheckin[]>('/user/checkins');
 }
+
+export interface AdminStoresResponse {
+  stores: Store[];
+  total: number;
+  statusCounts: Record<string, number>;
+  claimedCount: number;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  adminUserId: string;
+  adminEmail?: string;
+  adminName?: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  targetName?: string;
+  details: Record<string, any>;
+  createdAt: string;
+}
+
+export interface AuditLogsResponse {
+  logs: AuditLogEntry[];
+  total: number;
+}
+
+export async function fetchAdminStores(filters: {
+  status?: string;
+  claimed?: string;
+  search?: string;
+  province?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AdminStoresResponse> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.claimed) params.set('claimed', filters.claimed);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.province) params.set('province', filters.province);
+  if (filters.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return apiFetch<AdminStoresResponse>(`/admin/stores${qs ? `?${qs}` : ''}`);
+}
+
+export async function adminEditStore(id: string, updates: Partial<Store>): Promise<Store> {
+  return apiFetch<Store>(`/admin/stores/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function fetchAuditLogs(filters: {
+  storeId?: string;
+  adminUserId?: string;
+  action?: string;
+  targetType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<AuditLogsResponse> {
+  const params = new URLSearchParams();
+  if (filters.storeId) params.set('storeId', filters.storeId);
+  if (filters.adminUserId) params.set('adminUserId', filters.adminUserId);
+  if (filters.action) params.set('action', filters.action);
+  if (filters.targetType) params.set('targetType', filters.targetType);
+  if (filters.startDate) params.set('startDate', filters.startDate);
+  if (filters.endDate) params.set('endDate', filters.endDate);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return apiFetch<AuditLogsResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
+}

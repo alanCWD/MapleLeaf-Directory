@@ -13,6 +13,7 @@ import { PersonalScout } from './components/PersonalScout';
 import { LeadBanner } from './components/LeadBanner';
 import { AdminReviewQueue } from './components/AdminReviewQueue';
 import { AdminUsers } from './components/AdminUsers';
+import { AdminStores } from './components/AdminStores';
 import { CommunitySubmit } from './components/CommunitySubmit';
 import { AuthPage } from './components/AuthPage';
 import { BadgeProgress } from './components/BadgeProgress';
@@ -315,6 +316,7 @@ const App: React.FC = () => {
             <Route path="/admin/sync" element={<AdminSync onSync={handleSyncStores} />} />
             <Route path="/admin/review" element={<AdminReviewQueue />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/stores" element={<AdminStores />} />
             <Route path="/submit" element={<CommunitySubmit />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/badges" element={<BadgeProgress />} />

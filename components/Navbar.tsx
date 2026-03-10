@@ -140,6 +140,9 @@ export const Navbar: React.FC = () => {
             )}
             {user.role === 'admin' && (
               <>
+                <a href="#/admin/stores" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  Store Management
+                </a>
                 <a href="#/admin/review" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
                   Admin Review
                 </a>

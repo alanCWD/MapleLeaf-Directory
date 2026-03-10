@@ -69,6 +69,7 @@ export interface Store {
   placesCategory?: string;
 
   lastVerifiedAt?: string;
+  updatedAt?: string;
 
   storeInsights?: {
     atmosphere?: string;

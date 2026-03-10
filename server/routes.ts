@@ -10,6 +10,10 @@ import {
   getReviewQueue,
   adminReview,
   searchStoresInDb,
+  createAuditLog,
+  getAuditLogs,
+  getAdminAllStores,
+  adminUpdateStore,
 } from './db.ts';
 import { verifyStore } from './verification.ts';
 import { serverSearchStores } from './search.ts';
@@ -543,17 +547,31 @@ router.get('/admin/review-queue', isAuthenticated as RequestHandler, requireAdmi
   }
 });
 
-router.patch('/admin/stores/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req, res) => {
+router.patch('/admin/stores/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const { action, notes } = req.body;
     if (!action || !['approve', 'reject', 'mark_closed'].includes(action)) {
       res.status(400).json({ error: 'Valid action required: approve, reject, or mark_closed' });
       return;
     }
-    const store = await adminReview(paramId(req.params), action, notes);
+    const storeId = paramId(req.params);
+    const adminUserId = getUserId(req)!;
+    const existing = await getStoreById(storeId);
+    const store = await adminReview(storeId, action, notes);
     if (!store) {
       res.status(404).json({ error: 'Store not found' });
       return;
+    }
+    const actionMap: Record<string, string> = { approve: 'store_approved', reject: 'store_rejected', mark_closed: 'store_closed' };
+    try {
+      await createAuditLog(adminUserId, actionMap[action], 'store', storeId, {
+        storeName: store.name,
+        previousStatus: existing?.verificationStatus,
+        newStatus: store.verificationStatus,
+        notes: notes || null,
+      });
+    } catch (auditErr) {
+      console.error('Failed to write audit log:', auditErr);
     }
     res.json(store);
   } catch (error) {
@@ -572,18 +590,84 @@ router.get('/admin/claims', isAuthenticated as RequestHandler, requireAdmin, asy
   }
 });
 
-router.patch('/admin/claims/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req, res) => {
+router.patch('/admin/claims/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const { action, notes } = req.body;
     if (!action || !['approve', 'reject'].includes(action)) {
       res.status(400).json({ error: 'Valid action required: approve or reject' });
       return;
     }
+    const adminUserId = getUserId(req)!;
     const claim = await reviewClaim(parseInt(paramId(req.params)), action, notes);
+    try {
+      await createAuditLog(adminUserId, action === 'approve' ? 'claim_approved' : 'claim_rejected', 'claim', String(claim.id), {
+        storeId: claim.storeId,
+        userId: claim.userId,
+        notes: notes || null,
+      });
+    } catch (auditErr) {
+      console.error('Failed to write audit log:', auditErr);
+    }
     res.json(claim);
   } catch (error) {
     console.error('Error reviewing claim:', error);
     res.status(500).json({ error: 'Failed to review claim' });
+  }
+});
+
+router.get('/admin/stores', isAuthenticated as RequestHandler, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { status, claimed, search, province, sortBy, sortOrder, page, limit } = req.query;
+    const result = await getAdminAllStores({
+      status: status as string | undefined,
+      claimed: claimed as string | undefined,
+      search: search as string | undefined,
+      province: province as string | undefined,
+      sortBy: sortBy as string | undefined,
+      sortOrder: sortOrder as string | undefined,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching admin stores:', error);
+    res.status(500).json({ error: 'Failed to fetch stores' });
+  }
+});
+
+router.patch('/admin/stores/:id', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const adminUserId = getUserId(req)!;
+    const store = await adminUpdateStore(storeId, req.body, adminUserId);
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json(store);
+  } catch (error) {
+    console.error('Error updating store:', error);
+    res.status(500).json({ error: 'Failed to update store' });
+  }
+});
+
+router.get('/admin/audit-logs', isAuthenticated as RequestHandler, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { storeId, adminUserId, action, targetType, startDate, endDate, page, limit } = req.query;
+    const result = await getAuditLogs({
+      storeId: storeId as string | undefined,
+      adminUserId: adminUserId as string | undefined,
+      action: action as string | undefined,
+      targetType: targetType as string | undefined,
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
 
