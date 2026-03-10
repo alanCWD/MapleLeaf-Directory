@@ -44,6 +44,8 @@ import {
   evaluateUserBadges,
   getUserBadges,
   getReviewsWithBadges,
+  awardBadge,
+  revokeBadge,
 } from './integrity/index.ts';
 import type { RecorderQuestion } from './integrity/types.ts';
 
@@ -620,6 +622,44 @@ router.delete('/admin/users/:id', isAuthenticated as RequestHandler, requireAdmi
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+router.post('/admin/users/:id/badges/:badgeType', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const targetId = paramId(req.params);
+    const badgeType = req.params.badgeType;
+    const validTypes = ['verified_scout', 'legacy_archivist', 'integrity_anchor'];
+    if (!validTypes.includes(badgeType)) {
+      res.status(400).json({ error: 'Invalid badge type' });
+      return;
+    }
+    const badge = await awardBadge(targetId, badgeType, { awardedBy: 'admin', adminUserId: getUserId(req) });
+    res.json(badge);
+  } catch (error) {
+    console.error('Error awarding badge:', error);
+    res.status(500).json({ error: 'Failed to award badge' });
+  }
+});
+
+router.delete('/admin/users/:id/badges/:badgeType', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const targetId = paramId(req.params);
+    const badgeType = req.params.badgeType;
+    const validTypes = ['verified_scout', 'legacy_archivist', 'integrity_anchor'];
+    if (!validTypes.includes(badgeType)) {
+      res.status(400).json({ error: 'Invalid badge type' });
+      return;
+    }
+    const revoked = await revokeBadge(targetId, badgeType);
+    if (!revoked) {
+      res.status(404).json({ error: 'Badge not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error revoking badge:', error);
+    res.status(500).json({ error: 'Failed to revoke badge' });
   }
 });
 

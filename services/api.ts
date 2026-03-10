@@ -206,6 +206,14 @@ export async function deleteUserAPI(userId: string): Promise<void> {
   await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
 }
 
+export async function adminAwardBadge(userId: string, badgeType: string): Promise<UserBadge> {
+  return apiFetch<UserBadge>(`/admin/users/${userId}/badges/${badgeType}`, { method: 'POST' });
+}
+
+export async function adminRevokeBadge(userId: string, badgeType: string): Promise<void> {
+  await apiFetch(`/admin/users/${userId}/badges/${badgeType}`, { method: 'DELETE' });
+}
+
 export interface IntegrityScoreCard {
   score: number;
   verifiedPresenceRatio: number;

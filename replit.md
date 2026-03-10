@@ -147,7 +147,7 @@ Three automatically-awarded badges that serve as trust signals:
 | **Legacy Archivist** (amber) | 10+ reviews OR 5+ store submissions OR 3+ media uploads | Display-only reputation |
 | **Integrity Anchor** (emerald) | 8+ reviews, avg trust ≥ 0.7, 0 flagged | Display-only reputation |
 
-Badges auto-evaluate after every review submission and flag action. Displayed on reviews, navbar, admin panel, and the `/badges` progress page.
+Badges auto-evaluate after every review submission and flag action. Displayed on reviews, navbar, admin panel, and the `/badges` progress page. Admins can filter users by badge type, manually award badges, and revoke badges from the User Management panel.
 
 ### Future Extraction
 The `server/integrity/` module is structured for white-label extraction into a standalone service. All database operations, scoring logic, and media orchestration are self-contained with a clean public API via `index.ts`.
@@ -202,6 +202,8 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `POST /webhooks/bunny` (outside /api prefix) - Bunny Stream encoding webhook
 - `GET /api/users/:userId/badges` (public) - Get user's badges
 - `GET /api/user/badge-progress` (authenticated) - Get badge progress metrics
+- `POST /api/admin/users/:userId/badges/:badgeType` (admin) - Manually award a badge
+- `DELETE /api/admin/users/:userId/badges/:badgeType` (admin) - Manually revoke a badge
 
 ### Admin (admin role only)
 - `POST /api/stores` - Create store
@@ -231,6 +233,12 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-10: Added admin badge management to User Management panel
+  - Badge filter bar (filter users by Verified Scout / Legacy Archivist / Integrity Anchor)
+  - Badge count summary showing how many users hold each badge
+  - Award badge button per user with badge type selector
+  - Revoke badge with confirmation per user
+  - Admin-only API routes: POST/DELETE /api/admin/users/:id/badges/:badgeType
 - 2026-03-09: Added Badge System (Verified Scout, Legacy Archivist, Integrity Anchor)
   - Auto-awarded based on user activity thresholds
   - Verified Scout activates +0.3 trust weight bonus on reviews

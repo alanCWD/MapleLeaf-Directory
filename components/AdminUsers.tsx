@@ -2,8 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, type AdminUser } from '../services/api';
+import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, adminAwardBadge, adminRevokeBadge, type AdminUser } from '../services/api';
 import { BadgeIcon } from './BadgeIcon';
+
+const BADGE_TYPES = [
+  { value: 'verified_scout', label: 'Verified Scout' },
+  { value: 'legacy_archivist', label: 'Legacy Archivist' },
+  { value: 'integrity_anchor', label: 'Integrity Anchor' },
+] as const;
 
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-red-100 text-red-700 border-red-200',
@@ -18,6 +24,9 @@ export const AdminUsers: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [badgeFilter, setBadgeFilter] = useState<string | null>(null);
+  const [awardingBadgeFor, setAwardingBadgeFor] = useState<string | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState<{ userId: string; badgeType: string } | null>(null);
   const { isAuthenticated, isLoading: authLoading, isAdmin, user: currentUser } = useAuth();
 
   const loadUsers = async () => {
@@ -93,13 +102,50 @@ export const AdminUsers: React.FC = () => {
     }
   };
 
+  const handleAwardBadge = async (userId: string, badgeType: string) => {
+    setActionInProgress(userId);
+    try {
+      const badge = await adminAwardBadge(userId, badgeType);
+      setUsers(prev => prev.map(u => {
+        if (u.id !== userId) return u;
+        const existing = u.badges || [];
+        if (existing.some(b => b.badgeType === badgeType)) return u;
+        return { ...u, badges: [...existing, badge] };
+      }));
+      setAwardingBadgeFor(null);
+    } catch (err: any) {
+      console.error('Failed to award badge:', err);
+      alert(err.message || 'Failed to award badge');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleRevokeBadge = async (userId: string, badgeType: string) => {
+    setActionInProgress(userId);
+    try {
+      await adminRevokeBadge(userId, badgeType);
+      setUsers(prev => prev.map(u => {
+        if (u.id !== userId) return u;
+        return { ...u, badges: (u.badges || []).filter(b => b.badgeType !== badgeType) };
+      }));
+      setConfirmRevoke(null);
+    } catch (err: any) {
+      console.error('Failed to revoke badge:', err);
+      alert(err.message || 'Failed to revoke badge');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = !searchQuery ||
       (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.lastName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = !roleFilter || u.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesBadge = !badgeFilter || (u.badges && u.badges.some(b => b.badgeType === badgeFilter));
+    return matchesSearch && matchesRole && matchesBadge;
   });
 
   const roleCounts = {
@@ -107,6 +153,12 @@ export const AdminUsers: React.FC = () => {
     admin: users.filter(u => u.role === 'admin').length,
     owner: users.filter(u => u.role === 'owner').length,
     user: users.filter(u => u.role === 'user').length,
+  };
+
+  const badgeCounts = {
+    verified_scout: users.filter(u => u.badges?.some(b => b.badgeType === 'verified_scout')).length,
+    legacy_archivist: users.filter(u => u.badges?.some(b => b.badgeType === 'legacy_archivist')).length,
+    integrity_anchor: users.filter(u => u.badges?.some(b => b.badgeType === 'integrity_anchor')).length,
   };
 
   return (
@@ -160,6 +212,45 @@ export const AdminUsers: React.FC = () => {
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-3 mb-6 p-4 bg-stone-50 rounded-2xl border border-stone-200">
+            <span className="text-xs font-black text-stone-500 uppercase tracking-widest self-center mr-1">Badges:</span>
+            <button
+              onClick={() => setBadgeFilter(null)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                !badgeFilter ? 'bg-stone-900 text-white' : 'bg-white text-stone-500 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setBadgeFilter(badgeFilter === 'verified_scout' ? null : 'verified_scout')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                badgeFilter === 'verified_scout' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+              }`}
+            >
+              <span>Verified Scout</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'verified_scout' ? 'bg-purple-500' : 'bg-purple-200 text-purple-800'}`}>{badgeCounts.verified_scout}</span>
+            </button>
+            <button
+              onClick={() => setBadgeFilter(badgeFilter === 'legacy_archivist' ? null : 'legacy_archivist')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                badgeFilter === 'legacy_archivist' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              <span>Legacy Archivist</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'legacy_archivist' ? 'bg-amber-500' : 'bg-amber-200 text-amber-800'}`}>{badgeCounts.legacy_archivist}</span>
+            </button>
+            <button
+              onClick={() => setBadgeFilter(badgeFilter === 'integrity_anchor' ? null : 'integrity_anchor')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                badgeFilter === 'integrity_anchor' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              <span>Integrity Anchor</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'integrity_anchor' ? 'bg-emerald-500' : 'bg-emerald-200 text-emerald-800'}`}>{badgeCounts.integrity_anchor}</span>
+            </button>
+          </div>
+
           {isLoading ? (
             <div className="text-center py-16">
               <div className="text-4xl mb-4 animate-spin">⏳</div>
@@ -206,7 +297,19 @@ export const AdminUsers: React.FC = () => {
                               </span>
                             )}
                             {u.badges && u.badges.length > 0 && u.badges.map((b) => (
-                              <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={true} />
+                              <span key={b.badgeType} className="inline-flex items-center gap-0.5">
+                                <BadgeIcon badgeType={b.badgeType as any} size="sm" showLabel={true} />
+                                {!isCurrentUser && (
+                                  confirmRevoke?.userId === u.id && confirmRevoke?.badgeType === b.badgeType ? (
+                                    <span className="inline-flex gap-0.5 ml-0.5">
+                                      <button onClick={() => handleRevokeBadge(u.id, b.badgeType)} disabled={actionInProgress === u.id} className="w-5 h-5 rounded-full bg-red-500 text-white text-[9px] font-black hover:bg-red-400 disabled:opacity-50 flex items-center justify-center" title="Confirm revoke">Y</button>
+                                      <button onClick={() => setConfirmRevoke(null)} className="w-5 h-5 rounded-full bg-stone-300 text-stone-600 text-[9px] font-black hover:bg-stone-400 flex items-center justify-center" title="Cancel">N</button>
+                                    </span>
+                                  ) : (
+                                    <button onClick={() => setConfirmRevoke({ userId: u.id, badgeType: b.badgeType })} className="w-4 h-4 rounded-full bg-red-100 text-red-500 text-[9px] font-black hover:bg-red-200 flex items-center justify-center ml-0.5" title="Revoke badge">&times;</button>
+                                  )
+                                )}
+                              </span>
                             ))}
                           </div>
                           {u.email && u.firstName && (
@@ -221,42 +324,77 @@ export const AdminUsers: React.FC = () => {
                       </div>
 
                       {!isCurrentUser && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            disabled={actionInProgress === u.id}
-                            className="bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm font-bold text-stone-700 focus:border-emerald-400 focus:outline-none disabled:opacity-50"
-                          >
-                            <option value="user">User</option>
-                            <option value="owner">Owner</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                          {confirmDelete === u.id ? (
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleDelete(u.id)}
-                                disabled={actionInProgress === u.id}
-                                className="px-3 py-2 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setConfirmDelete(null)}
-                                className="px-3 py-2 rounded-xl text-sm font-bold bg-stone-200 text-stone-600 hover:bg-stone-300 transition"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDelete(u.id)}
+                        <div className="flex flex-col gap-2 flex-shrink-0 items-end">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
                               disabled={actionInProgress === u.id}
-                              className="px-3 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-600 hover:bg-red-200 transition disabled:opacity-50"
+                              className="bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm font-bold text-stone-700 focus:border-emerald-400 focus:outline-none disabled:opacity-50"
                             >
-                              Delete
-                            </button>
-                          )}
+                              <option value="user">User</option>
+                              <option value="owner">Owner</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                            {confirmDelete === u.id ? (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleDelete(u.id)}
+                                  disabled={actionInProgress === u.id}
+                                  className="px-3 py-2 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelete(null)}
+                                  className="px-3 py-2 rounded-xl text-sm font-bold bg-stone-200 text-stone-600 hover:bg-stone-300 transition"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDelete(u.id)}
+                                disabled={actionInProgress === u.id}
+                                className="px-3 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-600 hover:bg-red-200 transition disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {awardingBadgeFor === u.id ? (
+                              <div className="flex items-center gap-1">
+                                {BADGE_TYPES
+                                  .filter(bt => !(u.badges || []).some(b => b.badgeType === bt.value))
+                                  .map(bt => (
+                                    <button
+                                      key={bt.value}
+                                      onClick={() => handleAwardBadge(u.id, bt.value)}
+                                      disabled={actionInProgress === u.id}
+                                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition disabled:opacity-50"
+                                    >
+                                      {bt.label}
+                                    </button>
+                                  ))
+                                }
+                                <button
+                                  onClick={() => setAwardingBadgeFor(null)}
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-stone-200 text-stone-500 hover:bg-stone-300 transition"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setAwardingBadgeFor(u.id)}
+                                disabled={actionInProgress === u.id}
+                                className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition border border-emerald-200 disabled:opacity-50"
+                              >
+                                + Award Badge
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
