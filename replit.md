@@ -77,6 +77,7 @@ The app uses a split frontend/backend architecture:
     ├── search.ts               # AI search endpoint
     ├── verification.ts         # Verification pipeline
     ├── bunnyStream.ts          # Bunny Stream API client (create/get/delete video, TUS creds)
+    ├── videoStitcher.ts        # FFmpeg video auto-stitching (normalize, title cards, crossfade)
     ├── integrity/              # Portable Integrity Engine module
     │   ├── index.ts            # Module entry — exports + initIntegrityEngine()
     │   ├── types.ts            # TrustWeight, IntegrityScoreCard, WeightedReview, etc.
@@ -132,12 +133,25 @@ Composite score (0–10) from: 40% weighted average rating + 20% verified presen
 4. Media status updates: created → processing → ready (or failed)
 5. Videos served via Bunny CDN embed player + thumbnails
 
+### Video Auto-Stitching
+Server-side FFmpeg pipeline that concatenates multi-question clips into a single polished video:
+1. Client uploads individual recorded clips to `POST /api/stores/:id/media/stitch` (multipart form)
+2. Server normalizes all clips to 1280x720, 30fps, H.264+AAC
+3. Creates intro title card ("Video Review / Store Name") and per-question title cards
+4. Stitches segments with crossfade transitions (0.5s) between clips
+5. Uploads the final stitched MP4 to Bunny Stream via direct PUT upload
+6. Returns mediaId for review submission
+- Single-clip recordings bypass stitching and upload directly via TUS (existing flow)
+- Files: `server/videoStitcher.ts` (FFmpeg orchestration), route in `server/routes.ts`
+- Temp files stored in `/tmp/video-stitch/` and cleaned up after processing
+- Supports up to 10 clips per stitch job, 200MB per clip max
+
 ### Guided Video Recorder (VocalVideo-Style)
 Built natively with MediaRecorder API — no third-party service. Four-step flow:
 1. Welcome screen with camera permission request
 2. Prompted recording (per question) with record/pause/re-record controls
 3. Review all clips + star rating + optional text comment
-4. TUS upload + review submission with trust weight display
+4. Auto-stitch (multi-clip) or TUS upload (single clip) + review submission with trust weight display
 
 ### Badge System
 Three automatically-awarded badges that serve as trust signals:
@@ -192,6 +206,7 @@ The `server/integrity/` module is structured for white-label extraction into a s
 
 ### Integrity Engine (media + reviews)
 - `POST /api/stores/:id/media/init` (authenticated) - Initialize video upload, returns TUS credentials
+- `POST /api/stores/:id/media/stitch` (authenticated) - Upload clips + auto-stitch into polished video with transitions
 - `GET /api/stores/:id/media` (public) - List store media
 - `GET /api/stores/:id/media/:mediaId` (public) - Single media details
 - `DELETE /api/stores/:id/media/:mediaId` (authenticated, owner/admin) - Delete media
@@ -233,6 +248,17 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-10: Added Video Auto-Stitching pipeline
+  - Server-side FFmpeg processing concatenates multi-question clips into single polished video
+  - Intro title card + per-question title cards generated automatically
+  - Crossfade transitions (0.5s) between all segments
+  - Clips normalized to 1280x720 H.264+AAC before stitching
+  - Stitched video uploaded to Bunny Stream via direct PUT API
+  - VideoRecorder updated with multi-phase progress UI (uploading → stitching → processing → submitting)
+  - Single-clip recordings continue to use efficient direct TUS upload
+  - New file: server/videoStitcher.ts
+  - New API endpoint: POST /api/stores/:id/media/stitch
+  - New dependency: multer (multipart file uploads)
 - 2026-03-10: Added admin badge management to User Management panel
   - Badge filter bar (filter users by Verified Scout / Legacy Archivist / Integrity Anchor)
   - Badge count summary showing how many users hold each badge

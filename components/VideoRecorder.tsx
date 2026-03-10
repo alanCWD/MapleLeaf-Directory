@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchRecorderQuestions, initMediaUpload, submitReview } from '../services/api';
+import { fetchRecorderQuestions, initMediaUpload, submitReview, stitchVideoClips } from '../services/api';
 import type { RecorderQuestion, WeightedReview } from '../services/api';
 import * as tus from 'tus-js-client';
 
@@ -12,6 +12,7 @@ interface VideoRecorderProps {
 }
 
 type Step = 'welcome' | 'recording' | 'review' | 'uploading';
+type StitchPhase = 'uploading' | 'stitching' | 'processing' | 'submitting' | 'done';
 type CameraFacing = 'user' | 'environment';
 
 interface RecordedClip {
@@ -40,6 +41,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   const [commentText, setCommentText] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
+  const [stitchPhase, setStitchPhase] = useState<StitchPhase>('uploading');
   const [trustWeightEarned, setTrustWeightEarned] = useState(0);
   const [completedReview, setCompletedReview] = useState<WeightedReview | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -267,52 +269,87 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
     setStep('uploading');
     setUploadProgress(0);
     setUploadError('');
+    setStitchPhase('uploading');
 
     try {
-      const combinedBlob = new Blob(
-        recordedClips.map(c => c.blob),
-        { type: 'video/webm' }
-      );
+      const useStitching = recordedClips.length > 1;
+      let mediaId: number;
 
-      const creds = await initMediaUpload(storeId, `Video Review - ${storeName}`, 'review');
-      setUploadProgress(10);
+      if (useStitching) {
+        setStitchPhase('uploading');
+        setUploadProgress(10);
 
-      await new Promise<void>((resolve, reject) => {
-        const upload = new tus.Upload(combinedBlob, {
-          endpoint: `https://video.bunnycdn.com/tusupload`,
-          retryDelays: [0, 3000, 5000, 10000],
-          headers: {
-            AuthorizationSignature: creds.signature,
-            AuthorizationExpire: creds.expirationTime.toString(),
-            VideoId: creds.videoId,
-            LibraryId: creds.libraryId.toString(),
-          },
-          metadata: {
-            filetype: 'video/webm',
-            title: `Video Review - ${storeName}`,
-          },
-          onError: (error) => reject(error),
-          onProgress: (bytesUploaded, bytesTotal) => {
-            const pct = 10 + Math.round((bytesUploaded / bytesTotal) * 70);
-            setUploadProgress(pct);
-          },
-          onSuccess: () => {
-            setUploadProgress(85);
-            resolve();
-          },
+        const clipsForApi = recordedClips.map(c => ({
+          blob: c.blob,
+          questionId: c.questionId,
+        }));
+
+        const questionsForApi = questions.map(q => ({
+          id: q.id,
+          prompt: q.prompt,
+        }));
+
+        setStitchPhase('stitching');
+        setUploadProgress(30);
+
+        const stitchResult = await stitchVideoClips(
+          storeId,
+          clipsForApi,
+          questionsForApi,
+          storeName,
+          `Video Review - ${storeName}`
+        );
+
+        setStitchPhase('processing');
+        setUploadProgress(80);
+
+        mediaId = stitchResult.mediaId;
+      } else {
+        const singleBlob = recordedClips[0].blob;
+        const creds = await initMediaUpload(storeId, `Video Review - ${storeName}`, 'review');
+        setUploadProgress(10);
+
+        await new Promise<void>((resolve, reject) => {
+          const upload = new tus.Upload(singleBlob, {
+            endpoint: `https://video.bunnycdn.com/tusupload`,
+            retryDelays: [0, 3000, 5000, 10000],
+            headers: {
+              AuthorizationSignature: creds.signature,
+              AuthorizationExpire: creds.expirationTime.toString(),
+              VideoId: creds.videoId,
+              LibraryId: creds.libraryId.toString(),
+            },
+            metadata: {
+              filetype: 'video/webm',
+              title: `Video Review - ${storeName}`,
+            },
+            onError: (error) => reject(error),
+            onProgress: (bytesUploaded, bytesTotal) => {
+              const pct = 10 + Math.round((bytesUploaded / bytesTotal) * 70);
+              setUploadProgress(pct);
+            },
+            onSuccess: () => {
+              setUploadProgress(85);
+              resolve();
+            },
+          });
+          upload.start();
         });
-        upload.start();
-      });
 
+        mediaId = creds.mediaId;
+      }
+
+      setStitchPhase('submitting');
       setUploadProgress(90);
 
       const review = await submitReview(storeId, {
         rating,
         contentText: commentText || `Video review of ${storeName}`,
-        videoAssetId: creds.mediaId,
+        videoAssetId: mediaId,
       });
 
       setUploadProgress(100);
+      setStitchPhase('done');
       setTrustWeightEarned(review.trustWeight?.final ?? 0);
       setCompletedReview(review);
     } catch (err: any) {
@@ -664,6 +701,11 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
               </svg>
               Video reviews earn +0.2 trust weight bonus
             </div>
+            {recordedClips.length > 1 && (
+              <p className="text-emerald-600 text-xs mt-2">
+                Your {recordedClips.length} clips will be auto-stitched into a single polished video with title cards and smooth transitions.
+              </p>
+            )}
           </div>
 
           <button
@@ -714,11 +756,39 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-black text-stone-900 mb-3">Uploading Your Review</h2>
-              <p className="text-stone-500 text-sm mb-6">Please don't close this window...</p>
+              <h2 className="text-xl font-black text-stone-900 mb-3">
+                {stitchPhase === 'uploading' && 'Uploading Clips'}
+                {stitchPhase === 'stitching' && 'Stitching Your Video'}
+                {stitchPhase === 'processing' && 'Processing Video'}
+                {stitchPhase === 'submitting' && 'Submitting Review'}
+              </h2>
+              <p className="text-stone-500 text-sm mb-4">
+                {stitchPhase === 'uploading' && 'Sending your clips to the server...'}
+                {stitchPhase === 'stitching' && 'Adding transitions and title cards between your clips...'}
+                {stitchPhase === 'processing' && 'Uploading polished video to CDN...'}
+                {stitchPhase === 'submitting' && 'Finalizing your review...'}
+              </p>
+
+              {recordedClips.length > 1 && (
+                <div className="flex justify-center gap-1 mb-4">
+                  {(['uploading', 'stitching', 'processing', 'submitting'] as StitchPhase[]).map((phase, idx) => {
+                    const phases: StitchPhase[] = ['uploading', 'stitching', 'processing', 'submitting'];
+                    const currentIdx = phases.indexOf(stitchPhase);
+                    const isActive = idx <= currentIdx;
+                    return (
+                      <div key={phase} className="flex items-center gap-1">
+                        <div className={`w-2.5 h-2.5 rounded-full transition-colors ${isActive ? 'bg-emerald-500' : 'bg-stone-200'}`} />
+                        {idx < 3 && <div className={`w-4 h-0.5 transition-colors ${isActive ? 'bg-emerald-300' : 'bg-stone-200'}`} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-stone-400 text-xs mb-6">Please don't close this window...</p>
               <div className="w-full bg-stone-100 rounded-full h-3 mb-2">
                 <div
-                  className="bg-emerald-500 h-3 rounded-full transition-all duration-300"
+                  className="bg-emerald-500 h-3 rounded-full transition-all duration-500"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>

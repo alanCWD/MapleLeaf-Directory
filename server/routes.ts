@@ -48,6 +48,17 @@ import {
   revokeBadge,
 } from './integrity/index.ts';
 import type { RecorderQuestion } from './integrity/types.ts';
+import multer from 'multer';
+import { createJobDir, stitchClips, uploadStitchedToBunny, cleanupJobDir } from './videoStitcher.ts';
+import { createVideo, generateTusCredentials, getEmbedUrl } from './bunnyStream.ts';
+import { createStoreMedia, updateMediaStatus } from './integrity/models.ts';
+import path from 'path';
+import fs from 'fs';
+
+const clipUpload = multer({
+  dest: '/tmp/video-stitch/uploads',
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
 
 const router = Router();
 
@@ -685,6 +696,117 @@ router.post('/stores/:id/media/init', isAuthenticated as RequestHandler, require
   } catch (error: any) {
     console.error('Error initializing media upload:', error);
     res.status(500).json({ error: 'Failed to initialize upload' });
+  }
+});
+
+const ALLOWED_VIDEO_MIMES = ['video/webm', 'video/mp4', 'video/quicktime', 'video/x-matroska', 'video/ogg', 'application/octet-stream'];
+
+router.post('/stores/:id/media/stitch', isAuthenticated as RequestHandler, requireBunny, (req: any, res: any, next: any) => {
+  clipUpload.array('clips', 10)(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum 200MB per clip.' });
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ error: 'Too many clips. Maximum 10 clips.' });
+      }
+      return res.status(400).json({ error: err.message || 'Upload error' });
+    }
+    next();
+  });
+}, async (req: any, res: any) => {
+  let jobDir: string | null = null;
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      res.status(400).json({ error: 'No clips provided' });
+      return;
+    }
+
+    for (const file of files) {
+      if (!ALLOWED_VIDEO_MIMES.includes(file.mimetype)) {
+        res.status(400).json({ error: `Invalid file type: ${file.mimetype}. Only video files are accepted.` });
+        return;
+      }
+    }
+
+    let questions: { id: string; prompt: string }[] = [];
+    try {
+      questions = JSON.parse(req.body.questions || '[]');
+    } catch {
+      questions = [];
+    }
+
+    const storeName = req.body.storeName || 'Store Review';
+    const title = req.body.title || `Video Review - ${storeName}`;
+
+    jobDir = createJobDir();
+
+    const clipInputs = files.map((file, idx) => {
+      const destPath = path.join(jobDir!, `clip_${idx}${path.extname(file.originalname) || '.webm'}`);
+      fs.renameSync(file.path, destPath);
+      const q = questions[idx];
+      return {
+        filePath: destPath,
+        questionPrompt: q?.prompt || `Part ${idx + 1}`,
+        index: idx,
+      };
+    });
+
+    console.log(`[Stitch] Starting stitch job for store ${storeId}: ${clipInputs.length} clips`);
+
+    const stitchResult = await stitchClips({
+      clips: clipInputs,
+      storeName,
+      transitionDuration: 0.5,
+      titleCardDuration: 2.5,
+    });
+
+    const bunnyVideo = await createVideo(title);
+    let media: any = null;
+    try {
+      media = await createStoreMedia({
+        storeId,
+        userId,
+        bunnyVideoId: bunnyVideo.guid,
+        bunnyLibraryId: String(bunnyVideo.videoLibraryId),
+        title,
+        embedUrl: getEmbedUrl(bunnyVideo.guid),
+        mediaType: 'review',
+        status: 'processing',
+      });
+
+      await uploadStitchedToBunny(stitchResult.outputPath, bunnyVideo.guid);
+    } catch (uploadErr: any) {
+      console.error('[Stitch] Upload/DB error, cleaning up Bunny asset:', uploadErr);
+      if (media) {
+        try { await updateMediaStatus(bunnyVideo.guid, 'failed', {}); } catch {}
+      }
+      try {
+        const { deleteVideo } = await import('./bunnyStream.ts');
+        await deleteVideo(bunnyVideo.guid);
+      } catch {}
+      throw uploadErr;
+    }
+
+    cleanupJobDir(jobDir);
+    jobDir = null;
+
+    console.log(`[Stitch] Complete: mediaId=${media.id}, bunnyVideoId=${bunnyVideo.guid}`);
+
+    res.json({
+      mediaId: media.id,
+      videoId: bunnyVideo.guid,
+      embedUrl: getEmbedUrl(bunnyVideo.guid),
+      durationSeconds: stitchResult.durationSeconds,
+      fileSizeBytes: stitchResult.fileSizeBytes,
+    });
+  } catch (error: any) {
+    console.error('[Stitch] Error:', error);
+    if (jobDir) cleanupJobDir(jobDir);
+    res.status(500).json({ error: error.message || 'Video stitching failed' });
   }
 });
 

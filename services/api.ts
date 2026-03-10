@@ -294,6 +294,49 @@ export async function fetchRecorderQuestions(storeId: string): Promise<RecorderQ
   return apiFetch<RecorderQuestion[]>(`/stores/${storeId}/recorder-questions`);
 }
 
+export interface StitchResult {
+  mediaId: number;
+  videoId: string;
+  embedUrl: string;
+  durationSeconds: number;
+  fileSizeBytes: number;
+}
+
+export async function stitchVideoClips(
+  storeId: string,
+  clips: { blob: Blob; questionId: string }[],
+  questions: { id: string; prompt: string }[],
+  storeName: string,
+  title?: string
+): Promise<StitchResult> {
+  const formData = new FormData();
+  clips.forEach((clip, idx) => {
+    formData.append('clips', clip.blob, `clip_${idx}.webm`);
+  });
+
+  const orderedQuestions = clips.map(clip => {
+    const q = questions.find(q => q.id === clip.questionId);
+    return { id: clip.questionId, prompt: q?.prompt || `Part ${clips.indexOf(clip) + 1}` };
+  });
+
+  formData.append('questions', JSON.stringify(orderedQuestions));
+  formData.append('storeName', storeName);
+  if (title) formData.append('title', title);
+
+  const res = await fetch(`${API_BASE}/stores/${storeId}/media/stitch`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Video stitching failed');
+  }
+
+  return res.json();
+}
+
 export async function fetchUserBadges(userId: string): Promise<UserBadge[]> {
   return apiFetch<UserBadge[]>(`/users/${userId}/badges`);
 }
