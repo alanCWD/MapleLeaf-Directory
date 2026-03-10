@@ -65,8 +65,8 @@ export const AdminStores: React.FC = () => {
   const [provinceFilter, setProvinceFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [sortBy, setSortBy] = useState('updated_at');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
 
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editForm, setEditForm] = useState<EditFormData>({
