@@ -24,7 +24,7 @@ function mediaSnakeToCamel(row: Record<string, any>): StoreMedia {
 function reviewSnakeToCamel(row: Record<string, any>): WeightedReview {
   const trustWeight: TrustWeight = typeof row.trust_weight === 'string'
     ? JSON.parse(row.trust_weight)
-    : row.trust_weight || { base: 0.5, videoBonus: 0, scoutBonus: 0, geoDeviation: 0, final: 0.5 };
+    : row.trust_weight || { base: 0.5, videoBonus: 0, scoutBonus: 0, geoDeviation: 0, presenceBonus: 0, final: 0.5 };
 
   return {
     id: row.id,
@@ -103,6 +103,45 @@ export async function ensureIntegrityTables(): Promise<void> {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_badges_type ON user_badges(badge_type)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS presence_qr_codes (
+      id SERIAL PRIMARY KEY,
+      store_id VARCHAR(500) NOT NULL,
+      code_secret VARCHAR(255) NOT NULL UNIQUE,
+      rotation_epoch INTEGER NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_presence_qr_codes_store ON presence_qr_codes(store_id)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS presence_checkins (
+      id SERIAL PRIMARY KEY,
+      store_id VARCHAR(500) NOT NULL,
+      user_id VARCHAR(500) NOT NULL,
+      qr_code_id INTEGER REFERENCES presence_qr_codes(id),
+      verified_at TIMESTAMP DEFAULT NOW(),
+      lat NUMERIC,
+      lng NUMERIC,
+      distance_meters NUMERIC,
+      geo_verified BOOLEAN DEFAULT false,
+      qr_valid BOOLEAN DEFAULT false,
+      verified BOOLEAN DEFAULT false,
+      method VARCHAR(50) DEFAULT 'qr+geo'
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_presence_checkins_store ON presence_checkins(store_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_presence_checkins_user ON presence_checkins(user_id)
   `);
 }
 

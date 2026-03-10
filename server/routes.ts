@@ -46,6 +46,12 @@ import {
   getReviewsWithBadges,
   awardBadge,
   revokeBadge,
+  getCurrentQRPayload,
+  verifyPresence,
+  getStoreCheckins,
+  getUserCheckins,
+  hasRecentCheckin,
+  calculateDistance,
 } from './integrity/index.ts';
 import type { RecorderQuestion } from './integrity/types.ts';
 import multer from 'multer';
@@ -909,10 +915,24 @@ router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req
     const userBadges = await getUserBadges(userId);
     const isScout = userBadges.some(b => b.badgeType === 'verified_scout');
 
+    const hasVerifiedPresenceCheckin = await hasRecentCheckin(userId, storeId, 60);
+
+    let geoDeviationDetected = false;
+    if (!hasVerifiedPresenceCheckin && req.body.lat != null && req.body.lng != null) {
+      const store = await getStoreById(storeId);
+      if (store && store.lat != null && store.lng != null) {
+        const dist = calculateDistance(req.body.lat, req.body.lng, store.lat, store.lng);
+        if (dist > 500) {
+          geoDeviationDetected = true;
+        }
+      }
+    }
+
     const trustWeight = calculateTrustWeight({
       hasVerifiedVideo,
       isScout,
-      geoDeviationDetected: false,
+      geoDeviationDetected,
+      hasVerifiedPresence: hasVerifiedPresenceCheckin,
     });
 
     const review = await createReview({
@@ -1068,6 +1088,77 @@ router.get('/stores/:id/recorder-questions', async (req: Request, res: Response)
   } catch (error) {
     console.error('Error fetching recorder questions:', error);
     res.status(500).json({ error: 'Failed to fetch recorder questions' });
+  }
+});
+
+router.get('/stores/:id/presence/qr', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+
+    const payload = getCurrentQRPayload(storeId);
+    res.json(payload);
+  } catch (error) {
+    console.error('Error fetching presence QR:', error);
+    res.status(500).json({ error: 'Failed to fetch QR code' });
+  }
+});
+
+router.post('/stores/:id/presence/checkin', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const { qrCode, lat, lng } = req.body;
+
+    if (!qrCode || typeof qrCode !== 'string') {
+      res.status(400).json({ error: 'QR code is required' });
+      return;
+    }
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      res.status(400).json({ error: 'Valid lat and lng are required' });
+      return;
+    }
+
+    const result = await verifyPresence(storeId, userId, qrCode, lat, lng);
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing checkin:', error);
+    res.status(500).json({ error: 'Failed to process check-in' });
+  }
+});
+
+router.get('/stores/:id/presence/checkins', async (req: Request, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const checkins = await getStoreCheckins(storeId);
+    const verifiedCount = checkins.filter((c: any) => c.verified).length;
+    res.json({
+      total: checkins.length,
+      verified: verifiedCount,
+    });
+  } catch (error) {
+    console.error('Error fetching store checkins:', error);
+    res.status(500).json({ error: 'Failed to fetch check-ins' });
+  }
+});
+
+router.get('/user/checkins', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const checkins = await getUserCheckins(userId);
+    res.json(checkins);
+  } catch (error) {
+    console.error('Error fetching user checkins:', error);
+    res.status(500).json({ error: 'Failed to fetch check-ins' });
   }
 });
 

@@ -15,6 +15,7 @@ export interface TrustWeight {
   videoBonus: number;
   scoutBonus: number;
   geoDeviation: number;
+  presenceBonus: number;
   final: number;
 }
 

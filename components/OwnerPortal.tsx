@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia } from '../services/api';
 import { VideoUploader } from './VideoUploader';
+import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
 
 const SERVICES = [
@@ -236,6 +237,7 @@ const OwnedStoresSection: React.FC = () => {
             )}
 
             <StoreMediaSection store={store} />
+            <PresenceQR storeId={store.id} storeName={store.name} />
           </div>
         ))}
       </div>

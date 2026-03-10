@@ -13,6 +13,7 @@ import { VideoRecorder } from './VideoRecorder';
 import { VideoUploader } from './VideoUploader';
 import { IntegrityCard } from './IntegrityCard';
 import { BadgeIcon } from './BadgeIcon';
+import { PresenceCheckin } from './PresenceCheckin';
 import { useAuth } from '../hooks/useAuth';
 
 interface StoreDetailProps {
@@ -665,6 +666,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
         <div className="space-y-8">
           <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
+
+          <PresenceCheckin storeId={store.id} storeName={store.name} />
 
           <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-sm">
             <h3 className="text-lg font-black text-stone-900 mb-6 uppercase tracking-wider">Information</h3>

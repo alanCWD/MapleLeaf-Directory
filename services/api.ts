@@ -245,7 +245,7 @@ export interface WeightedReview {
   rating: number;
   contentText: string;
   videoAssetId: number | null;
-  trustWeight: { base: number; videoBonus: number; scoutBonus: number; geoDeviation: number; final: number };
+  trustWeight: { base: number; videoBonus: number; scoutBonus: number; geoDeviation: number; presenceBonus: number; final: number };
   hasVerifiedVideo: boolean;
   isFlagged: boolean;
   disclosures: Record<string, unknown> | null;
@@ -354,4 +354,58 @@ export interface BadgeProgress {
 
 export async function fetchBadgeProgress(): Promise<BadgeProgress> {
   return apiFetch<BadgeProgress>('/user/badge-progress');
+}
+
+export interface PresenceQRPayload {
+  code: string;
+  expiresAt: string;
+  storeId: string;
+}
+
+export interface PresenceCheckinResult {
+  verified: boolean;
+  distance: number;
+  geoVerified: boolean;
+  qrValid: boolean;
+  checkinId: number | null;
+}
+
+export interface PresenceCheckin {
+  id: number;
+  storeId: string;
+  userId: string;
+  qrCodeId: number;
+  verifiedAt: string;
+  lat: number | null;
+  lng: number | null;
+  distanceMeters: number | null;
+  geoVerified: boolean;
+  method: string;
+}
+
+export interface StoreCheckinStats {
+  total: number;
+  verified: number;
+}
+
+export async function fetchPresenceQR(storeId: string): Promise<PresenceQRPayload> {
+  return apiFetch<PresenceQRPayload>(`/stores/${storeId}/presence/qr`);
+}
+
+export async function submitPresenceCheckin(
+  storeId: string,
+  data: { qrCode: string; lat: number; lng: number }
+): Promise<PresenceCheckinResult> {
+  return apiFetch<PresenceCheckinResult>(`/stores/${storeId}/presence/checkin`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchStoreCheckins(storeId: string): Promise<StoreCheckinStats> {
+  return apiFetch<StoreCheckinStats>(`/stores/${storeId}/presence/checkins`);
+}
+
+export async function fetchUserCheckins(): Promise<PresenceCheckin[]> {
+  return apiFetch<PresenceCheckin[]>('/user/checkins');
 }

@@ -120,7 +120,8 @@ Each review receives a trust weight calculated as:
 - **Base weight**: 0.5
 - **Video bonus**: +0.2 (if review includes verified video)
 - **Scout status bonus**: +0.3 (activated when user earns Verified Scout badge)
-- **Geo-deviation penalty**: -0.4 (placeholder for Phase 3 presence verification)
+- **Presence bonus**: +0.15 (if user has verified check-in at store within last 60 minutes)
+- **Geo-deviation penalty**: -0.4 (if user submits review with GPS > 500m from store without check-in)
 - Final weight clamped to 0.0–1.0
 
 ### IntegrityScore Calculation

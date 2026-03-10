@@ -24,6 +24,17 @@ export { evaluateUserBadges, checkVerifiedScout, checkLegacyArchivist, checkInte
 
 export { initUpload, handleWebhook, removeMedia, getStoreMediaList, getSingleMedia, isBunnyConfigured } from './media';
 
+export {
+  generateQRSecret,
+  getCurrentQRPayload,
+  validateQRCode,
+  calculateDistance,
+  verifyPresence,
+  getStoreCheckins,
+  getUserCheckins,
+  hasRecentCheckin,
+} from './presence';
+
 export type {
   BadgeType,
   UserBadge as UserBadgeType,
@@ -42,7 +53,7 @@ export async function initIntegrityEngine(): Promise<void> {
   const { ensureIntegrityTables } = await import('./models');
   console.log('[IntegrityEngine] Initializing...');
   await ensureIntegrityTables();
-  console.log('[IntegrityEngine] Tables ensured (store_media, integrity_reviews, user_badges)');
+  console.log('[IntegrityEngine] Tables ensured (store_media, integrity_reviews, user_badges, presence_qr_codes, presence_checkins)');
 
   const { isBunnyConfigured } = await import('../bunnyStream');
   if (isBunnyConfigured()) {

@@ -4,16 +4,18 @@ export function calculateTrustWeight(params: {
   hasVerifiedVideo: boolean;
   isScout?: boolean;
   geoDeviationDetected?: boolean;
+  hasVerifiedPresence?: boolean;
 }): TrustWeight {
   const base = 0.5;
   const videoBonus = params.hasVerifiedVideo ? 0.2 : 0;
   const scoutBonus = params.isScout ? 0.3 : 0;
   const geoDeviation = params.geoDeviationDetected ? -0.4 : 0;
+  const presenceBonus = params.hasVerifiedPresence ? 0.15 : 0;
 
-  const raw = base + videoBonus + scoutBonus + geoDeviation;
+  const raw = base + videoBonus + scoutBonus + geoDeviation + presenceBonus;
   const final = Math.max(0, Math.min(1, raw));
 
-  return { base, videoBonus, scoutBonus, geoDeviation, final };
+  return { base, videoBonus, scoutBonus, geoDeviation, presenceBonus, final };
 }
 
 export function calculateIntegrityScore(reviews: WeightedReview[]): IntegrityScoreCard {
