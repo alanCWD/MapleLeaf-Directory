@@ -52,9 +52,9 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
   };
 
   return (
-    <div className="relative pt-32 pb-24 overflow-hidden">
+    <div className="relative pt-32 pb-24 overflow-hidden w-full">
       {/* Floating Circles - Green and Purple Theme */}
-      <div className="absolute inset-0 -z-10">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute top-20 left-10 w-32 h-32 bg-emerald-100 rounded-full blur-2xl animate-float"></div>
         <div className="absolute top-40 right-20 w-48 h-48 bg-purple-100 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
         <div className="absolute bottom-10 left-1/4 w-40 h-40 bg-lime-100 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }}></div>

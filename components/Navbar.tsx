@@ -30,8 +30,8 @@ export const Navbar: React.FC = () => {
   );
 
   return (
-    <nav className="sticky top-4 z-50 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div className="glass mt-2 rounded-3xl border border-white/40 shadow-xl shadow-emerald-900/5 px-8 overflow-visible">
+    <nav className="sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-8 pt-4">
+      <div className="glass mx-auto max-w-7xl mt-2 rounded-3xl border border-white/40 shadow-xl shadow-emerald-900/5 px-8 overflow-visible">
         <div className="flex justify-between h-16 items-center gap-x-12">
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
             <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300 shadow-lg shadow-emerald-200">
@@ -114,7 +114,8 @@ export const Navbar: React.FC = () => {
       {showUserMenu && user && (
         <div
           ref={dropdownRef}
-          className="absolute right-4 sm:right-8 top-[72px] w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in"
+          className="absolute right-0 sm:right-4 top-[72px] w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-[9999] animate-fade-in"
+          style={{ maxWidth: 'calc(100vw - 2rem)' }}
         >
           <div className="p-4 border-b border-stone-100 bg-stone-50">
             <p className="font-bold text-stone-900 text-sm truncate">
@@ -167,7 +168,7 @@ export const Navbar: React.FC = () => {
       )}
 
       {isMenuOpen && (
-        <div className="md:hidden absolute top-20 left-4 right-4 animate-slide-up">
+        <div className="md:hidden absolute top-20 left-0 right-0 px-4 animate-slide-up">
           <div className="glass rounded-[32px] border border-white/40 shadow-2xl p-4 overflow-hidden">
             <div className="flex flex-col gap-2">
               <Link 
