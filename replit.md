@@ -255,6 +255,15 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-11: Store header images overhaul
+  - Replaced LoremFlickr-generated images with curated Unsplash cannabis/retail image repository (18 images)
+  - New `header_image_url` column on stores table for persistent image storage
+  - Unclaimed stores get varied default images via deterministic hash (not all the same)
+  - Store owners can change header image from Owner Portal (pick from defaults or enter custom URL)
+  - Admins can change any store's header image from Admin Store Management edit modal
+  - New utility: `utils/defaultStoreImages.ts` with `getStoreHeaderImage()` and `getDefaultStoreImage()` helpers
+  - Updated components: StoreCard.tsx, StoreDetail.tsx, OwnerPortal.tsx, AdminStores.tsx
+  - API: `headerImageUrl` added to owner and admin store update endpoints
 - 2026-03-10: Added Admin Store Management dashboard with audit log
   - New page at /admin/stores showing all stores in a filterable, sortable table
   - Status summary cards showing counts for verified, AI suggested, rejected, closed, and claimed

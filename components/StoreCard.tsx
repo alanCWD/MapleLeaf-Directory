@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Store } from '../types';
 import { VerificationBadge } from './VerificationBadge';
+import { getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 interface StoreCardProps {
   store: Store;
@@ -11,27 +12,7 @@ interface StoreCardProps {
 }
 
 export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggleFavorite }) => {
-  const getHashCode = (str: string) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
-  };
-
-  const seed = getHashCode(store.id);
-  
-  const exteriorPool = ['modern', 'architecture', 'rustic', 'exterior', 'facade', 'garden', 'timber', 'glass', 'minimalist', 'building'];
-  const boutiquePool = ['boutique', 'chic', 'urban', 'industrial', 'street', 'storefront'];
-  const naturePool = ['lodge', 'cabin', 'forest', 'native', 'heritage', 'natural'];
-
-  const tags = store.type === 'Sovereign' 
-    ? [naturePool[seed % naturePool.length], exteriorPool[(seed + 1) % exteriorPool.length], 'wood']
-    : [boutiquePool[seed % boutiquePool.length], exteriorPool[(seed + 1) % exteriorPool.length], 'urban'];
-
-  const nameSlug = store.name.toLowerCase().replace(/[^a-z]/g, '');
-  const imageUrl = `https://loremflickr.com/400/300/${tags.join(',')},${nameSlug}?lock=${seed % 10000}`;
+  const imageUrl = getStoreHeaderImage(store.id, store.headerImageUrl);
 
   const isUnverified = store.verificationStatus === 'ai_suggested' && store.confidenceScore < 0.3;
   const isClosed = store.verificationStatus === 'historically_closed';

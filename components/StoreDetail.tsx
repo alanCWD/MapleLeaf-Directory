@@ -15,6 +15,7 @@ import { IntegrityCard } from './IntegrityCard';
 import { BadgeIcon } from './BadgeIcon';
 import { PresenceCheckin } from './PresenceCheckin';
 import { useAuth } from '../hooks/useAuth';
+import { getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 interface StoreDetailProps {
   stores: Store[];
@@ -98,26 +99,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     fetchStoreMedia(id).then(setStoreMedia).catch(() => {});
   };
 
-  const getHashCode = (str: string) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
-  };
-
-  const seed = store?.id ? getHashCode(store.id) : 0;
-  
-  const interiorPool = ['lounge', 'decor', 'furniture', 'interior', 'lighting', 'modern', 'vintage', 'plants', 'bohemian', 'industrial'];
-  const detailTags = [
-    interiorPool[seed % interiorPool.length],
-    interiorPool[(seed + 3) % interiorPool.length],
-    'atmosphere'
-  ];
-
-  const nameSlug = store?.name.toLowerCase().replace(/[^a-z]/g, '') || 'store';
-  const detailHeaderUrl = `https://loremflickr.com/1600/600/${detailTags.join(',')},${nameSlug}?lock=${(seed + 8000) % 20000}`;
+  const detailHeaderUrl = store ? getStoreHeaderImage(store.id, store.headerImageUrl) : '';
 
   useEffect(() => {
     if (!store) return;

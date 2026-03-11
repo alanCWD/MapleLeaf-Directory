@@ -6,6 +6,7 @@ import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAP
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
+import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 const SERVICES = [
   {
@@ -204,6 +205,49 @@ const OwnedStoresSection: React.FC = () => {
                     onChange={e => setEditData({ ...editData, address: e.target.value })}
                     className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-stone-500 mb-1">Header Image</label>
+                  <div className="mb-2">
+                    <img
+                      src={editData.headerImageUrl ?? getStoreHeaderImage(store.id, store.headerImageUrl)}
+                      alt="Header preview"
+                      className="w-full h-32 object-cover rounded-xl border border-stone-200"
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/400x200/065f46/ffffff?text=Image+Error`; }}
+                    />
+                  </div>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={editData.headerImageUrl ?? store.headerImageUrl ?? ''}
+                      onChange={e => setEditData({ ...editData, headerImageUrl: e.target.value })}
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+                      placeholder="Custom image URL (or pick from defaults below)"
+                    />
+                    {(editData.headerImageUrl || store.headerImageUrl) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditData({ ...editData, headerImageUrl: '' })}
+                        className="px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-500 hover:bg-stone-100 transition whitespace-nowrap"
+                      >
+                        Use Default
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                    {DEFAULT_STORE_IMAGES.map((url, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setEditData({ ...editData, headerImageUrl: url })}
+                        className={`rounded-lg overflow-hidden border-2 transition ${
+                          (editData.headerImageUrl ?? store.headerImageUrl) === url ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-stone-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        <img src={url} alt={`Default ${i + 1}`} className="w-full h-16 object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button

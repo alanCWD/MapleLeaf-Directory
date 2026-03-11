@@ -4,6 +4,7 @@ import { Store, Province, VerificationStatus } from '../types';
 import { fetchAdminStores, adminEditStore, fetchAuditLogs } from '../services/api';
 import type { AuditLogEntry } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 const STATUS_COLORS: Record<string, string> = {
   verified: 'bg-emerald-100 text-emerald-800',
@@ -49,6 +50,7 @@ interface EditFormData {
   verificationStatus: string;
   adminNotes: string;
   featuredOfferings: string;
+  headerImageUrl: string;
 }
 
 export const AdminStores: React.FC = () => {
@@ -71,7 +73,7 @@ export const AdminStores: React.FC = () => {
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editForm, setEditForm] = useState<EditFormData>({
     name: '', address: '', province: '', type: '', phone: '', website: '',
-    verificationStatus: '', adminNotes: '', featuredOfferings: '',
+    verificationStatus: '', adminNotes: '', featuredOfferings: '', headerImageUrl: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -170,6 +172,7 @@ export const AdminStores: React.FC = () => {
       verificationStatus: store.verificationStatus,
       adminNotes: store.adminNotes || '',
       featuredOfferings: (store.featuredOfferings || []).join(', '),
+      headerImageUrl: store.headerImageUrl || '',
     });
     setSaveMessage('');
   };
@@ -188,6 +191,7 @@ export const AdminStores: React.FC = () => {
         website: editForm.website || undefined,
         verificationStatus: editForm.verificationStatus as VerificationStatus,
         adminNotes: editForm.adminNotes || undefined,
+        headerImageUrl: editForm.headerImageUrl || null,
         featuredOfferings: editForm.featuredOfferings
           ? editForm.featuredOfferings.split(',').map(s => s.trim()).filter(Boolean)
           : [],
@@ -716,6 +720,52 @@ export const AdminStores: React.FC = () => {
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 h-24 resize-none"
                   placeholder="Internal admin notes..."
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Header Image</label>
+                {editingStore && (
+                  <div className="mb-2">
+                    <img
+                      src={editForm.headerImageUrl || getStoreHeaderImage(editingStore.id, editingStore.headerImageUrl)}
+                      alt="Header preview"
+                      className="w-full h-32 object-cover rounded-xl border border-stone-200"
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/400x200/065f46/ffffff?text=Image+Error`; }}
+                    />
+                  </div>
+                )}
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={editForm.headerImageUrl}
+                    onChange={e => setEditForm(f => ({ ...f, headerImageUrl: e.target.value }))}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Custom image URL (or pick from defaults below)"
+                  />
+                  {editForm.headerImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, headerImageUrl: '' }))}
+                      className="px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-500 hover:bg-stone-100 transition whitespace-nowrap"
+                    >
+                      Use Default
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-6 gap-2 max-h-36 overflow-y-auto">
+                  {DEFAULT_STORE_IMAGES.map((url, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, headerImageUrl: url }))}
+                      className={`rounded-lg overflow-hidden border-2 transition ${
+                        editForm.headerImageUrl === url ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-stone-200 hover:border-emerald-300'
+                      }`}
+                    >
+                      <img src={url} alt={`Default ${i + 1}`} className="w-full h-12 object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {saveMessage && (

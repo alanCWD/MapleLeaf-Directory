@@ -520,7 +520,7 @@ router.patch('/owner/stores/:id', isAuthenticated as RequestHandler, requireOwne
         return;
       }
     }
-    const allowedFields = ['phone', 'website', 'hours', 'featuredOfferings', 'address'];
+    const allowedFields = ['phone', 'website', 'hours', 'featuredOfferings', 'address', 'headerImageUrl'];
     const updates: any = {};
     for (const field of allowedFields) {
       if (field in req.body) updates[field] = req.body[field];

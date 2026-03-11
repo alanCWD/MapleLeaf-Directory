@@ -68,6 +68,7 @@ export interface Store {
   placesApiMatch: boolean;
   placesCategory?: string;
 
+  headerImageUrl?: string;
   lastVerifiedAt?: string;
   updatedAt?: string;
 

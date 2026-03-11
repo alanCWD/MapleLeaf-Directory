@@ -39,6 +39,7 @@ function snakeToCamel(row: Record<string, any>): Store {
     placesApiMatch: row.places_api_match ?? false,
     placesCategory: row.places_category || undefined,
     lastVerifiedAt: row.last_verified_at ? row.last_verified_at.toISOString() : undefined,
+    headerImageUrl: row.header_image_url || undefined,
     storeInsights: row.store_insights || null,
     updatedAt: row.updated_at ? row.updated_at.toISOString() : undefined,
   };
@@ -102,10 +103,10 @@ export async function upsertStore(store: Partial<Store>): Promise<Store> {
       hours, reviews, verification_status, confidence_score,
       evidence_sources, evidence_count, flag_count, admin_reviewed,
       admin_notes, lat, lng, places_api_match, places_category,
-      last_verified_at
+      last_verified_at, header_image_url
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-      $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+      $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
     )
     ON CONFLICT (id) DO UPDATE SET
       name = COALESCE(EXCLUDED.name, stores.name),
@@ -132,6 +133,7 @@ export async function upsertStore(store: Partial<Store>): Promise<Store> {
       places_api_match = COALESCE(EXCLUDED.places_api_match, stores.places_api_match),
       places_category = COALESCE(EXCLUDED.places_category, stores.places_category),
       last_verified_at = COALESCE(EXCLUDED.last_verified_at, stores.last_verified_at),
+      header_image_url = COALESCE(EXCLUDED.header_image_url, stores.header_image_url),
       updated_at = now()
     RETURNING *`,
     [
@@ -161,6 +163,7 @@ export async function upsertStore(store: Partial<Store>): Promise<Store> {
       store.placesApiMatch ?? false,
       store.placesCategory || null,
       store.lastVerifiedAt || null,
+      store.headerImageUrl || null,
     ]
   );
 
@@ -197,6 +200,7 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
     lng: 'lng',
     placesApiMatch: 'places_api_match',
     placesCategory: 'places_category',
+    headerImageUrl: 'header_image_url',
     lastVerifiedAt: 'last_verified_at',
     storeInsights: 'store_insights',
   };
@@ -339,6 +343,13 @@ export async function initAuditLogTable(): Promise<void> {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)`);
   console.log('[DB] audit_logs table initialized');
+}
+
+export async function ensureHeaderImageColumn(): Promise<void> {
+  await pool.query(`
+    ALTER TABLE stores ADD COLUMN IF NOT EXISTS header_image_url TEXT
+  `);
+  console.log('[DB] header_image_url column ensured');
 }
 
 export async function createAuditLog(
@@ -511,7 +522,7 @@ export async function adminUpdateStore(
 
   const changes: Record<string, { from: any; to: any }> = {};
   const trackFields = ['name', 'address', 'province', 'type', 'phone', 'website',
-    'verificationStatus', 'adminNotes', 'featuredOfferings', 'isClaimed'] as const;
+    'verificationStatus', 'adminNotes', 'featuredOfferings', 'isClaimed', 'headerImageUrl'] as const;
   
   for (const field of trackFields) {
     if (field in updates && JSON.stringify((updates as any)[field]) !== JSON.stringify((existing as any)[field])) {
