@@ -59,10 +59,9 @@ localPort = 5001
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "gce"
+deploymentTarget = "cloudrun"
 run = ["npm", "run", "start"]
 build = ["npm", "run", "build"]
-publicDir = "dist/public"
 
 [userenv]
 
