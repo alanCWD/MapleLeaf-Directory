@@ -4,7 +4,7 @@ import { searchStoresAPI } from '../services/api';
 import { Store, StoreType } from '../types';
 
 interface HeroProps {
-  onSearchResults: (results: Store[]) => void;
+  onSearchResults: (results: Store[], query: string) => void;
   userLocation?: { lat: number; lng: number };
 }
 
@@ -57,7 +57,7 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
           } as Store;
         });
 
-        onSearchResults(processedStores);
+        onSearchResults(processedStores, searchQuery);
       } else {
         setSearchError('No sovereign or independent shops found for that area. Try a different search.');
       }

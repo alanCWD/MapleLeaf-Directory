@@ -40,6 +40,8 @@ const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<StoreType | null>(null);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [cityFilter, setCityFilter] = useState('');
+  const [searchResults, setSearchResults] = useState<Store[] | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | undefined>();
   const [vibeRecommendedIds, setVibeRecommendedIds] = useState<string[] | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -151,17 +153,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSearchResults = async (newStores: Store[]) => {
-    await handleSyncStores(newStores);
-    setSelectedProvince(null);
-    setSelectedType(null);
-    setShowOnlyFavorites(false);
+  const handleSearchResults = async (newStores: Store[], query: string) => {
+    handleSyncStores(newStores);
+    setSearchResults(newStores);
+    setSearchQuery(query);
     setVibeRecommendedIds(null);
-    
+
     const listEl = document.getElementById('listings-container');
     if (listEl) {
       listEl.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const clearSearch = () => {
+    setSearchResults(null);
+    setSearchQuery(null);
   };
 
   const handleUpdateStore = async (updatedStore: Store) => {
@@ -236,6 +242,7 @@ const App: React.FC = () => {
                       setSelectedProvince(p);
                       setCityFilter('');
                       setVibeRecommendedIds(null);
+                      clearSearch();
                     }} />
                     <button
                       onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
@@ -288,50 +295,91 @@ const App: React.FC = () => {
                   />
                   
                   <div className="mt-12">
-                    <div className="flex justify-between items-end mb-8">
-                      <div>
-                        {vibeRecommendedIds && (
-                          <div className="flex items-center gap-2 mb-2 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit animate-pulse">
-                            <span>✨ Profile Match Active</span>
-                            <button onClick={() => setVibeRecommendedIds(null)} className="hover:text-emerald-900 ml-1">✕</button>
+                    {searchResults !== null ? (
+                      <>
+                        <div className="flex justify-between items-end mb-8">
+                          <div>
+                            <button
+                              onClick={clearSearch}
+                              className="flex items-center gap-1 text-xs font-bold text-stone-400 hover:text-emerald-600 uppercase tracking-widest mb-2 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                              Back to directory
+                            </button>
+                            <h2 className="text-3xl font-black text-stone-900 tracking-tight">
+                              Results near <span className="text-emerald-600">{searchQuery}</span>
+                            </h2>
                           </div>
-                        )}
-                        <h2 className="text-3xl font-black text-stone-900 tracking-tight">
-                          {selectedProvince && cityFilter
-                            ? `${cityFilter}, ${selectedProvince}`
-                            : selectedProvince
-                            ? `${selectedProvince} Listings`
-                            : 'Directory Results'}
-                        </h2>
-                      </div>
-                      <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{filteredStores.length} stores mapped</p>
-                    </div>
+                          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{searchResults.length} found</p>
+                        </div>
 
-                    {isLoading ? (
-                      <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
-                        <div className="text-6xl mb-6 animate-spin">⏳</div>
-                        <p className="text-stone-400 font-bold text-lg">Loading directory...</p>
-                      </div>
-                    ) : filteredStores.length === 0 ? (
-                      <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
-                        <div className="text-6xl mb-6">🏜️</div>
-                        <p className="text-stone-400 font-bold text-lg">No stores found matching your criteria.</p>
-                        <p className="text-stone-300 text-sm mt-2">Try adjusting your filters or expanding your search.</p>
-                      </div>
+                        {searchResults.length === 0 ? (
+                          <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
+                            <div className="text-6xl mb-6">🏜️</div>
+                            <p className="text-stone-400 font-bold text-lg">No sovereign or independent shops found near "{searchQuery}".</p>
+                            <p className="text-stone-300 text-sm mt-2">Try a nearby city or a broader search term.</p>
+                            <button onClick={clearSearch} className="mt-6 px-6 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-all">
+                              Browse full directory
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <StoreList stores={searchResults.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                            {searchResults.length > 4 && !isAuthenticated && (
+                              <div className="my-16"><LeadBanner /></div>
+                            )}
+                            {searchResults.length > 8 && (
+                              <div className="mt-12">
+                                <StoreList stores={searchResults.slice(8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
                     ) : (
                       <>
-                        <StoreList stores={filteredStores.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
-                        
-                        {filteredStores.length > 4 && !isAuthenticated && (
-                          <div className="my-16">
-                            <LeadBanner />
+                        <div className="flex justify-between items-end mb-8">
+                          <div>
+                            {vibeRecommendedIds && (
+                              <div className="flex items-center gap-2 mb-2 bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit animate-pulse">
+                                <span>✨ Profile Match Active</span>
+                                <button onClick={() => setVibeRecommendedIds(null)} className="hover:text-emerald-900 ml-1">✕</button>
+                              </div>
+                            )}
+                            <h2 className="text-3xl font-black text-stone-900 tracking-tight">
+                              {selectedProvince && cityFilter
+                                ? `${cityFilter}, ${selectedProvince}`
+                                : selectedProvince
+                                ? `${selectedProvince} Listings`
+                                : 'Directory Results'}
+                            </h2>
                           </div>
-                        )}
+                          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{filteredStores.length} stores mapped</p>
+                        </div>
 
-                        {filteredStores.length > 8 && (
-                          <div className="mt-12">
-                            <StoreList stores={filteredStores.slice(8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                        {isLoading ? (
+                          <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
+                            <div className="text-6xl mb-6 animate-spin">⏳</div>
+                            <p className="text-stone-400 font-bold text-lg">Loading directory...</p>
                           </div>
+                        ) : filteredStores.length === 0 ? (
+                          <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">
+                            <div className="text-6xl mb-6">🏜️</div>
+                            <p className="text-stone-400 font-bold text-lg">No stores found matching your criteria.</p>
+                            <p className="text-stone-300 text-sm mt-2">Try adjusting your filters or expanding your search.</p>
+                          </div>
+                        ) : (
+                          <>
+                            <StoreList stores={filteredStores.slice(0, 8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                            {filteredStores.length > 4 && !isAuthenticated && (
+                              <div className="my-16"><LeadBanner /></div>
+                            )}
+                            {filteredStores.length > 8 && (
+                              <div className="mt-12">
+                                <StoreList stores={filteredStores.slice(8)} favorites={favorites} onToggleFavorite={toggleFavorite} />
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     )}
