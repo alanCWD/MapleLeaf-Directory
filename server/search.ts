@@ -56,13 +56,26 @@ Each object in "stores" must have:
 - hours: array of {day: string, time: string} (only if verifiable, empty array otherwise)`;
 
 export async function serverSearchStores(query: string, userLocation?: { lat: number; lng: number }) {
-  const latLngConfig = userLocation ? { latitude: userLocation.lat, longitude: userLocation.lng } : undefined;
+  const isLocationSearch = !!userLocation;
 
-  console.log(`[Search] Pass 1: Searching for "${query}"...`);
+  let locationConstraint = '';
+  if (userLocation) {
+    locationConstraint = `
+STRICT GEOGRAPHIC REQUIREMENT:
+- The user is physically located at coordinates: latitude ${userLocation.lat.toFixed(4)}, longitude ${userLocation.lng.toFixed(4)}
+- The search location is: "${query}"
+- YOU MUST ONLY return stores that are physically located in or immediately around "${query}".
+- DO NOT return stores in other cities, other regions, or other provinces unless they are within approximately 50km of the coordinates above.
+- If you cannot find stores strictly near this location, return {"stores": []} rather than returning stores from elsewhere.
+`;
+  }
+
+  console.log(`[Search] Pass 1: Searching for "${query}"${isLocationSearch ? ' (location-constrained)' : ''}...`);
 
   const response = await getAI().models.generateContent({
     model: "gemini-2.5-flash",
     contents: `${ANTI_HALLUCINATION_PROMPT}
+${locationConstraint}
 
 Find ALL sovereign Indigenous cannabis shops, trading posts, smoke shops, and independent dispensaries near: "${query}".
 
@@ -85,9 +98,6 @@ SEARCH STRATEGY - DO ALL OF THESE:
 ${STORE_FIELDS_PROMPT}`,
     config: {
       tools: [{ googleSearch: {} }],
-      toolConfig: {
-        retrievalConfig: { latLng: latLngConfig }
-      }
     }
   });
 
@@ -100,6 +110,13 @@ ${STORE_FIELDS_PROMPT}`,
   );
 
   console.log(`[Search] Pass 1 found ${pass1Stores.length} stores: ${pass1Stores.map((s: any) => s.name).join(', ')}`);
+
+  // Skip Pass 2 for location-based searches — it expands results geographically,
+  // which is the opposite of what "Near Me" needs.
+  if (isLocationSearch) {
+    console.log(`[Search] Skipping Pass 2 for location-constrained search.`);
+    return { stores: pass1Stores };
+  }
 
   if (pass1Stores.length > 0) {
     const foundNames = pass1Stores.map((s: any) => s.name).filter(Boolean);
@@ -125,9 +142,6 @@ Search news articles, Reddit, social media, Google Maps, and community forums fo
 ${STORE_FIELDS_PROMPT}`,
         config: {
           tools: [{ googleSearch: {} }],
-          toolConfig: {
-            retrievalConfig: { latLng: latLngConfig }
-          }
         }
       });
 
