@@ -49,6 +49,8 @@ Each object in "stores" must have:
 - type: "Sovereign" or "Local Gem"
 - address: string (real street address if known, OR a descriptive location like "Highway 97A near Enderby, BC" for informal/sovereign shops)
 - province: A string matching one of: Alberta, British Columbia, Manitoba, New Brunswick, Newfoundland and Labrador, Nova Scotia, Northwest Territories, Nunavut, Ontario, Prince Edward Island, Quebec, Saskatchewan, Yukon
+- lat: number (decimal latitude of this store's location — required, use Google Maps knowledge)
+- lng: number (decimal longitude of this store's location — required, use Google Maps knowledge)
 - website: string (real URL, social media page URL, or empty string if not found)
 - sourceUrl: string (URL to evidence page - news articles, social media, forums, community posts all count)
 - rating: number (real rating if found, 0 if unknown)

@@ -65,6 +65,7 @@ export interface Store {
 
   lat?: number;
   lng?: number;
+  distanceKm?: number;
   placesApiMatch: boolean;
   placesCategory?: string;
 

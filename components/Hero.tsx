@@ -27,6 +27,22 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   return province ? `${city}, ${province}` : city;
 }
 
+async function forwardGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const encoded = encodeURIComponent(query + ', Canada');
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&countrycodes=ca`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
 export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -71,7 +87,9 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    await runSearch(query, userLocation);
+    if (!query.trim()) return;
+    const coords = await forwardGeocode(query) || userLocation;
+    await runSearch(query, coords);
   };
 
   const handleNearMe = async () => {

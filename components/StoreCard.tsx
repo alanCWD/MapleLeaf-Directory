@@ -93,9 +93,20 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, isFavorite, onToggl
         </div>
 
         <div className="flex items-center justify-between mt-auto pt-6 border-t border-stone-100">
-          <div className="flex items-center gap-2 bg-stone-50 px-3 py-1 rounded-xl">
-            <span className="text-emerald-500 text-lg">★</span>
-            <span className="text-sm font-black text-stone-900">{store.rating || '4.5'}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-stone-50 px-3 py-1 rounded-xl">
+              <span className="text-emerald-500 text-lg">★</span>
+              <span className="text-sm font-black text-stone-900">{store.rating || '4.5'}</span>
+            </div>
+            {store.distanceKm != null && (
+              <div className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-3 py-1 rounded-xl">
+                <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="text-xs font-black text-blue-600">{store.distanceKm} km</span>
+              </div>
+            )}
           </div>
           <Link to={`/store/${store.id}`} className="bg-emerald-500/10 text-emerald-600 px-5 py-2 rounded-2xl text-sm font-black hover:bg-emerald-500 hover:text-white transition-all">
             See Vault →

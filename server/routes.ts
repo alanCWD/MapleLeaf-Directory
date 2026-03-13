@@ -114,7 +114,27 @@ router.post('/search', async (req: Request, res: Response) => {
 
     if (dbStores.length >= DB_RESULT_THRESHOLD) {
       console.log(`[API] Sufficient results from database (${dbStores.length} >= ${DB_RESULT_THRESHOLD}), skipping AI search`);
-      res.json({ stores: dbStores, source: 'database' });
+      if (userLocation?.lat && userLocation?.lng) {
+        const RADIUS_M = 100000;
+        const sorted = dbStores
+          .map(s => {
+            if (s.lat && s.lng) {
+              const distM = calculateDistance(userLocation.lat, userLocation.lng, s.lat, s.lng);
+              return { ...s, distanceKm: Math.round(distM / 100) / 10 };
+            }
+            return { ...s, distanceKm: null };
+          })
+          .filter(s => (s as any).distanceKm === null || (s as any).distanceKm * 1000 <= RADIUS_M)
+          .sort((a: any, b: any) => {
+            if (a.distanceKm === null && b.distanceKm === null) return 0;
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
+        res.json({ stores: sorted, source: 'database' });
+      } else {
+        res.json({ stores: dbStores, source: 'database' });
+      }
       return;
     }
 
@@ -128,8 +148,29 @@ router.post('/search', async (req: Request, res: Response) => {
       !dbIds.has(s.id) && !dbNames.has((s.name || '').toLowerCase())
     );
 
-    const combined = [...dbStores, ...newAiStores];
+    let combined: any[] = [...dbStores, ...newAiStores];
     console.log(`[API] Combined results: ${dbStores.length} from DB + ${newAiStores.length} new from AI = ${combined.length} total`);
+
+    if (userLocation?.lat && userLocation?.lng) {
+      const RADIUS_M = 100000;
+      combined = combined
+        .map(s => {
+          if (s.lat && s.lng) {
+            const distM = calculateDistance(userLocation.lat, userLocation.lng, s.lat, s.lng);
+            return { ...s, distanceKm: Math.round(distM / 100) / 10 };
+          }
+          return { ...s, distanceKm: null };
+        })
+        .filter(s => s.distanceKm === null || s.distanceKm * 1000 <= RADIUS_M)
+        .sort((a, b) => {
+          if (a.distanceKm === null && b.distanceKm === null) return 0;
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
+      console.log(`[API] After 100km filter + distance sort: ${combined.length} stores`);
+    }
+
     res.json({ stores: combined, source: 'combined' });
   } catch (error: any) {
     console.error('[API] Search error:', error?.message || error);
