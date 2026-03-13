@@ -8,37 +8,55 @@ interface HeroProps {
   userLocation?: { lat: number; lng: number };
 }
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+    { headers: { 'Accept-Language': 'en' } }
+  );
+  if (!res.ok) throw new Error('Geocode failed');
+  const data = await res.json();
+  const city =
+    data.address?.city ||
+    data.address?.town ||
+    data.address?.village ||
+    data.address?.hamlet ||
+    data.address?.county ||
+    '';
+  const province = data.address?.state || '';
+  if (!city) throw new Error('Could not determine city');
+  return province ? `${city}, ${province}` : city;
+}
+
 export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const runSearch = async (searchQuery: string, location?: { lat: number; lng: number }) => {
+    if (!searchQuery.trim()) return;
     setIsSearching(true);
     setSearchError(null);
-    
+
     try {
-      const result = await searchStoresAPI(query, userLocation);
-      
+      const result = await searchStoresAPI(searchQuery, location);
+
       if (result.stores && result.stores.length > 0) {
         const processedStores: Store[] = result.stores.map((s: any) => {
           const safeId = btoa(unescape(encodeURIComponent((s.name || '') + (s.address || ''))))
             .replace(/[^a-zA-Z0-9]/g, '')
             .substring(0, 12);
-            
+
           return {
             ...s,
             id: `search-${safeId}`,
             isClaimed: false,
             rating: s.rating || 4.5,
             type: (s.type as StoreType) || 'Sovereign',
-            province: s.province
+            province: s.province,
           } as Store;
         });
-        
+
         onSearchResults(processedStores);
       } else {
         setSearchError('No sovereign or independent shops found for that area. Try a different search.');
@@ -48,6 +66,38 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
       setSearchError(error?.message || 'Search failed. Please try again.');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runSearch(query, userLocation);
+  };
+
+  const handleNearMe = async () => {
+    setIsLocating(true);
+    setSearchError(null);
+
+    try {
+      let coords = userLocation;
+
+      if (!coords) {
+        coords = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+          if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => reject(new Error('Location permission denied'))
+          );
+        });
+      }
+
+      const cityQuery = await reverseGeocode(coords.lat, coords.lng);
+      setQuery(cityQuery);
+      setIsLocating(false);
+      await runSearch(cityQuery, coords);
+    } catch (err: any) {
+      setIsLocating(false);
+      setSearchError(err?.message || 'Could not detect your location. Try typing a city instead.');
     }
   };
 
@@ -92,7 +142,7 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
             </div>
             <input 
               type="text" 
-              placeholder="Try 'Sovereign flower in Tyendinaga'..." 
+              placeholder="Try 'Chilliwack, BC' or 'Sovereign flower in Tyendinaga'..." 
               className="w-full py-4 text-stone-800 placeholder-stone-400 focus:outline-none font-bold text-lg bg-transparent"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -100,7 +150,7 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
           </div>
           <button 
             type="submit" 
-            disabled={isSearching}
+            disabled={isSearching || isLocating}
             className="bg-emerald-600 text-white px-10 py-4 rounded-[24px] font-black hover:bg-emerald-500 transition-all disabled:opacity-50 min-w-[160px] text-lg shadow-xl hover:shadow-emerald-200"
           >
             {isSearching ? (
@@ -114,6 +164,35 @@ export const Hero: React.FC<HeroProps> = ({ onSearchResults, userLocation }) => 
             ) : 'Explore Gems'}
           </button>
         </form>
+
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleNearMe}
+            disabled={isSearching || isLocating}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white border border-stone-200 text-stone-600 text-sm font-bold hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all disabled:opacity-50 shadow-sm"
+          >
+            {isLocating ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Locating...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Near Me
+              </>
+            )}
+          </button>
+          <span className="text-stone-300 text-sm">or type any city in Canada</span>
+        </div>
+
         {searchError && (
           <p className="mt-4 text-rose-500 text-sm font-bold animate-fade-in">{searchError}</p>
         )}

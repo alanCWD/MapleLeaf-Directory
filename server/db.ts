@@ -638,28 +638,39 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
   const searchTerms = query.trim().toLowerCase();
   
   const provinceMap: Record<string, string> = {
-    'bc': 'British Columbia', 'british columbia': 'British Columbia',
-    'ab': 'Alberta', 'alberta': 'Alberta',
-    'sk': 'Saskatchewan', 'saskatchewan': 'Saskatchewan',
-    'mb': 'Manitoba', 'manitoba': 'Manitoba',
-    'on': 'Ontario', 'ontario': 'Ontario',
-    'qc': 'Quebec', 'quebec': 'Quebec', 'québec': 'Quebec',
-    'nb': 'New Brunswick', 'new brunswick': 'New Brunswick',
-    'ns': 'Nova Scotia', 'nova scotia': 'Nova Scotia',
-    'pe': 'Prince Edward Island', 'prince edward island': 'Prince Edward Island', 'pei': 'Prince Edward Island',
-    'nl': 'Newfoundland and Labrador', 'newfoundland': 'Newfoundland and Labrador', 'newfoundland and labrador': 'Newfoundland and Labrador',
-    'nt': 'Northwest Territories', 'northwest territories': 'Northwest Territories', 'nwt': 'Northwest Territories',
-    'nu': 'Nunavut', 'nunavut': 'Nunavut',
-    'yt': 'Yukon', 'yukon': 'Yukon',
+    'british columbia': 'British Columbia', 'bc': 'British Columbia',
+    'alberta': 'Alberta', 'ab': 'Alberta',
+    'saskatchewan': 'Saskatchewan', 'sk': 'Saskatchewan',
+    'manitoba': 'Manitoba', 'mb': 'Manitoba',
+    'ontario': 'Ontario', 'on': 'Ontario',
+    'québec': 'Quebec', 'quebec': 'Quebec', 'qc': 'Quebec',
+    'new brunswick': 'New Brunswick', 'nb': 'New Brunswick',
+    'nova scotia': 'Nova Scotia', 'ns': 'Nova Scotia',
+    'prince edward island': 'Prince Edward Island', 'pei': 'Prince Edward Island', 'pe': 'Prince Edward Island',
+    'newfoundland and labrador': 'Newfoundland and Labrador', 'newfoundland': 'Newfoundland and Labrador', 'nl': 'Newfoundland and Labrador',
+    'northwest territories': 'Northwest Territories', 'nwt': 'Northwest Territories', 'nt': 'Northwest Territories',
+    'nunavut': 'Nunavut', 'nu': 'Nunavut',
+    'yukon': 'Yukon', 'yt': 'Yukon',
   };
 
+  // Sort keys longest-first so multi-word provinces match before abbreviations
+  const sortedProvinceKeys = Object.keys(provinceMap).sort((a, b) => b.length - a.length);
+
   let matchedProvince: string | null = null;
-  for (const [key, value] of Object.entries(provinceMap)) {
+  let remainingTerms = searchTerms;
+
+  for (const key of sortedProvinceKeys) {
     if (searchTerms.includes(key)) {
-      matchedProvince = value;
+      matchedProvince = provinceMap[key];
+      // Strip the province keyword from remaining terms to isolate the city/name portion
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      remainingTerms = remainingTerms.replace(new RegExp(escaped, 'g'), '');
       break;
     }
   }
+
+  // Clean up: remove commas, extra whitespace left after stripping province
+  remainingTerms = remainingTerms.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
   const typeKeywords: Record<string, string> = {
     'sovereign': 'Sovereign',
@@ -672,8 +683,10 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
 
   let matchedType: string | null = null;
   for (const [key, value] of Object.entries(typeKeywords)) {
-    if (searchTerms.includes(key)) {
+    if (remainingTerms.includes(key)) {
       matchedType = value;
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      remainingTerms = remainingTerms.replace(new RegExp(escaped, 'g'), '').trim();
       break;
     }
   }
@@ -694,15 +707,17 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
     params.push(matchedType);
   }
 
-  const likeParam = `%${searchTerms}%`;
-  conditions.push(`(
-    LOWER(name) LIKE $${idx} OR 
-    LOWER(address) LIKE $${idx} OR 
-    LOWER(province) LIKE $${idx} OR
-    LOWER(COALESCE(array_to_string(featured_offerings, ' '), '')) LIKE $${idx}
-    ${matchedProvince ? ` OR province = $${idx - (matchedType ? 2 : 1)}` : ''}
-  )`);
-  params.push(likeParam);
+  // Only apply LIKE filter if there are meaningful city/name terms left after stripping province/type
+  if (remainingTerms.length > 0) {
+    const likeParam = `%${remainingTerms}%`;
+    conditions.push(`(
+      LOWER(name) LIKE $${idx} OR 
+      LOWER(address) LIKE $${idx} OR
+      LOWER(COALESCE(array_to_string(featured_offerings, ' '), '')) LIKE $${idx}
+    )`);
+    params.push(likeParam);
+    idx++;
+  }
 
   const where = `WHERE ${conditions.join(' AND ')}`;
   const sql = `SELECT * FROM stores ${where} ORDER BY 

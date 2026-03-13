@@ -39,6 +39,7 @@ const App: React.FC = () => {
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
   const [selectedType, setSelectedType] = useState<StoreType | null>(null);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [cityFilter, setCityFilter] = useState('');
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | undefined>();
   const [vibeRecommendedIds, setVibeRecommendedIds] = useState<string[] | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -181,7 +182,8 @@ const App: React.FC = () => {
     const verificationMatch = !verificationFilter || s.verificationStatus === verificationFilter;
     const unverifiedMatch = !hideUnverified || s.verificationStatus === 'verified' || s.verificationStatus === 'historically_closed';
     const notRejected = s.verificationStatus !== 'rejected';
-    return provinceMatch && typeMatch && favoriteMatch && vibeMatch && verificationMatch && unverifiedMatch && notRejected;
+    const cityMatch = !cityFilter.trim() || (s.address || '').toLowerCase().includes(cityFilter.trim().toLowerCase());
+    return provinceMatch && typeMatch && favoriteMatch && vibeMatch && verificationMatch && unverifiedMatch && notRejected && cityMatch;
   });
 
   return (
@@ -232,6 +234,7 @@ const App: React.FC = () => {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <ProvinceSelector selected={selectedProvince} onSelect={(p) => {
                       setSelectedProvince(p);
+                      setCityFilter('');
                       setVibeRecommendedIds(null);
                     }} />
                     <button
@@ -244,6 +247,34 @@ const App: React.FC = () => {
                       {showOnlyFavorites ? 'Favorites Only' : 'Show Favorites'}
                     </button>
                   </div>
+                  {selectedProvince && (
+                    <div className="mb-6 flex items-center gap-3 animate-fade-in">
+                      <div className="flex-grow flex items-center gap-2 bg-white border border-stone-200 rounded-xl px-4 py-2 shadow-sm focus-within:border-emerald-400 transition-all max-w-xs">
+                        <svg className="w-4 h-4 text-stone-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <input
+                          type="text"
+                          placeholder={`Filter by city in ${selectedProvince}...`}
+                          className="w-full text-sm text-stone-700 placeholder-stone-400 focus:outline-none font-medium bg-transparent"
+                          value={cityFilter}
+                          onChange={(e) => setCityFilter(e.target.value)}
+                        />
+                        {cityFilter && (
+                          <button onClick={() => setCityFilter('')} className="text-stone-400 hover:text-stone-600 ml-1 shrink-0">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        )}
+                      </div>
+                      {cityFilter && (
+                        <span className="text-xs text-stone-500 font-medium">
+                          Showing results in <span className="font-black text-emerald-600">{cityFilter}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <TypeSelector selected={selectedType} onSelect={(t) => {
                     setSelectedType(t);
                     setVibeRecommendedIds(null);
@@ -266,7 +297,11 @@ const App: React.FC = () => {
                           </div>
                         )}
                         <h2 className="text-3xl font-black text-stone-900 tracking-tight">
-                          {selectedProvince ? `${selectedProvince} Listings` : 'Directory Results'}
+                          {selectedProvince && cityFilter
+                            ? `${cityFilter}, ${selectedProvince}`
+                            : selectedProvince
+                            ? `${selectedProvince} Listings`
+                            : 'Directory Results'}
                         </h2>
                       </div>
                       <p className="text-xs font-bold text-stone-400 uppercase tracking-widest">{filteredStores.length} stores mapped</p>
