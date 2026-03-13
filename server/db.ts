@@ -707,16 +707,21 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
     params.push(matchedType);
   }
 
-  // Only apply LIKE filter if there are meaningful city/name terms left after stripping province/type
+  // Only apply text filter if there are meaningful city/name terms left after stripping province/type
   if (remainingTerms.length > 0) {
     const likeParam = `%${remainingTerms}%`;
+    // For address matching, use regex to match the term as a city (start of address or after a comma),
+    // not as part of a street name like "123 Victoria St". This prevents false positives like
+    // a store on "Victoria St, Kamloops" appearing in a "Victoria, BC" search.
+    const cityRegex = `(^|,\\s*)${remainingTerms.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
     conditions.push(`(
       LOWER(name) LIKE $${idx} OR 
-      LOWER(address) LIKE $${idx} OR
+      LOWER(address) ~* $${idx + 1} OR
       LOWER(COALESCE(array_to_string(featured_offerings, ' '), '')) LIKE $${idx}
     )`);
     params.push(likeParam);
-    idx++;
+    params.push(cityRegex);
+    idx += 2;
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`;
