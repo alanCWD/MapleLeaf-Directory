@@ -124,9 +124,14 @@ router.post('/search', async (req: Request, res: Response) => {
             }
             return { ...s, distanceKm: null };
           })
-          // Exclude stores with no coordinates — can't verify they're within 100km
-          .filter(s => (s as any).distanceKm !== null && (s as any).distanceKm * 1000 <= RADIUS_M)
-          .sort((a: any, b: any) => a.distanceKm - b.distanceKm);
+          // Keep stores that are within 100km (if coordinates known) or that matched by city name (no coordinates)
+          .filter(s => (s as any).distanceKm === null || (s as any).distanceKm * 1000 <= RADIUS_M)
+          .sort((a: any, b: any) => {
+            if (a.distanceKm === null && b.distanceKm === null) return 0;
+            if (a.distanceKm === null) return 1;
+            if (b.distanceKm === null) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
         res.json({ stores: sorted, source: 'database' });
       } else {
         res.json({ stores: dbStores, source: 'database' });
@@ -157,9 +162,14 @@ router.post('/search', async (req: Request, res: Response) => {
           }
           return { ...s, distanceKm: null };
         })
-        // Exclude stores with no coordinates — can't verify they're within 100km
-        .filter(s => s.distanceKm !== null && s.distanceKm * 1000 <= RADIUS_M)
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+        // Keep stores within 100km (if coordinates known) or matched by city text (no coordinates)
+        .filter(s => s.distanceKm === null || s.distanceKm * 1000 <= RADIUS_M)
+        .sort((a, b) => {
+          if (a.distanceKm === null && b.distanceKm === null) return 0;
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
       console.log(`[API] After 100km filter + distance sort: ${combined.length} stores`);
     }
 
