@@ -289,12 +289,10 @@ router.post('/stores/bulk', isAuthenticated as RequestHandler, requireAdmin, asy
     const results = [];
     const skipped = [];
     for (const storeData of validStores) {
-      if (!storeData.id) {
-        const existing = await findStoreByNameOrAddress(storeData.name, storeData.address);
-        if (existing && existing.verificationStatus !== 'rejected') {
-          skipped.push({ name: storeData.name, existingId: existing.id });
-          continue;
-        }
+      const existing = await findStoreByNameOrAddress(storeData.name, storeData.address);
+      if (existing && existing.verificationStatus !== 'rejected' && existing.id !== storeData.id) {
+        skipped.push({ name: storeData.name, existingId: existing.id });
+        continue;
       }
       const store = await upsertStore(storeData);
       results.push(store);

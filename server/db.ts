@@ -81,10 +81,24 @@ export async function getAllStores(filters: {
     conditions.push(`(verification_status != 'ai_suggested')`);
   }
 
+  conditions.push(`verification_status != 'rejected'`);
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const query = `SELECT * FROM stores ${where} ORDER BY name ASC`;
+  const query = `SELECT * FROM stores ${where} ORDER BY 
+    CASE WHEN verification_status = 'verified' THEN 0
+         WHEN verification_status = 'ai_suggested' THEN 1
+         ELSE 2 END,
+    confidence_score DESC, name ASC`;
   const result = await pool.query(query, params);
-  return result.rows.map(snakeToCamel);
+  const rows = result.rows.map(snakeToCamel);
+
+  const seen = new Map<string, Store>();
+  for (const store of rows) {
+    const key = store.name.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, store);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 export async function getStoreById(id: string): Promise<Store | null> {
@@ -750,7 +764,26 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
     LIMIT 50`;
 
   const result = await pool.query(sql, params);
-  return result.rows.map(snakeToCamel);
+  const rows = result.rows.map(snakeToCamel);
+
+  const seen = new Map<string, Store>();
+  for (const store of rows) {
+    const key = store.name.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, store);
+    } else {
+      const existing = seen.get(key)!;
+      const rank = (s: Store) => {
+        if (s.verificationStatus === 'verified') return 2;
+        if (s.verificationStatus === 'ai_suggested') return 1;
+        return 0;
+      };
+      if (rank(store) > rank(existing) || (rank(store) === rank(existing) && (store.confidenceScore || 0) > (existing.confidenceScore || 0))) {
+        seen.set(key, store);
+      }
+    }
+  }
+  return Array.from(seen.values());
 }
 
 export { pool };
