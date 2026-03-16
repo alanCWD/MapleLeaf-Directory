@@ -1,4 +1,4 @@
-import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, MediaType } from '../types';
+import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, MediaType, CreatorPost } from '../types';
 
 const API_BASE = '/api';
 
@@ -184,6 +184,7 @@ export interface AdminUser {
   lastName: string | null;
   profileImageUrl: string | null;
   role: string;
+  isCreator: boolean;
   createdAt: string;
   updatedAt: string;
   favoritesCount: number;
@@ -465,6 +466,78 @@ export async function adminEditStore(id: string, updates: Partial<Store>): Promi
   return apiFetch<Store>(`/admin/stores/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
+  });
+}
+
+export async function createCreatorPost(data: {
+  title: string;
+  subtitle?: string;
+  bodyText?: string;
+  contentTier: 'clean' | 'raw';
+  storeId?: string;
+  media?: { mediaType: string; cdnUrl: string; bunnyId?: string; caption?: string }[];
+}): Promise<CreatorPost> {
+  return apiFetch<CreatorPost>('/posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchPublishedPosts(options?: {
+  storeId?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ posts: CreatorPost[]; total: number }> {
+  const params = new URLSearchParams();
+  if (options?.storeId) params.set('storeId', options.storeId);
+  if (options?.page) params.set('page', String(options.page));
+  if (options?.limit) params.set('limit', String(options.limit));
+  const qs = params.toString();
+  return apiFetch<{ posts: CreatorPost[]; total: number }>(`/posts${qs ? `?${qs}` : ''}`);
+}
+
+export async function fetchMyPosts(): Promise<CreatorPost[]> {
+  return apiFetch<CreatorPost[]>('/posts/mine');
+}
+
+export async function fetchPendingPosts(): Promise<CreatorPost[]> {
+  return apiFetch<CreatorPost[]>('/posts/pending');
+}
+
+export async function fetchPostById(id: number): Promise<CreatorPost> {
+  return apiFetch<CreatorPost>(`/posts/${id}`);
+}
+
+export async function moderatePost(id: number, action: 'approve' | 'reject', notes?: string): Promise<CreatorPost> {
+  return apiFetch<CreatorPost>(`/posts/${id}/moderate`, {
+    method: 'POST',
+    body: JSON.stringify({ action, notes }),
+  });
+}
+
+export async function deleteCreatorPost(id: number): Promise<void> {
+  await apiFetch<{ success: boolean }>(`/posts/${id}`, { method: 'DELETE' });
+}
+
+export async function uploadPostImage(file: File): Promise<{ cdnUrl: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`${API_BASE}/posts/upload-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Upload failed');
+  }
+  return res.json();
+}
+
+export async function setCreatorStatus(userId: string, isCreator: boolean): Promise<void> {
+  await apiFetch<{ success: boolean }>(`/admin/users/${userId}/creator`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isCreator }),
   });
 }
 

@@ -18,6 +18,9 @@ import { CommunitySubmit } from './components/CommunitySubmit';
 import { AuthPage } from './components/AuthPage';
 import { BadgeProgress } from './components/BadgeProgress';
 import { VerificationFilter } from './components/VerificationFilter';
+import { PostFeed } from './components/PostFeed';
+import { PostDetailPage } from './components/PostDetailPage';
+import { CreatePost } from './components/CreatePost';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
 import { useAuth } from './hooks/useAuth';
@@ -400,6 +403,9 @@ const App: React.FC = () => {
             <Route path="/admin/review" element={<AdminReviewQueue />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/stores" element={<AdminStores />} />
+            <Route path="/posts" element={<PostFeed />} />
+            <Route path="/posts/create" element={<CreatePost />} />
+            <Route path="/posts/:id" element={<PostDetailPage />} />
             <Route path="/submit" element={<CommunitySubmit />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/badges" element={<BadgeProgress />} />

@@ -147,6 +147,45 @@ export async function ensureIntegrityTables(): Promise<void> {
   await pool.query(`
     ALTER TABLE stores ADD COLUMN IF NOT EXISTS bc_region VARCHAR(100)
   `);
+
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_creator BOOLEAN DEFAULT false
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS creator_posts (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(500) NOT NULL,
+      store_id VARCHAR(500),
+      title VARCHAR(500) NOT NULL,
+      subtitle VARCHAR(500),
+      body_text TEXT,
+      content_tier VARCHAR(20) NOT NULL DEFAULT 'clean',
+      status VARCHAR(30) NOT NULL DEFAULT 'draft',
+      moderation_notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_user ON creator_posts(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_store ON creator_posts(store_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_status ON creator_posts(status)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS post_media (
+      id SERIAL PRIMARY KEY,
+      post_id INTEGER NOT NULL REFERENCES creator_posts(id) ON DELETE CASCADE,
+      media_type VARCHAR(20) NOT NULL DEFAULT 'image',
+      bunny_id VARCHAR(255),
+      cdn_url TEXT NOT NULL,
+      caption VARCHAR(500),
+      display_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media(post_id)`);
+
+  console.log('[IntegrityEngine] creator_posts & post_media tables ensured');
 }
 
 export async function createStoreMedia(data: {

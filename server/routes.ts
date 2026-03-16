@@ -63,12 +63,41 @@ import multer from 'multer';
 import { createJobDir, stitchClips, uploadStitchedToBunny, cleanupJobDir } from './videoStitcher.ts';
 import { createVideo, generateTusCredentials, getEmbedUrl } from './bunnyStream.ts';
 import { createStoreMedia, updateMediaStatus } from './integrity/models.ts';
+import {
+  createPost,
+  getPostById,
+  listPublishedPosts,
+  listUserPosts,
+  listPendingPosts,
+  updatePostStatus,
+  deletePost,
+  adminDeletePost,
+  addPostMedia,
+  isUserCreator,
+  setUserCreatorStatus,
+  moderateCleanContent,
+} from './posts.ts';
+import { uploadImageToStorage, isBunnyStorageConfigured } from './bunnyStorage.ts';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 const clipUpload = multer({
   dest: '/tmp/video-stitch/uploads',
   limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'));
+    }
+  },
 });
 
 const router = Router();
@@ -1277,6 +1306,218 @@ router.get('/user/checkins', isAuthenticated as RequestHandler, async (req: any,
   } catch (error) {
     console.error('Error fetching user checkins:', error);
     res.status(500).json({ error: 'Failed to fetch check-ins' });
+  }
+});
+
+const requireCreator: RequestHandler = async (req: any, res, next) => {
+  const userId = getUserId(req);
+  if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const role = await getUserRole(userId);
+  if (role === 'admin') { next(); return; }
+  const creator = await isUserCreator(userId);
+  if (!creator) { res.status(403).json({ error: 'Creator access required' }); return; }
+  next();
+};
+
+router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCreator, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    if (!isBunnyStorageConfigured()) {
+      res.status(503).json({ error: 'Image storage is not configured' });
+      return;
+    }
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
+    const filename = `${crypto.randomUUID()}${ext}`;
+    const cdnUrl = await uploadImageToStorage(req.file.buffer, filename);
+    res.json({ cdnUrl, filename });
+  } catch (error: any) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload image' });
+  }
+});
+
+router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const { title, subtitle, bodyText, contentTier, storeId, media } = req.body;
+    if (!title || !title.trim()) {
+      res.status(400).json({ error: 'Title is required' });
+      return;
+    }
+    const tier = contentTier === 'raw' ? 'raw' : 'clean';
+    let status: 'published' | 'pending_moderation' | 'rejected' = 'published';
+    let moderationNotes: string | null = null;
+
+    if (tier === 'clean') {
+      const check = moderateCleanContent(title, subtitle, bodyText);
+      if (!check.passed) {
+        status = 'rejected';
+        moderationNotes = check.reason || 'Failed auto-moderation';
+      }
+    } else {
+      status = 'pending_moderation';
+    }
+
+    const post = await createPost({
+      userId,
+      storeId: storeId || null,
+      title: title.trim(),
+      subtitle: subtitle?.trim() || null,
+      bodyText: bodyText?.trim() || null,
+      contentTier: tier,
+      status,
+      moderationNotes,
+    });
+
+    if (Array.isArray(media) && media.length > 0) {
+      const allowedDomains = ['.b-cdn.net', '.bunnycdn.com', '.bunny.net'];
+      for (let i = 0; i < Math.min(media.length, 10); i++) {
+        const m = media[i];
+        if (m.cdnUrl && typeof m.cdnUrl === 'string') {
+          try {
+            const url = new URL(m.cdnUrl);
+            const domainAllowed = url.protocol === 'https:' && allowedDomains.some(d => url.hostname.endsWith(d));
+            if (!domainAllowed) {
+              console.warn(`Rejected media URL from non-allowed domain: ${url.hostname}`);
+              continue;
+            }
+          } catch {
+            continue;
+          }
+          await addPostMedia({
+            postId: post.id,
+            mediaType: 'image',
+            bunnyId: m.bunnyId || null,
+            cdnUrl: m.cdnUrl,
+            caption: m.caption || null,
+            displayOrder: i,
+          });
+        }
+      }
+    }
+
+    const fullPost = await getPostById(post.id);
+    res.status(201).json(fullPost);
+  } catch (error: any) {
+    console.error('Error creating post:', error);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
+});
+
+router.get('/posts', async (req: Request, res: Response) => {
+  try {
+    const { storeId, page, limit } = req.query;
+    const result = await listPublishedPosts({
+      storeId: storeId as string | undefined,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error listing posts:', error);
+    res.status(500).json({ error: 'Failed to list posts' });
+  }
+});
+
+router.get('/posts/mine', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const posts = await listUserPosts(userId);
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching user posts:', error);
+    res.status(500).json({ error: 'Failed to fetch your posts' });
+  }
+});
+
+router.get('/posts/pending', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
+  try {
+    const posts = await listPendingPosts();
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching pending posts:', error);
+    res.status(500).json({ error: 'Failed to fetch pending posts' });
+  }
+});
+
+router.get('/posts/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
+    const post = await getPostById(id);
+    if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
+    if (post.status !== 'published') {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json(post);
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ error: 'Failed to fetch post' });
+  }
+});
+
+router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
+    const { action, notes } = req.body;
+    if (action !== 'approve' && action !== 'reject') {
+      res.status(400).json({ error: 'Action must be approve or reject' });
+      return;
+    }
+    const newStatus = action === 'approve' ? 'published' : 'rejected';
+    const post = await updatePostStatus(id, newStatus as any, notes);
+    if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
+
+    const adminId = getUserId(req)!;
+    await createAuditLog(adminId, `post_${action}`, 'post', String(id), {
+      postTitle: post.title,
+      contentTier: post.contentTier,
+      notes: notes || null,
+    });
+
+    res.json(post);
+  } catch (error) {
+    console.error('Error moderating post:', error);
+    res.status(500).json({ error: 'Failed to moderate post' });
+  }
+});
+
+router.delete('/posts/:id', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    let deleted: boolean;
+    if (role === 'admin') {
+      deleted = await adminDeletePost(id);
+    } else {
+      deleted = await deletePost(id, userId);
+    }
+    if (!deleted) { res.status(404).json({ error: 'Post not found or not yours' }); return; }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
+router.patch('/admin/users/:id/creator', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+    const { isCreator } = req.body;
+    await setUserCreatorStatus(userId, !!isCreator);
+    const adminId = getUserId(req)!;
+    await createAuditLog(adminId, isCreator ? 'grant_creator' : 'revoke_creator', 'user', userId, {});
+    res.json({ success: true, isCreator: !!isCreator });
+  } catch (error) {
+    console.error('Error updating creator status:', error);
+    res.status(500).json({ error: 'Failed to update creator status' });
   }
 });
 

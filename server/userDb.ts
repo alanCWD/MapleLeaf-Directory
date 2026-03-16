@@ -152,6 +152,7 @@ export interface AdminUser {
   lastName: string | null;
   profileImageUrl: string | null;
   role: string;
+  isCreator: boolean;
   createdAt: string;
   updatedAt: string;
   favoritesCount: number;
@@ -196,6 +197,7 @@ function formatUser(row: any): AdminUser {
     lastName: row.last_name,
     profileImageUrl: row.profile_image_url,
     role: row.role,
+    isCreator: row.is_creator === true,
     createdAt: row.created_at?.toISOString() || new Date().toISOString(),
     updatedAt: row.updated_at?.toISOString() || new Date().toISOString(),
     favoritesCount: parseInt(row.favorites_count) || 0,

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, adminAwardBadge, adminRevokeBadge, type AdminUser } from '../services/api';
+import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, adminAwardBadge, adminRevokeBadge, setCreatorStatus, type AdminUser } from '../services/api';
 import { BadgeIcon } from './BadgeIcon';
 
 const BADGE_TYPES = [
@@ -137,6 +137,18 @@ export const AdminUsers: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to revoke badge:', err);
       alert(err.message || 'Failed to revoke badge');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleToggleCreator = async (userId: string, currentStatus: boolean) => {
+    setActionInProgress(userId);
+    try {
+      await setCreatorStatus(userId, !currentStatus);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isCreator: !currentStatus } : u));
+    } catch (err: any) {
+      console.error('Failed to toggle creator status:', err);
     } finally {
       setActionInProgress(null);
     }
@@ -352,6 +364,19 @@ export const AdminUsers: React.FC = () => {
                                 Delete
                               </button>
                             )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleCreator(u.id, !!u.isCreator)}
+                              disabled={actionInProgress === u.id}
+                              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition border disabled:opacity-50 ${
+                                u.isCreator
+                                  ? 'bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-200'
+                                  : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'
+                              }`}
+                            >
+                              {u.isCreator ? '✍️ Creator' : '+ Creator'}
+                            </button>
                           </div>
                           <div className="flex items-center gap-1">
                             {awardingBadgeFor === u.id ? (

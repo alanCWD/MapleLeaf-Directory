@@ -138,3 +138,35 @@ export interface UploadCredentials {
   mediaId: number;
   embedUrl: string;
 }
+
+export type ContentTier = 'clean' | 'raw';
+export type PostStatus = 'draft' | 'pending_moderation' | 'published' | 'rejected';
+
+export interface CreatorPost {
+  id: number;
+  userId: string;
+  storeId: string | null;
+  title: string;
+  subtitle: string | null;
+  bodyText: string | null;
+  contentTier: ContentTier;
+  status: PostStatus;
+  moderationNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorName?: string;
+  authorImageUrl?: string;
+  storeName?: string;
+  media?: PostMedia[];
+}
+
+export interface PostMedia {
+  id: number;
+  postId: number;
+  mediaType: 'image' | 'video';
+  bunnyId: string | null;
+  cdnUrl: string;
+  caption: string | null;
+  displayOrder: number;
+  createdAt: string;
+}

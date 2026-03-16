@@ -1,29 +1,33 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Store } from '../types';
-import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI } from '../services/api';
+import { Store, CreatorPost } from '../types';
+import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchPendingPosts, moderatePost } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { useAuth } from '../hooks/useAuth';
 
 export const AdminReviewQueue: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [claims, setClaims] = useState<any[]>([]);
+  const [pendingPosts, setPendingPosts] = useState<CreatorPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<'stores' | 'claims'>('stores');
+  const [postNotes, setPostNotes] = useState<Record<number, string>>({});
+  const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts'>('stores');
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
   const loadQueue = async () => {
     setIsLoading(true);
     try {
-      const [storeData, claimData] = await Promise.all([
+      const [storeData, claimData, postsData] = await Promise.all([
         fetchReviewQueue(),
         getAdminClaimsAPI(),
+        fetchPendingPosts(),
       ]);
       setStores(storeData);
       setClaims(claimData);
+      setPendingPosts(postsData);
     } catch (err: any) {
       console.error('Failed to load review queue:', err);
     } finally {
@@ -101,6 +105,18 @@ export const AdminReviewQueue: React.FC = () => {
     }
   };
 
+  const handlePostModerate = async (postId: number, action: 'approve' | 'reject') => {
+    setActionInProgress(`post-${postId}`);
+    try {
+      await moderatePost(postId, action, postNotes[postId]);
+      setPendingPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (err) {
+      console.error('Post moderation failed:', err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
       <div className="bg-white rounded-[40px] border border-stone-200 shadow-2xl overflow-hidden">
@@ -114,7 +130,7 @@ export const AdminReviewQueue: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-sm font-bold border border-amber-500/30">
-                {stores.length} stores | {claims.length} claims
+                {stores.length} stores | {claims.length} claims | {pendingPosts.length} posts
               </span>
               <button
                 onClick={loadQueue}
@@ -136,6 +152,12 @@ export const AdminReviewQueue: React.FC = () => {
               className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'claims' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               Ownership Claims ({claims.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'posts' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              Creator Posts ({pendingPosts.length})
             </button>
           </div>
         </div>
@@ -230,7 +252,7 @@ export const AdminReviewQueue: React.FC = () => {
                 ))}
               </div>
             )
-          ) : (
+          ) : activeTab === 'claims' ? (
             claims.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-4xl mb-4">✅</div>
@@ -260,6 +282,84 @@ export const AdminReviewQueue: React.FC = () => {
                         <button
                           onClick={() => handleClaimReview(claim.id, 'reject')}
                           disabled={actionInProgress === `claim-${claim.id}`}
+                          className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            pendingPosts.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-4xl mb-4">✅</div>
+                <p className="text-stone-500 font-bold text-lg">No creator posts pending review.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {pendingPosts.map((post) => (
+                  <div key={post.id} className="border border-amber-200 rounded-2xl p-6 bg-amber-50/30">
+                    <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-black text-stone-900 text-lg">{post.title}</h4>
+                          <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+                            🔥 Raw
+                          </span>
+                        </div>
+                        {post.subtitle && (
+                          <p className="text-sm text-stone-500 font-medium">{post.subtitle}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 text-xs text-stone-400">
+                          <span>By: {post.authorName || 'Unknown'}</span>
+                          {post.storeName && <span>| Store: {post.storeName}</span>}
+                          <span>| {new Date(post.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {post.bodyText && (
+                      <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4 max-h-40 overflow-y-auto">
+                        <p className="text-sm text-stone-700 whitespace-pre-wrap">{post.bodyText}</p>
+                      </div>
+                    )}
+
+                    {post.media && post.media.length > 0 && (
+                      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                        {post.media.map((m, i) => (
+                          <div key={i} className="w-20 h-20 rounded-xl overflow-hidden border border-stone-200 flex-shrink-0 bg-stone-100">
+                            {m.mediaType === 'image' ? (
+                              <img src={m.cdnUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-400 text-xl">🎬</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-amber-200/50">
+                      <input
+                        type="text"
+                        placeholder="Moderation notes (optional)"
+                        value={postNotes[post.id] || ''}
+                        onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
+                        className="flex-grow bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handlePostModerate(post.id, 'approve')}
+                          disabled={actionInProgress === `post-${post.id}`}
+                          className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handlePostModerate(post.id, 'reject')}
+                          disabled={actionInProgress === `post-${post.id}`}
                           className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
                         >
                           Reject

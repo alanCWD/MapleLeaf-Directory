@@ -7,6 +7,7 @@ export interface User {
   lastName: string | null;
   profileImageUrl: string | null;
   role: string;
+  isCreator: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -36,6 +37,7 @@ class AuthStorage implements IAuthStorage {
       lastName: row.last_name,
       profileImageUrl: row.profile_image_url,
       role: row.role || 'user',
+      isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -68,6 +70,7 @@ class AuthStorage implements IAuthStorage {
       lastName: row.last_name,
       profileImageUrl: row.profile_image_url,
       role: row.role || 'user',
+      isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

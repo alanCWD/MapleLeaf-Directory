@@ -8,6 +8,7 @@ export interface AuthUser {
   lastName: string | null;
   profileImageUrl: string | null;
   role: string;
+  isCreator: boolean;
   createdAt: string | null;
   updatedAt: string | null;
   badges: UserBadge[];
@@ -44,6 +45,7 @@ export function useAuth() {
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     isOwner: user?.role === 'owner' || user?.role === 'admin',
+    isCreator: user?.isCreator === true || user?.role === 'admin',
     refetch: fetchUser,
   };
 }
