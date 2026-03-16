@@ -634,6 +634,23 @@ export async function seedStoresFromFile(): Promise<number> {
   return imported;
 }
 
+export async function findStoreByNameOrAddress(name: string, address: string): Promise<Store | null> {
+  const normalizedName = name.trim().toLowerCase();
+  const normalizedAddress = address.trim().toLowerCase();
+  const result = await pool.query(
+    `SELECT * FROM stores 
+     WHERE LOWER(TRIM(name)) = $1 OR LOWER(TRIM(address)) = $2
+     ORDER BY 
+       CASE WHEN verification_status = 'verified' THEN 0
+            WHEN verification_status = 'ai_suggested' THEN 1
+            ELSE 2 END
+     LIMIT 1`,
+    [normalizedName, normalizedAddress]
+  );
+  if (result.rows.length === 0) return null;
+  return snakeToCamel(result.rows[0]);
+}
+
 export async function searchStoresInDb(query: string): Promise<Store[]> {
   const searchTerms = query.trim().toLowerCase();
   

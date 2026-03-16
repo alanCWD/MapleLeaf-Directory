@@ -14,6 +14,7 @@ import {
   getAuditLogs,
   getAdminAllStores,
   adminUpdateStore,
+  findStoreByNameOrAddress,
 } from './db.ts';
 import { verifyStore } from './verification.ts';
 import { serverSearchStores } from './search.ts';
@@ -286,11 +287,19 @@ router.post('/stores/bulk', isAuthenticated as RequestHandler, requireAdmin, asy
       s.address && s.address.trim() !== ''
     );
     const results = [];
+    const skipped = [];
     for (const storeData of validStores) {
+      if (!storeData.id) {
+        const existing = await findStoreByNameOrAddress(storeData.name, storeData.address);
+        if (existing && existing.verificationStatus !== 'rejected') {
+          skipped.push({ name: storeData.name, existingId: existing.id });
+          continue;
+        }
+      }
       const store = await upsertStore(storeData);
       results.push(store);
     }
-    res.status(201).json({ count: results.length, stores: results });
+    res.status(201).json({ count: results.length, stores: results, skipped });
   } catch (error) {
     console.error('Error bulk upserting stores:', error);
     res.status(500).json({ error: 'Failed to bulk upsert stores' });
@@ -379,6 +388,13 @@ router.post('/stores/community-submit', isAuthenticated as RequestHandler, async
       res.status(400).json({ error: 'Name, address, province, and type are required' });
       return;
     }
+
+    const existingStore = await findStoreByNameOrAddress(name, address);
+    if (existingStore && existingStore.verificationStatus !== 'rejected') {
+      res.status(409).json({ error: 'A store with this name or address already exists', existingId: existingStore.id });
+      return;
+    }
+
     const userId = getUserId(req);
     const evidenceSources = [];
     if (submitterNote) {
