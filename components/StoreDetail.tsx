@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Store, Review, StoreMedia } from '../types';
+import { Store, Review, StoreMedia, CreatorPost } from '../types';
 import { getStoreInsights } from '../services/geminiService';
-import { saveStoreInsights, fetchStoreMedia, fetchStoreReviews, fetchIntegrityScore, submitReview } from '../services/api';
+import { saveStoreInsights, fetchStoreMedia, fetchStoreReviews, fetchIntegrityScore, submitReview, fetchPublishedPosts } from '../services/api';
 import type { WeightedReview, IntegrityScoreCard } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { EvidencePanel } from './EvidencePanel';
@@ -51,6 +51,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [isLoadingIntegrity, setIsLoadingIntegrity] = useState(false);
   const [reviewVideoMode, setReviewVideoMode] = useState<'none' | 'recorder' | 'uploader'>('none');
   const [reviewVideoAssetId, setReviewVideoAssetId] = useState<number | undefined>(undefined);
+  const [storePosts, setStorePosts] = useState<CreatorPost[]>([]);
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -86,6 +87,10 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     fetchStoreReviews(id)
       .then(setWeightedReviews)
       .catch(() => setWeightedReviews([]));
+
+    fetchPublishedPosts({ storeId: id, limit: 5 })
+      .then(result => setStorePosts(result.posts))
+      .catch(() => setStorePosts([]));
 
     setIsLoadingIntegrity(true);
     fetchIntegrityScore(id)
@@ -450,6 +455,54 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </div>
             <MediaGallery media={storeMedia} isLoading={isLoadingMedia} />
           </section>
+
+          {storePosts.length > 0 && (
+            <section className="mb-16">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
+                  <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
+                  Creator Posts
+                </h2>
+                <Link
+                  to={`/posts?storeId=${store?.id}`}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
+                >
+                  View All
+                </Link>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {storePosts.map(post => {
+                  const heroImage = post.media?.find(m => m.mediaType === 'image');
+                  return (
+                    <Link
+                      key={post.id}
+                      to={`/posts/${post.id}`}
+                      className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
+                    >
+                      {heroImage && (
+                        <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-stone-100">
+                          <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="p-4 flex-grow min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                            post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
+                          </span>
+                          <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
+                        {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
+                        <p className="text-[10px] text-stone-400 mt-1">By {post.authorName || 'Anonymous'}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <section id="reviews">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">

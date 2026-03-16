@@ -1,5 +1,16 @@
 import { pool } from './db';
+import { GoogleGenAI } from "@google/genai";
 import type { CreatorPost, PostMedia, ContentTier, PostStatus } from '../types';
+
+let ai: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!ai) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) return null;
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 function postSnakeToCamel(row: Record<string, any>): CreatorPost {
   return {
@@ -239,7 +250,7 @@ const PROFANITY_WORDS = [
   'cock', 'cunt', 'bastard', 'slut', 'whore', 'nigger', 'faggot',
 ];
 
-export function moderateCleanContent(title: string, subtitle?: string | null, bodyText?: string | null): {
+export function profanityCheck(title: string, subtitle?: string | null, bodyText?: string | null): {
   passed: boolean;
   reason?: string;
 } {
@@ -257,4 +268,87 @@ export function moderateCleanContent(title: string, subtitle?: string | null, bo
   }
 
   return { passed: true };
+}
+
+export async function moderateCleanContent(title: string, subtitle?: string | null, bodyText?: string | null): Promise<{
+  passed: boolean;
+  reason?: string;
+}> {
+  const localCheck = profanityCheck(title, subtitle, bodyText);
+  if (!localCheck.passed) return localCheck;
+
+  const genai = getAI();
+  if (!genai) return { passed: true };
+
+  try {
+    const fullText = [title, subtitle, bodyText].filter(Boolean).join('\n\n');
+    const response = await genai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `You are a content safety moderator. Evaluate the following user-generated post for a cannabis store directory community. Check for:
+- Hate speech, slurs, or discriminatory language
+- Threats or incitement to violence
+- Explicit sexual content
+- Spam or misleading content
+- Illegal activity promotion (beyond legal cannabis)
+
+Post content:
+"""
+${fullText.slice(0, 2000)}
+"""
+
+Respond in JSON format: {"safe": true} or {"safe": false, "reason": "brief explanation"}`,
+    });
+    const text = response?.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      if (result.safe === false) {
+        return { passed: false, reason: result.reason || 'Content flagged by safety check.' };
+      }
+    }
+    return { passed: true };
+  } catch (err) {
+    console.error('Gemini safety check error:', err);
+    return { passed: true };
+  }
+}
+
+export async function updatePost(id: number, userId: string, data: {
+  title?: string;
+  subtitle?: string | null;
+  bodyText?: string | null;
+}): Promise<CreatorPost | null> {
+  const existing = await pool.query(
+    `SELECT * FROM creator_posts WHERE id = $1 AND user_id = $2 AND status IN ('draft', 'rejected')`,
+    [id, userId]
+  );
+  if (existing.rows.length === 0) return null;
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (data.title !== undefined) {
+    fields.push(`title = $${idx++}`);
+    values.push(data.title.trim());
+  }
+  if (data.subtitle !== undefined) {
+    fields.push(`subtitle = $${idx++}`);
+    values.push(data.subtitle?.trim() || null);
+  }
+  if (data.bodyText !== undefined) {
+    fields.push(`body_text = $${idx++}`);
+    values.push(data.bodyText?.trim() || null);
+  }
+
+  if (fields.length === 0) return postSnakeToCamel(existing.rows[0]);
+
+  fields.push(`updated_at = NOW()`);
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE creator_posts SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+    values
+  );
+  return postSnakeToCamel(result.rows[0]);
 }

@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchPublishedPosts } from '../services/api';
 import type { CreatorPost } from '../types';
 
-export const PostFeed: React.FC = () => {
+interface PostFeedProps {
+  storeId?: string;
+  storeName?: string;
+  compact?: boolean;
+}
+
+export const PostFeed: React.FC<PostFeedProps> = ({ storeId: propStoreId, storeName, compact }) => {
   const { isCreator } = useAuth();
+  const [searchParams] = useSearchParams();
+  const storeId = propStoreId || searchParams.get('storeId') || undefined;
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const limit = 12;
+  const limit = compact ? 6 : 12;
 
   useEffect(() => {
     setIsLoading(true);
-    fetchPublishedPosts({ page, limit })
+    fetchPublishedPosts({ storeId, page, limit })
       .then(result => {
         setPosts(result.posts);
         setTotal(result.total);
       })
       .catch(err => console.error('Failed to load posts:', err))
       .finally(() => setIsLoading(false));
-  }, [page]);
+  }, [page, storeId]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -35,14 +43,19 @@ export const PostFeed: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
+      {!compact && (
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
           <Link to="/" className="text-xs font-bold text-stone-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center gap-1 mb-3">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
             Back to Directory
           </Link>
-          <h1 className="text-3xl font-black text-stone-900 tracking-tight">Creator Posts</h1>
-          <p className="text-stone-500 font-medium mt-1">Stories and experiences from our community creators</p>
+          <h1 className="text-3xl font-black text-stone-900 tracking-tight">
+            {storeName ? `Posts about ${storeName}` : 'Creator Posts'}
+          </h1>
+          <p className="text-stone-500 font-medium mt-1">
+            {storeName ? `Stories and experiences about ${storeName}` : 'Stories and experiences from our community creators'}
+          </p>
         </div>
         {isCreator && (
           <Link
@@ -54,6 +67,7 @@ export const PostFeed: React.FC = () => {
           </Link>
         )}
       </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-24 bg-white rounded-[40px] border-4 border-dashed border-stone-100">

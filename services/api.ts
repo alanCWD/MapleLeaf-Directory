@@ -515,6 +515,17 @@ export async function moderatePost(id: number, action: 'approve' | 'reject', not
   });
 }
 
+export async function updateCreatorPost(id: number, data: {
+  title?: string;
+  subtitle?: string;
+  bodyText?: string;
+}): Promise<CreatorPost> {
+  return apiFetch<CreatorPost>(`/posts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function deleteCreatorPost(id: number): Promise<void> {
   await apiFetch<{ success: boolean }>(`/posts/${id}`, { method: 'DELETE' });
 }

@@ -70,6 +70,7 @@ import {
   listUserPosts,
   listPendingPosts,
   updatePostStatus,
+  updatePost,
   deletePost,
   adminDeletePost,
   addPostMedia,
@@ -77,6 +78,7 @@ import {
   setUserCreatorStatus,
   moderateCleanContent,
 } from './posts.ts';
+import type { PostStatus } from '../types';
 import { uploadImageToStorage, isBunnyStorageConfigured } from './bunnyStorage.ts';
 import path from 'path';
 import fs from 'fs';
@@ -1348,11 +1350,11 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
       return;
     }
     const tier = contentTier === 'raw' ? 'raw' : 'clean';
-    let status: 'published' | 'pending_moderation' | 'rejected' = 'published';
+    let status: PostStatus = 'published';
     let moderationNotes: string | null = null;
 
     if (tier === 'clean') {
-      const check = moderateCleanContent(title, subtitle, bodyText);
+      const check = await moderateCleanContent(title, subtitle, bodyText);
       if (!check.passed) {
         status = 'rejected';
         moderationNotes = check.reason || 'Failed auto-moderation';
@@ -1389,7 +1391,7 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
           }
           await addPostMedia({
             postId: post.id,
-            mediaType: 'image',
+            mediaType: m.mediaType === 'video' ? 'video' : 'image',
             bunnyId: m.bunnyId || null,
             cdnUrl: m.cdnUrl,
             caption: m.caption || null,
@@ -1469,8 +1471,8 @@ router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdm
       res.status(400).json({ error: 'Action must be approve or reject' });
       return;
     }
-    const newStatus = action === 'approve' ? 'published' : 'rejected';
-    const post = await updatePostStatus(id, newStatus as any, notes);
+    const newStatus: PostStatus = action === 'approve' ? 'published' : 'rejected';
+    const post = await updatePostStatus(id, newStatus, notes);
     if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
 
     const adminId = getUserId(req)!;
@@ -1484,6 +1486,25 @@ router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdm
   } catch (error) {
     console.error('Error moderating post:', error);
     res.status(500).json({ error: 'Failed to moderate post' });
+  }
+});
+
+router.patch('/posts/:id', isAuthenticated as RequestHandler, requireCreator, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
+    const userId = getUserId(req)!;
+    const { title, subtitle, bodyText } = req.body;
+    const updated = await updatePost(id, userId, { title, subtitle, bodyText });
+    if (!updated) {
+      res.status(404).json({ error: 'Post not found or cannot be edited (only draft/rejected posts can be updated)' });
+      return;
+    }
+    const fullPost = await getPostById(updated.id);
+    res.json(fullPost);
+  } catch (error) {
+    console.error('Error updating post:', error);
+    res.status(500).json({ error: 'Failed to update post' });
   }
 });
 
