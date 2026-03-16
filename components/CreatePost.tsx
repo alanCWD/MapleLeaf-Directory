@@ -464,7 +464,7 @@ export const CreatePost: React.FC = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp"
                 multiple
                 onChange={handleImageSelect}
                 className="hidden"

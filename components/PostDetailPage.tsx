@@ -86,7 +86,7 @@ export const PostDetailPage: React.FC = () => {
         )}
 
         {videos.length > 0 && videos.map((v, i) => {
-          const isBunnyUrl = v.cdnUrl && (v.cdnUrl.includes('.b-cdn.net') || v.cdnUrl.includes('.bunny.net'));
+          const isBunnyUrl = v.cdnUrl && (v.cdnUrl.includes('.b-cdn.net') || v.cdnUrl.includes('.bunny.net') || v.cdnUrl.includes('.mediadelivery.net'));
           if (!isBunnyUrl) return null;
           return (
             <div key={v.id || i} className="aspect-video bg-black">

@@ -170,6 +170,10 @@ export async function ensureIntegrityTables(): Promise<void> {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_user ON creator_posts(user_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_store ON creator_posts(store_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_creator_posts_status ON creator_posts(status)`);
+  try {
+    await pool.query(`ALTER TABLE creator_posts ADD CONSTRAINT fk_creator_posts_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE SET NULL`);
+  } catch {
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS post_media (
