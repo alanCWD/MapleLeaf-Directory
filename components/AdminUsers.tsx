@@ -6,9 +6,13 @@ import { getAdminUsersAPI, updateUserRoleAPI, deleteUserAPI, adminAwardBadge, ad
 import { BadgeIcon } from './BadgeIcon';
 
 const BADGE_TYPES = [
-  { value: 'verified_scout', label: 'Verified Scout' },
-  { value: 'legacy_archivist', label: 'Legacy Archivist' },
-  { value: 'integrity_anchor', label: 'Integrity Anchor' },
+  { value: 'explorer', label: 'Explorer', color: 'green' },
+  { value: 'local_scout', label: 'Local Scout', color: 'blue' },
+  { value: 'regional_builder', label: 'Regional Builder', color: 'orange' },
+  { value: 'cross_region_contributor', label: 'Cross-Region Contributor', color: 'purple' },
+  { value: 'provincial_connector', label: 'Provincial Connector', color: 'slate' },
+  { value: 'bc_culture_guide', label: 'BC Culture Guide', color: 'teal' },
+  { value: 'founding_bc_architect', label: 'Founding BC Architect', color: 'amber' },
 ] as const;
 
 const ROLE_COLORS: Record<string, string> = {
@@ -155,11 +159,9 @@ export const AdminUsers: React.FC = () => {
     user: users.filter(u => u.role === 'user').length,
   };
 
-  const badgeCounts = {
-    verified_scout: users.filter(u => u.badges?.some(b => b.badgeType === 'verified_scout')).length,
-    legacy_archivist: users.filter(u => u.badges?.some(b => b.badgeType === 'legacy_archivist')).length,
-    integrity_anchor: users.filter(u => u.badges?.some(b => b.badgeType === 'integrity_anchor')).length,
-  };
+  const badgeCounts = Object.fromEntries(
+    BADGE_TYPES.map(bt => [bt.value, users.filter(u => u.badges?.some(b => b.badgeType === bt.value)).length])
+  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
@@ -222,33 +224,22 @@ export const AdminUsers: React.FC = () => {
             >
               All
             </button>
-            <button
-              onClick={() => setBadgeFilter(badgeFilter === 'verified_scout' ? null : 'verified_scout')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                badgeFilter === 'verified_scout' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
-              }`}
-            >
-              <span>Verified Scout</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'verified_scout' ? 'bg-purple-500' : 'bg-purple-200 text-purple-800'}`}>{badgeCounts.verified_scout}</span>
-            </button>
-            <button
-              onClick={() => setBadgeFilter(badgeFilter === 'legacy_archivist' ? null : 'legacy_archivist')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                badgeFilter === 'legacy_archivist' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-              }`}
-            >
-              <span>Legacy Archivist</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'legacy_archivist' ? 'bg-amber-500' : 'bg-amber-200 text-amber-800'}`}>{badgeCounts.legacy_archivist}</span>
-            </button>
-            <button
-              onClick={() => setBadgeFilter(badgeFilter === 'integrity_anchor' ? null : 'integrity_anchor')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                badgeFilter === 'integrity_anchor' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-              }`}
-            >
-              <span>Integrity Anchor</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === 'integrity_anchor' ? 'bg-emerald-500' : 'bg-emerald-200 text-emerald-800'}`}>{badgeCounts.integrity_anchor}</span>
-            </button>
+            {BADGE_TYPES.map(bt => (
+              <button
+                key={bt.value}
+                onClick={() => setBadgeFilter(badgeFilter === bt.value ? null : bt.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  badgeFilter === bt.value
+                    ? 'bg-stone-700 text-white'
+                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                }`}
+              >
+                <span>{bt.label}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${badgeFilter === bt.value ? 'bg-stone-500' : 'bg-stone-200 text-stone-700'}`}>
+                  {badgeCounts[bt.value] ?? 0}
+                </span>
+              </button>
+            ))}
           </div>
 
           {isLoading ? (

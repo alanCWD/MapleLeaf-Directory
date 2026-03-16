@@ -6,45 +6,137 @@ import { fetchBadgeProgress } from '../services/api';
 import type { BadgeProgress as BadgeProgressData, UserBadge } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
+type BadgeType =
+  | 'explorer'
+  | 'local_scout'
+  | 'regional_builder'
+  | 'cross_region_contributor'
+  | 'provincial_connector'
+  | 'bc_culture_guide'
+  | 'founding_bc_architect';
+
 interface BadgeDefinition {
-  type: 'verified_scout' | 'legacy_archivist' | 'integrity_anchor';
+  type: BadgeType;
   name: string;
+  emoji: string;
+  tier: string;
   description: string;
-  trustImpact: string;
+  qualityNote: string;
   getProgress: (data: BadgeProgressData) => { current: number; target: number; label: string }[];
+  extraNote?: string;
 }
 
 const badgeDefinitions: BadgeDefinition[] = [
   {
-    type: 'verified_scout',
-    name: 'Verified Scout',
-    description: 'Awarded to active video reviewers who provide verified visual proof across multiple stores.',
-    trustImpact: '+0.3 trust weight bonus on all reviews',
+    type: 'explorer',
+    name: 'Explorer',
+    emoji: '🌱',
+    tier: 'Tier 1 — Entry',
+    description: 'Welcome to the community. Start documenting local cannabis culture.',
+    qualityNote: 'No quality floor required',
     getProgress: (data) => [
-      { current: data.videoReviewCount, target: 3, label: 'Verified video reviews' },
-      { current: data.distinctVideoStores, target: 2, label: 'Distinct stores with video' },
+      { current: data.uniqueStoreReviews, target: 1, label: 'Store review' },
+      { current: data.culturePosts, target: 1, label: 'Culture post (media upload)' },
     ],
   },
   {
-    type: 'legacy_archivist',
-    name: 'Legacy Archivist',
-    description: 'Awarded to prolific community contributors who help build the directory through reviews, submissions, or media.',
-    trustImpact: 'Reputation badge (display only)',
+    type: 'local_scout',
+    name: 'Local Scout',
+    emoji: '📍',
+    tier: 'Tier 2 — Regional Grounding',
+    description: 'Build local density by reviewing multiple stores in one region.',
+    qualityNote: 'Quality average ≥ 0.9',
     getProgress: (data) => [
-      { current: data.totalReviewCount, target: 10, label: 'Reviews written' },
-      { current: data.communitySubmissionCount, target: 5, label: 'Community submissions' },
-      { current: data.mediaUploadCount, target: 3, label: 'Media uploads' },
+      { current: data.uniqueStoreReviews, target: 5, label: 'Store reviews' },
+      { current: data.distinctStores, target: 3, label: 'Different stores visited' },
+      { current: data.culturePosts, target: 3, label: 'Culture posts' },
+      { current: Math.round(data.qualityAverage * 100), target: 90, label: 'Quality average (%)' },
     ],
   },
   {
-    type: 'integrity_anchor',
-    name: 'Integrity Anchor',
-    description: 'Awarded to consistently trustworthy reviewers with high trust weights and zero flagged reviews.',
-    trustImpact: 'Reputation badge (display only)',
+    type: 'regional_builder',
+    name: 'Regional Builder',
+    emoji: '🔥',
+    tier: 'Tier 3 — Store Diversity',
+    description: 'Go deep in one region — breadth of stores and early revisits matter.',
+    qualityNote: 'Quality average ≥ 1.0',
     getProgress: (data) => [
-      { current: data.totalReviewCount, target: 8, label: 'Reviews written' },
-      { current: Math.round(data.avgTrustWeight * 100), target: 70, label: 'Avg trust weight (%)' },
-      { current: data.flaggedCount === 0 ? 1 : 0, target: 1, label: 'Zero flagged reviews' },
+      { current: data.uniqueStoreReviews, target: 12, label: 'Store reviews' },
+      { current: data.distinctStores, target: 8, label: 'Different stores visited' },
+      { current: data.culturePosts, target: 8, label: 'Culture posts' },
+      { current: data.repeatVisitStores, target: 2, label: 'Stores with a repeat visit' },
+      { current: Math.round(data.qualityAverage * 100), target: 100, label: 'Quality average (%)' },
+    ],
+  },
+  {
+    type: 'cross_region_contributor',
+    name: 'Cross-Region Contributor',
+    emoji: '🌉',
+    tier: 'Tier 4 — Geographic Expansion',
+    description: 'Venture beyond your home region and document cannabis culture across BC.',
+    qualityNote: 'Quality average ≥ 1.05',
+    getProgress: (data) => [
+      { current: data.uniqueStoreReviews, target: 18, label: 'Store reviews' },
+      { current: data.distinctStores, target: 12, label: 'Different stores visited' },
+      { current: data.regionsCount, target: 2, label: 'BC regions covered' },
+      { current: data.culturePosts, target: 15, label: 'Culture posts' },
+      { current: data.repeatVisitStores, target: 3, label: 'Stores with a repeat visit' },
+      { current: Math.round(data.qualityAverage * 100), target: 105, label: 'Quality average (%)' },
+    ],
+  },
+  {
+    type: 'provincial_connector',
+    name: 'Provincial Connector',
+    emoji: '🏔',
+    tier: 'Tier 5 — Wide BC Coverage',
+    description: 'Span three BC regions and prove your commitment to geographic diversity.',
+    qualityNote: 'Quality average ≥ 1.1 — No single store > 20% of your reviews',
+    extraNote: 'Single-store farming stops working at this tier.',
+    getProgress: (data) => [
+      { current: data.uniqueStoreReviews, target: 30, label: 'Store reviews' },
+      { current: data.distinctStores, target: 20, label: 'Different stores visited' },
+      { current: data.regionsCount, target: 3, label: 'BC regions covered' },
+      { current: data.culturePosts, target: 25, label: 'Culture posts' },
+      { current: data.repeatVisitStores, target: 5, label: 'Stores with a repeat visit' },
+      { current: Math.round(data.qualityAverage * 100), target: 110, label: 'Quality average (%)' },
+      { current: data.singleStoreMaxPct <= 20 ? 1 : 0, target: 1, label: 'Single store ≤ 20% of reviews' },
+    ],
+  },
+  {
+    type: 'bc_culture_guide',
+    name: 'BC Culture Guide',
+    emoji: '🧭',
+    tier: 'Tier 6 — Top Tier (BC Phase)',
+    description: 'The highest standard: breadth across four regions, depth through revisits, and seasonal storytelling.',
+    qualityNote: 'Quality average ≥ 1.15 — No single store > 15% of your reviews',
+    getProgress: (data) => [
+      { current: data.uniqueStoreReviews, target: 45, label: 'Store reviews' },
+      { current: data.distinctStores, target: 30, label: 'Different stores visited' },
+      { current: data.regionsCount, target: 4, label: 'BC regions covered' },
+      { current: data.culturePosts, target: 40, label: 'Culture posts' },
+      { current: data.repeatVisitStores, target: 8, label: 'Stores with a repeat visit' },
+      { current: data.seasonalRevisits, target: 3, label: 'Stores revisited in different seasons' },
+      { current: Math.round(data.qualityAverage * 100), target: 115, label: 'Quality average (%)' },
+      { current: data.singleStoreMaxPct <= 15 ? 1 : 0, target: 1, label: 'Single store ≤ 15% of reviews' },
+    ],
+  },
+  {
+    type: 'founding_bc_architect',
+    name: 'Founding BC Architect',
+    emoji: '🏆',
+    tier: 'Tier 7 — Elite (Optional)',
+    description: 'Aspirational and rare. All five regions, deep revisit history, and elite quality. A permanent mark of legacy.',
+    qualityNote: 'Quality average ≥ 1.2 — No single store > 12% of your reviews',
+    extraNote: 'Requires at least one store revisited across three distinct time periods.',
+    getProgress: (data) => [
+      { current: data.uniqueStoreReviews, target: 60, label: 'Store reviews' },
+      { current: data.distinctStores, target: 40, label: 'Different stores visited' },
+      { current: data.regionsCount, target: 5, label: 'BC regions covered (all five)' },
+      { current: data.culturePosts, target: 60, label: 'Culture posts' },
+      { current: data.repeatVisitStores, target: 10, label: 'Stores with a repeat visit' },
+      { current: data.timePeriodRevisits, target: 1, label: 'Store revisited across 3 time periods' },
+      { current: Math.round(data.qualityAverage * 100), target: 120, label: 'Quality average (%)' },
+      { current: data.singleStoreMaxPct <= 12 ? 1 : 0, target: 1, label: 'Single store ≤ 12% of reviews' },
     ],
   },
 ];
@@ -69,7 +161,7 @@ const ProgressBar: React.FC<{ current: number; target: number; label: string }> 
       </div>
     </div>
   );
-}
+};
 
 export const BadgeProgress: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -135,6 +227,8 @@ export const BadgeProgress: React.FC = () => {
     earnedBadgeMap[b.badgeType] = b;
   }
 
+  const highestEarned = [...badgeDefinitions].reverse().find((d) => earnedBadgeTypes.has(d.type));
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
       <div className="mb-8">
@@ -146,30 +240,51 @@ export const BadgeProgress: React.FC = () => {
       <div className="mb-10">
         <h1 className="text-3xl font-black text-stone-900 tracking-tight mb-2">My Badges</h1>
         <p className="text-stone-500 text-sm">
-          Track your progress toward earning trust badges. Badges are awarded automatically based on your activity.
+          Geography-first progression — cover BC, visit stores across regions, and build real community depth.
         </p>
       </div>
 
       {progress.badges.length > 0 && (
         <div className="mb-10 p-6 bg-emerald-50 border border-emerald-100 rounded-3xl">
           <h3 className="text-xs font-black uppercase tracking-widest text-emerald-700 mb-4">Earned Badges</h3>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mb-4">
             {progress.badges.map((b) => (
-              <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="lg" />
+              <BadgeIcon key={b.badgeType} badgeType={b.badgeType as BadgeType} size="lg" />
             ))}
           </div>
+          {highestEarned && (
+            <p className="text-xs text-emerald-600 font-bold">
+              Current rank: {highestEarned.emoji} {highestEarned.name}
+            </p>
+          )}
         </div>
       )}
+
+      <div className="mb-6 p-4 bg-stone-50 border border-stone-100 rounded-2xl">
+        <h3 className="text-xs font-black uppercase tracking-widest text-stone-500 mb-3">Your Stats</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[
+            { label: 'Store Reviews', value: progress.uniqueStoreReviews },
+            { label: 'Unique Stores', value: progress.distinctStores },
+            { label: 'Culture Posts', value: progress.culturePosts },
+            { label: 'Regions Covered', value: `${progress.regionsCount} / 5` },
+            { label: 'Repeat Visits', value: progress.repeatVisitCount },
+            { label: 'Quality Average', value: `${progress.qualityAverage.toFixed(2)}` },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-white rounded-xl p-3 border border-stone-100">
+              <div className="text-lg font-black text-stone-900">{stat.value}</div>
+              <div className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="space-y-6">
         {badgeDefinitions.map((def) => {
           const earned = earnedBadgeTypes.has(def.type);
           const badge = earnedBadgeMap[def.type];
           const progressItems = def.getProgress(progress);
-          const isArchivist = def.type === 'legacy_archivist';
-          const allMet = isArchivist
-            ? progressItems.some((p) => p.current >= p.target)
-            : progressItems.every((p) => p.current >= p.target);
+          const allMet = progressItems.every((p) => p.current >= p.target);
 
           return (
             <div
@@ -180,7 +295,7 @@ export const BadgeProgress: React.FC = () => {
                   : 'border-stone-100 bg-white'
               }`}
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center gap-3">
                   <BadgeIcon badgeType={def.type} size="md" />
                   {earned && (
@@ -196,17 +311,15 @@ export const BadgeProgress: React.FC = () => {
                 )}
               </div>
 
+              <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-2">{def.tier}</p>
               <p className="text-sm text-stone-600 mb-1">{def.description}</p>
-              <p className="text-xs text-stone-400 mb-4 italic">{def.trustImpact}</p>
-
-              {isArchivist && (
-                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">
-                  Qualify via any one path:
-                </p>
+              <p className="text-xs text-stone-400 mb-1 italic">{def.qualityNote}</p>
+              {def.extraNote && (
+                <p className="text-xs text-amber-600 font-bold mb-3">{def.extraNote}</p>
               )}
 
-              <div className={earned ? 'opacity-60' : ''}>
-                {progressItems.map((p, i) => (
+              <div className={`mt-4 ${earned ? 'opacity-60' : ''}`}>
+                {progressItems.map((p) => (
                   <ProgressBar key={p.label} current={p.current} target={p.target} label={p.label} />
                 ))}
               </div>
@@ -214,13 +327,23 @@ export const BadgeProgress: React.FC = () => {
               {!earned && allMet && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
                   <p className="text-xs font-bold text-amber-700">
-                    🎉 You meet the criteria! Your badge will be awarded on your next review activity.
+                    You meet the criteria! Your badge will be awarded on your next review activity.
                   </p>
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-10 p-6 bg-stone-50 border border-stone-100 rounded-3xl">
+        <h3 className="text-xs font-black uppercase tracking-widest text-stone-500 mb-3">How Repeat Visits Work</h3>
+        <ul className="space-y-1 text-xs text-stone-500">
+          <li>• Repeat visits must be at least 30 days apart</li>
+          <li>• Must include an operational update or layout / seasonal / staffing change note</li>
+          <li>• Same-store reviews diminish in quality weight (1st: 1.0×, 2nd: 0.8×, 3rd: 0.6×, 4th+: 0.4×)</li>
+          <li>• Marked "Significant Change Visit" reviews are exempt from diminishing returns</li>
+        </ul>
       </div>
     </div>
   );

@@ -342,13 +342,16 @@ export async function fetchUserBadges(userId: string): Promise<UserBadge[]> {
 }
 
 export interface BadgeProgress {
-  videoReviewCount: number;
-  distinctVideoStores: number;
-  totalReviewCount: number;
-  avgTrustWeight: number;
-  flaggedCount: number;
-  mediaUploadCount: number;
-  communitySubmissionCount: number;
+  uniqueStoreReviews: number;
+  distinctStores: number;
+  culturePosts: number;
+  regionsCount: number;
+  repeatVisitCount: number;
+  repeatVisitStores: number;
+  qualityAverage: number;
+  seasonalRevisits: number;
+  timePeriodRevisits: number;
+  singleStoreMaxPct: number;
   badges: UserBadge[];
 }
 

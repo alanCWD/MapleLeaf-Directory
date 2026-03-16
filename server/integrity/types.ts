@@ -1,6 +1,13 @@
 export type { StoreMedia, MediaStatus, MediaType, UploadCredentials } from '../../types';
 
-export type BadgeType = 'verified_scout' | 'legacy_archivist' | 'integrity_anchor';
+export type BadgeType =
+  | 'explorer'
+  | 'local_scout'
+  | 'regional_builder'
+  | 'cross_region_contributor'
+  | 'provincial_connector'
+  | 'bc_culture_guide'
+  | 'founding_bc_architect';
 
 export interface UserBadge {
   id: number;

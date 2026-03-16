@@ -593,14 +593,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                         )}
                         <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                           Trust: {((wr.trustWeight?.final ?? 0) * 100).toFixed(0)}%
-                          {wr.reviewerBadges?.some(b => b.badgeType === 'verified_scout') && wr.trustWeight?.scoutBonus > 0 && (
-                            <span className="text-purple-600" title="Scout bonus +0.3">⚡</span>
+                          {wr.trustWeight?.scoutBonus > 0 && (
+                            <span className="text-blue-600" title="Scout bonus">⚡</span>
                           )}
                         </span>
-                        {wr.reviewerBadges?.some(b => b.badgeType === 'verified_scout') && (
-                          <BadgeIcon badgeType="verified_scout" size="sm" />
-                        )}
-                        {wr.reviewerBadges?.filter(b => b.badgeType !== 'verified_scout').map(b => (
+                        {wr.reviewerBadges?.map(b => (
                           <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={false} />
                         ))}
                       </div>

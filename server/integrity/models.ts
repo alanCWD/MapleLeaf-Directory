@@ -143,6 +143,10 @@ export async function ensureIntegrityTables(): Promise<void> {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_presence_checkins_user ON presence_checkins(user_id)
   `);
+
+  await pool.query(`
+    ALTER TABLE stores ADD COLUMN IF NOT EXISTS bc_region VARCHAR(100)
+  `);
 }
 
 export async function createStoreMedia(data: {

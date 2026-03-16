@@ -20,7 +20,17 @@ export {
 
 export type { UserBadge } from './models';
 
-export { evaluateUserBadges, checkVerifiedScout, checkLegacyArchivist, checkIntegrityAnchor } from './badges';
+export {
+  evaluateUserBadges,
+  checkExplorer,
+  checkLocalScout,
+  checkRegionalBuilder,
+  checkCrossRegionContributor,
+  checkProvincialConnector,
+  checkBcCultureGuide,
+  checkFoundingBcArchitect,
+  getUserStats,
+} from './badges';
 
 export { initUpload, handleWebhook, removeMedia, getStoreMediaList, getSingleMedia, isBunnyConfigured } from './media';
 

@@ -773,7 +773,10 @@ router.post('/admin/users/:id/badges/:badgeType', isAuthenticated as RequestHand
   try {
     const targetId = paramId(req.params);
     const badgeType = req.params.badgeType;
-    const validTypes = ['verified_scout', 'legacy_archivist', 'integrity_anchor'];
+    const validTypes = [
+      'explorer', 'local_scout', 'regional_builder', 'cross_region_contributor',
+      'provincial_connector', 'bc_culture_guide', 'founding_bc_architect',
+    ];
     if (!validTypes.includes(badgeType)) {
       res.status(400).json({ error: 'Invalid badge type' });
       return;
@@ -790,7 +793,10 @@ router.delete('/admin/users/:id/badges/:badgeType', isAuthenticated as RequestHa
   try {
     const targetId = paramId(req.params);
     const badgeType = req.params.badgeType;
-    const validTypes = ['verified_scout', 'legacy_archivist', 'integrity_anchor'];
+    const validTypes = [
+      'explorer', 'local_scout', 'regional_builder', 'cross_region_contributor',
+      'provincial_connector', 'bc_culture_guide', 'founding_bc_architect',
+    ];
     if (!validTypes.includes(badgeType)) {
       res.status(400).json({ error: 'Invalid badge type' });
       return;
@@ -1040,7 +1046,8 @@ router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req
     }
 
     const userBadges = await getUserBadges(userId);
-    const isScout = userBadges.some(b => b.badgeType === 'verified_scout');
+    const scoutTiers = ['local_scout', 'regional_builder', 'cross_region_contributor', 'provincial_connector', 'bc_culture_guide', 'founding_bc_architect'];
+    const isScout = userBadges.some(b => scoutTiers.includes(b.badgeType));
 
     const hasVerifiedPresenceCheckin = await hasRecentCheckin(userId, storeId, 60);
 
@@ -1108,52 +1115,22 @@ router.get('/users/:userId/badges', async (req: Request, res: Response) => {
 router.get('/user/badge-progress', isAuthenticated as RequestHandler, async (req: any, res) => {
   try {
     const userId = getUserId(req)!;
-    const { pool } = await import('./db');
+    const { getUserStats } = await import('./integrity/badges');
 
-    const videoReviewResult = await pool.query(
-      `SELECT COUNT(*) as cnt, COUNT(DISTINCT store_id) as store_cnt
-       FROM integrity_reviews WHERE user_id = $1 AND has_verified_video = true`,
-      [userId]
-    );
-    const videoReviewCount = parseInt(videoReviewResult.rows[0].cnt);
-    const distinctVideoStores = parseInt(videoReviewResult.rows[0].store_cnt);
-
-    const reviewResult = await pool.query(
-      `SELECT COUNT(*) as cnt,
-              AVG((trust_weight->>'final')::numeric) as avg_trust,
-              SUM(CASE WHEN is_flagged THEN 1 ELSE 0 END) as flagged_cnt
-       FROM integrity_reviews WHERE user_id = $1`,
-      [userId]
-    );
-    const totalReviewCount = parseInt(reviewResult.rows[0].cnt);
-    const avgTrustWeight = reviewResult.rows[0].avg_trust ? parseFloat(reviewResult.rows[0].avg_trust) : 0;
-    const flaggedCount = parseInt(reviewResult.rows[0].flagged_cnt);
-
-    const mediaResult = await pool.query(
-      `SELECT COUNT(*) as cnt FROM store_media WHERE user_id = $1`,
-      [userId]
-    );
-    const mediaUploadCount = parseInt(mediaResult.rows[0].cnt);
-
-    let communitySubmissionCount = 0;
-    try {
-      const subResult = await pool.query(
-        `SELECT COUNT(*) as cnt FROM store_claims WHERE user_id = $1 AND status = 'approved'`,
-        [userId]
-      );
-      communitySubmissionCount = parseInt(subResult.rows[0].cnt);
-    } catch {}
-
+    const stats = await getUserStats(userId);
     const badges = await getUserBadges(userId);
 
     res.json({
-      videoReviewCount,
-      distinctVideoStores,
-      totalReviewCount,
-      avgTrustWeight: Math.round(avgTrustWeight * 1000) / 1000,
-      flaggedCount,
-      mediaUploadCount,
-      communitySubmissionCount,
+      uniqueStoreReviews: stats.uniqueStoreReviews,
+      distinctStores: stats.distinctStores,
+      culturePosts: stats.culturePosts,
+      regionsCount: stats.regionsCount,
+      repeatVisitCount: stats.repeatVisitCount,
+      repeatVisitStores: stats.repeatVisitStores,
+      qualityAverage: Math.round(stats.qualityAverage * 1000) / 1000,
+      seasonalRevisits: stats.seasonalRevisits,
+      timePeriodRevisits: stats.timePeriodRevisits,
+      singleStoreMaxPct: Math.round(stats.singleStoreMaxPct * 100),
       badges,
     });
   } catch (error) {
