@@ -95,18 +95,21 @@ async function getUserStats(userId: string): Promise<UserStats> {
   const timePeriodRevisits = parseInt(timePeriodResult.rows[0].tp_stores) || 0;
 
   const maxPctResult = await pool.query(
-    `SELECT CASE WHEN COUNT(*) = 0 THEN 0
-            ELSE MAX(store_count::numeric / COUNT(*) OVER ())
+    `SELECT CASE WHEN total = 0 THEN 0
+            ELSE max_store_count::numeric / total
             END as max_pct
      FROM (
-       SELECT store_id, COUNT(*) as store_count
-       FROM integrity_reviews
-       WHERE user_id = $1 AND is_flagged = false
-       GROUP BY store_id
-     ) sub`,
+       SELECT MAX(store_count) as max_store_count, SUM(store_count) as total
+       FROM (
+         SELECT store_id, COUNT(*) as store_count
+         FROM integrity_reviews
+         WHERE user_id = $1 AND is_flagged = false
+         GROUP BY store_id
+       ) per_store
+     ) totals`,
     [userId]
   );
-  const singleStoreMaxPct = maxPctResult.rows[0].max_pct
+  const singleStoreMaxPct = maxPctResult.rows[0]?.max_pct
     ? parseFloat(maxPctResult.rows[0].max_pct)
     : 0;
 
