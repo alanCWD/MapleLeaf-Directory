@@ -52,6 +52,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [reviewVideoMode, setReviewVideoMode] = useState<'none' | 'recorder' | 'uploader'>('none');
   const [reviewVideoAssetId, setReviewVideoAssetId] = useState<number | undefined>(undefined);
   const [storePosts, setStorePosts] = useState<CreatorPost[]>([]);
+  const [activeTab, setActiveTab] = useState<'media' | 'posts' | 'reviews'>('media');
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -422,6 +423,34 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </section>
           )}
 
+          <div className="flex gap-1 border-b border-stone-200 mb-8">
+            {[
+              { key: 'media' as const, label: 'Media', count: storeMedia.length },
+              { key: 'posts' as const, label: 'Posts', count: storePosts.length },
+              { key: 'reviews' as const, label: 'Reviews', count: weightedReviews.length },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-6 py-3 font-bold text-sm border-b-2 transition-all ${
+                  activeTab === tab.key
+                    ? 'border-emerald-500 text-emerald-700'
+                    : 'border-transparent text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className={`ml-2 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                    activeTab === tab.key ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'media' && (
           <section>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
               <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
@@ -455,9 +484,10 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </div>
             <MediaGallery media={storeMedia} isLoading={isLoadingMedia} />
           </section>
+          )}
 
-          {storePosts.length > 0 && (
-            <section className="mb-16">
+          {activeTab === 'posts' && (
+            <section>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
                   <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
@@ -470,6 +500,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   View All
                 </Link>
               </div>
+              {storePosts.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {storePosts.map(post => {
                   const heroImage = post.media?.find(m => m.mediaType === 'image');
@@ -489,7 +520,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                           <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
                             post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                           }`}>
-                            {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
+                            {post.contentTier === 'raw' ? '\uD83D\uDD25 Raw' : '\u2728 Clean'}
                           </span>
                           <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
                         </div>
@@ -501,9 +532,20 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   );
                 })}
               </div>
+              ) : (
+                <div className="text-center py-16 bg-white rounded-[32px] border border-stone-200">
+                  <div className="text-4xl mb-4">&#x1F4DD;</div>
+                  <p className="text-stone-400 font-bold">No creator posts for this store yet</p>
+                  <p className="text-stone-300 text-sm mt-1">Be the first to share your experience!</p>
+                  <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
+                    Create a Post
+                  </Link>
+                </div>
+              )}
             </section>
           )}
 
+          {activeTab === 'reviews' && (
           <section id="reviews">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
@@ -694,6 +736,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
               ) : null}
             </div>
           </section>
+          )}
         </div>
 
         <div className="space-y-8">

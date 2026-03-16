@@ -530,6 +530,19 @@ export async function deleteCreatorPost(id: number): Promise<void> {
   await apiFetch<{ success: boolean }>(`/posts/${id}`, { method: 'DELETE' });
 }
 
+export async function initPostVideoUpload(title: string): Promise<{
+  videoId: string;
+  signature: string;
+  expirationTime: number;
+  libraryId: string;
+  embedUrl: string;
+}> {
+  return apiFetch(`/posts/init-video`, {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  });
+}
+
 export async function uploadPostImage(file: File): Promise<{ cdnUrl: string; filename: string }> {
   const formData = new FormData();
   formData.append('image', file);

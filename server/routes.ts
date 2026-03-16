@@ -1341,6 +1341,29 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
   }
 });
 
+router.post('/posts/init-video', isAuthenticated as RequestHandler, requireCreator, requireBunny, async (req: any, res) => {
+  try {
+    const { title } = req.body;
+    if (!title || typeof title !== 'string') {
+      res.status(400).json({ error: 'Title is required' });
+      return;
+    }
+    const video = await createVideo(title.trim());
+    const creds = generateTusCredentials(video.guid);
+    const embedUrl = getEmbedUrl(video.guid);
+    res.json({
+      videoId: video.guid,
+      signature: creds.signature,
+      expirationTime: creds.expirationTime,
+      libraryId: creds.libraryId,
+      embedUrl,
+    });
+  } catch (error: any) {
+    console.error('Error initializing post video upload:', error);
+    res.status(500).json({ error: error.message || 'Failed to initialize video upload' });
+  }
+});
+
 router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (req: any, res) => {
   try {
     const userId = getUserId(req)!;
@@ -1375,7 +1398,7 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
     });
 
     if (Array.isArray(media) && media.length > 0) {
-      const allowedDomains = ['.b-cdn.net', '.bunnycdn.com', '.bunny.net'];
+      const allowedDomains = ['.b-cdn.net', '.bunnycdn.com', '.bunny.net', '.mediadelivery.net'];
       for (let i = 0; i < Math.min(media.length, 10); i++) {
         const m = media[i];
         if (m.cdnUrl && typeof m.cdnUrl === 'string') {
