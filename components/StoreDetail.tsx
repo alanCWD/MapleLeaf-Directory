@@ -270,18 +270,18 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const hoursList = Array.isArray(insights?.hours) ? insights?.hours : (Array.isArray(store.hours) ? store.hours : null);
 
   return (
-    <div className="bg-stone-50 min-h-screen pb-24">
-      <div className="relative h-[400px] overflow-hidden">
+    <div className="bg-stone-50 min-h-screen pb-24 overflow-x-hidden">
+      <div className="relative overflow-hidden">
         <img 
           src={detailHeaderUrl} 
           alt={store.name} 
-          className={`w-full h-full object-cover ${store.verificationStatus === 'historically_closed' ? 'grayscale' : ''}`}
+          className={`absolute inset-0 w-full h-full object-cover ${store.verificationStatus === 'historically_closed' ? 'grayscale' : ''}`}
           onError={(e) => {
             (e.target as HTMLImageElement).src = `https://placehold.co/1600x600/065f46/ffffff?text=${encodeURIComponent(store.name)}`;
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
+        <div className="relative pt-32 md:pt-48 pb-8 md:pb-12 px-8 md:px-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="text-white">
               <div className="flex flex-wrap gap-2 mb-4">
@@ -299,9 +299,9 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   </span>
                 )}
               </div>
-              <h1 className="text-4xl md:text-6xl font-black mb-2 tracking-tight">{store.name}</h1>
-              <p className="text-xl text-stone-300 flex items-center gap-2">
-                <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+              <h1 className="text-3xl md:text-6xl font-black mb-2 tracking-tight leading-tight">{store.name}</h1>
+              <p className="text-base md:text-xl text-stone-300 flex items-start gap-2">
+                <svg className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 {store.address}, {store.province}
               </p>
             </div>
@@ -311,7 +311,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   href={store.website.startsWith('http') ? store.website : `https://${store.website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-emerald-500 transition shadow-xl flex items-center justify-center gap-2"
+                  className="bg-emerald-600 text-white px-6 py-3 md:px-8 md:py-4 rounded-2xl font-bold hover:bg-emerald-500 transition shadow-xl flex items-center justify-center gap-2 text-sm md:text-base"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
                   Visit Website
@@ -321,13 +321,13 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white text-stone-900 px-8 py-4 rounded-2xl font-bold hover:bg-stone-100 transition shadow-xl flex items-center justify-center gap-2"
+                className="bg-white text-stone-900 px-6 py-3 md:px-8 md:py-4 rounded-2xl font-bold hover:bg-stone-100 transition shadow-xl flex items-center justify-center gap-2 text-sm md:text-base"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 01-1.447-.894L15 7m0 10V7"></path></svg>
                 Get Directions
               </a>
               {!store.isClaimed && (
-                <Link to="/owners" className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-emerald-500 transition shadow-xl shadow-emerald-900/40">
+                <Link to="/owners" className="bg-emerald-600 text-white px-6 py-3 md:px-8 md:py-4 rounded-2xl font-bold hover:bg-emerald-500 transition shadow-xl shadow-emerald-900/40 text-sm md:text-base">
                   Claim Listing
                 </Link>
               )}
