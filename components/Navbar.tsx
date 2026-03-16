@@ -7,7 +7,7 @@ import { BadgeIcon } from './BadgeIcon';
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const { user, isLoading, isAuthenticated, isCreator } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,21 +43,6 @@ export const Navbar: React.FC = () => {
           </Link>
           
           <div className="hidden md:flex items-center gap-4">
-            <Link 
-              to="/posts" 
-              className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
-            >
-              Posts
-            </Link>
-            {isCreator && (
-              <Link 
-                to="/posts/create" 
-                className="text-emerald-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap flex items-center gap-1"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                Create Post
-              </Link>
-            )}
             <Link 
               to="/submit" 
               className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
@@ -193,23 +178,6 @@ export const Navbar: React.FC = () => {
               >
                 Claim Store
               </Link>
-              <Link 
-                to="/posts" 
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
-              >
-                Posts
-              </Link>
-              {isCreator && (
-                <Link 
-                  to="/posts/create" 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center justify-center gap-1 py-4 text-emerald-600 font-bold hover:text-emerald-500"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                  Create Post
-                </Link>
-              )}
               <Link 
                 to="/submit" 
                 onClick={() => setIsMenuOpen(false)}

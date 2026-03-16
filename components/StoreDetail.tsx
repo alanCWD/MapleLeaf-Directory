@@ -52,7 +52,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [reviewVideoMode, setReviewVideoMode] = useState<'none' | 'recorder' | 'uploader'>('none');
   const [reviewVideoAssetId, setReviewVideoAssetId] = useState<number | undefined>(undefined);
   const [storePosts, setStorePosts] = useState<CreatorPost[]>([]);
-  const [activeTab, setActiveTab] = useState<'media' | 'posts' | 'reviews'>('media');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'posts'>('reviews');
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -425,9 +425,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
           <div className="flex gap-1 border-b border-stone-200 mb-8">
             {[
-              { key: 'media' as const, label: 'Media', count: storeMedia.length },
-              { key: 'posts' as const, label: 'Posts', count: storePosts.length },
               { key: 'reviews' as const, label: 'Reviews', count: weightedReviews.length },
+              { key: 'posts' as const, label: 'Community Posts', count: storeMedia.length + storePosts.length },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -450,98 +449,103 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             ))}
           </div>
 
-          {activeTab === 'media' && (
-          <section>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-              <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
-                <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
-                Raw Content
-              </h2>
-              <div className="flex flex-wrap gap-3">
-                {isAuthenticated && (
-                  <button
-                    onClick={() => setShowVideoRecorder(true)}
-                    className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10 flex items-center gap-2 text-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Share Your Experience
-                  </button>
-                )}
-                {isOwnerOrAdmin && (
-                  <button
-                    onClick={() => setShowVideoUploader(true)}
-                    className="bg-stone-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-stone-700 transition shadow-lg flex items-center gap-2 text-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Upload Video
-                  </button>
-                )}
-              </div>
-            </div>
-            <MediaGallery media={storeMedia} isLoading={isLoadingMedia} />
-          </section>
-          )}
-
           {activeTab === 'posts' && (
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
-                  <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
-                  Creator Posts
-                </h2>
-                <Link
-                  to={`/posts?storeId=${store?.id}`}
-                  className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
-                >
-                  View All
-                </Link>
+            <section className="space-y-12">
+              <div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                  <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
+                    <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
+                    Community Posts
+                  </h2>
+                  <div className="flex flex-wrap gap-3">
+                    {isAuthenticated && (
+                      <button
+                        onClick={() => setShowVideoRecorder(true)}
+                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10 flex items-center gap-2 text-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Share Your Experience
+                      </button>
+                    )}
+                    {isOwnerOrAdmin && (
+                      <button
+                        onClick={() => setShowVideoUploader(true)}
+                        className="bg-stone-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-stone-700 transition shadow-lg flex items-center gap-2 text-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Upload Video
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <MediaGallery media={storeMedia} isLoading={isLoadingMedia} isAuthenticated={isAuthenticated} />
               </div>
-              {storePosts.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {storePosts.map(post => {
-                  const heroImage = post.media?.find(m => m.mediaType === 'image');
-                  return (
-                    <Link
-                      key={post.id}
-                      to={`/posts/${post.id}`}
-                      className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
-                    >
-                      {heroImage && (
-                        <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-stone-100">
-                          <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      )}
-                      <div className="p-4 flex-grow min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
-                            post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {post.contentTier === 'raw' ? '\uD83D\uDD25 Raw' : '\u2728 Clean'}
-                          </span>
-                          <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
-                        {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
-                        <p className="text-[10px] text-stone-400 mt-1">By {post.authorName || 'Anonymous'}</p>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-              ) : (
-                <div className="text-center py-16 bg-white rounded-[32px] border border-stone-200">
-                  <div className="text-4xl mb-4">&#x1F4DD;</div>
-                  <p className="text-stone-400 font-bold">No creator posts for this store yet</p>
-                  <p className="text-stone-300 text-sm mt-1">Be the first to share your experience!</p>
-                  <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
-                    Create a Post
+
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
+                    <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
+                    Creator Posts
+                  </h2>
+                  <Link
+                    to={`/posts?storeId=${store?.id}`}
+                    className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
+                  >
+                    View All
                   </Link>
                 </div>
-              )}
+                {storePosts.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {storePosts.map(post => {
+                    const heroImage = post.media?.find(m => m.mediaType === 'image');
+                    return (
+                      <Link
+                        key={post.id}
+                        to={`/posts/${post.id}`}
+                        className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
+                      >
+                        {heroImage && (
+                          <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-stone-100">
+                            <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="p-4 flex-grow min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                              post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {post.contentTier === 'raw' ? '\uD83D\uDD25 Raw' : '\u2728 Clean'}
+                            </span>
+                            <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
+                          {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
+                          <p className="text-[10px] text-stone-400 mt-1">By {post.authorName || 'Anonymous'}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                ) : (
+                  <div className="text-center py-16 bg-white rounded-[32px] border border-stone-200">
+                    <div className="text-4xl mb-4">&#x1F4DD;</div>
+                    <p className="text-stone-400 font-bold">No creator posts for this store yet</p>
+                    {isAuthenticated ? (
+                      <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
+                        Create a Post
+                      </Link>
+                    ) : (
+                      <a href="#/auth" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
+                        Sign In to Post
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
           )}
 

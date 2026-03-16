@@ -4,9 +4,10 @@ import type { StoreMedia } from '../types';
 interface MediaGalleryProps {
   media: StoreMedia[];
   isLoading?: boolean;
+  isAuthenticated?: boolean;
 }
 
-export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = false }) => {
+export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = false, isAuthenticated = false }) => {
   const [selectedMedia, setSelectedMedia] = useState<StoreMedia | null>(null);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -79,7 +80,12 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = f
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         </div>
-        <p className="text-stone-400 italic font-medium">No videos yet. Be the first to share!</p>
+        <p className="text-stone-400 italic font-medium">No content yet. Be the first to share!</p>
+        {!isAuthenticated && (
+          <a href="#/auth" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-400 transition">
+            Sign In to Share
+          </a>
+        )}
       </div>
     );
   }
