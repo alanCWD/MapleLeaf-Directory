@@ -211,6 +211,10 @@ export const CreatePost: React.FC = () => {
         storeId: storeId || undefined,
         media: uploadedMedia,
       });
+      if (post.status === 'published') {
+        navigate(`/posts/${post.id}`);
+        return;
+      }
       setSuccess({ id: post.id, status: post.status });
     } catch (err: any) {
       setError(err.message || 'Failed to create post');
