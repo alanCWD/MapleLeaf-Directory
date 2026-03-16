@@ -255,6 +255,13 @@ The `server/integrity/` module is structured for white-label extraction into a s
 - `/auth` - Sign in / Register page (Email/Password + Google OAuth)
 
 ## Recent Changes
+- 2026-03-16: Owner/Admin store editing expanded
+  - Store owners can now edit store hours (add/remove day+time entries via UI in Owner Portal)
+  - Store owners can now add/remove Featured Selection items (chip-based UI in Owner Portal)
+  - "Visit Official Site" website URL field now clearly labelled in Owner Portal edit form
+  - Admin store edit modal now includes Store Hours editor (add/remove entries) alongside existing fields
+  - All these fields were already supported by the backend (`hours`, `featuredOfferings`, `website`, `headerImageUrl`); only UI was missing
+  - Updated components: OwnerPortal.tsx, AdminStores.tsx
 - 2026-03-11: Store header images overhaul
   - Replaced LoremFlickr-generated images with curated Unsplash cannabis/retail image repository (18 images)
   - New `header_image_url` column on stores table for persistent image storage

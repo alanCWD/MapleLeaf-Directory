@@ -40,6 +40,8 @@ const ACTION_COLORS: Record<string, string> = {
 
 const PROVINCES = Object.values(Province);
 
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 interface EditFormData {
   name: string;
   address: string;
@@ -51,6 +53,7 @@ interface EditFormData {
   adminNotes: string;
   featuredOfferings: string;
   headerImageUrl: string;
+  hours: { day: string; time: string }[];
 }
 
 export const AdminStores: React.FC = () => {
@@ -73,8 +76,10 @@ export const AdminStores: React.FC = () => {
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editForm, setEditForm] = useState<EditFormData>({
     name: '', address: '', province: '', type: '', phone: '', website: '',
-    verificationStatus: '', adminNotes: '', featuredOfferings: '', headerImageUrl: '',
+    verificationStatus: '', adminNotes: '', featuredOfferings: '', headerImageUrl: '', hours: [],
   });
+  const [newAdminHourDay, setNewAdminHourDay] = useState('Monday');
+  const [newAdminHourTime, setNewAdminHourTime] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -173,7 +178,10 @@ export const AdminStores: React.FC = () => {
       adminNotes: store.adminNotes || '',
       featuredOfferings: (store.featuredOfferings || []).join(', '),
       headerImageUrl: store.headerImageUrl || '',
+      hours: [...(store.hours || [])],
     });
+    setNewAdminHourDay('Monday');
+    setNewAdminHourTime('');
     setSaveMessage('');
   };
 
@@ -195,6 +203,7 @@ export const AdminStores: React.FC = () => {
         featuredOfferings: editForm.featuredOfferings
           ? editForm.featuredOfferings.split(',').map(s => s.trim()).filter(Boolean)
           : [],
+        hours: editForm.hours,
       };
       const updated = await adminEditStore(editingStore.id, updates);
       setStores(prev => prev.map(s => s.id === updated.id ? updated : s));
@@ -710,6 +719,62 @@ export const AdminStores: React.FC = () => {
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="Edibles, Flower, Concentrates"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Store Hours</label>
+                <div className="space-y-1.5 mb-3">
+                  {(editForm.hours || []).map((h, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2 border border-stone-200">
+                      <span className="text-xs font-bold text-stone-600 w-24 shrink-0">{h.day}</span>
+                      <span className="text-xs text-stone-700 flex-1">{h.time}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm(f => ({ ...f, hours: f.hours.filter((_, i) => i !== idx) }))}
+                        className="text-stone-400 hover:text-red-500 transition text-sm leading-none"
+                        aria-label="Remove hour"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {(editForm.hours || []).length === 0 && (
+                    <p className="text-xs text-stone-400 italic">No hours set.</p>
+                  )}
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <select
+                    value={newAdminHourDay}
+                    onChange={e => setNewAdminHourDay(e.target.value)}
+                    className="bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {DAYS_OF_WEEK.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    value={newAdminHourTime}
+                    onChange={e => setNewAdminHourTime(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const t = newAdminHourTime.trim();
+                        if (t) { setEditForm(f => ({ ...f, hours: [...f.hours, { day: newAdminHourDay, time: t }] })); setNewAdminHourTime(''); }
+                      }
+                    }}
+                    placeholder="e.g. 10:00 AM - 9:00 PM"
+                    className="flex-1 min-w-0 px-4 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = newAdminHourTime.trim();
+                      if (t) { setEditForm(f => ({ ...f, hours: [...f.hours, { day: newAdminHourDay, time: t }] })); setNewAdminHourTime(''); }
+                    }}
+                    className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-400 transition"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
 
               <div>

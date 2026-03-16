@@ -137,15 +137,57 @@ const ClaimStoreSection: React.FC = () => {
   );
 };
 
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 const OwnedStoresSection: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [newOffering, setNewOffering] = useState('');
+  const [newHourDay, setNewHourDay] = useState('Monday');
+  const [newHourTime, setNewHourTime] = useState('');
 
   useEffect(() => {
     getOwnedStoresAPI().then(setStores).catch(() => {});
   }, []);
+
+  const startEditing = (store: Store) => {
+    setEditing(store.id);
+    setEditData({
+      phone: store.phone ?? '',
+      website: store.website ?? '',
+      address: store.address ?? '',
+      headerImageUrl: store.headerImageUrl ?? '',
+      featuredOfferings: [...(store.featuredOfferings || [])],
+      hours: [...(store.hours || [])],
+    });
+    setNewOffering('');
+    setNewHourDay('Monday');
+    setNewHourTime('');
+  };
+
+  const addOffering = () => {
+    const trimmed = newOffering.trim();
+    if (!trimmed) return;
+    setEditData((prev: any) => ({ ...prev, featuredOfferings: [...(prev.featuredOfferings || []), trimmed] }));
+    setNewOffering('');
+  };
+
+  const removeOffering = (idx: number) => {
+    setEditData((prev: any) => ({ ...prev, featuredOfferings: prev.featuredOfferings.filter((_: any, i: number) => i !== idx) }));
+  };
+
+  const addHour = () => {
+    const trimmed = newHourTime.trim();
+    if (!trimmed) return;
+    setEditData((prev: any) => ({ ...prev, hours: [...(prev.hours || []), { day: newHourDay, time: trimmed }] }));
+    setNewHourTime('');
+  };
+
+  const removeHour = (idx: number) => {
+    setEditData((prev: any) => ({ ...prev, hours: prev.hours.filter((_: any, i: number) => i !== idx) }));
+  };
 
   const handleSave = async (storeId: string) => {
     setSaving(true);
@@ -178,39 +220,41 @@ const OwnedStoresSection: React.FC = () => {
             </div>
             
             {editing === store.id ? (
-              <div className="space-y-3 mt-4">
+              <div className="space-y-4 mt-4">
                 <div>
                   <label className="block text-xs font-bold text-stone-500 mb-1">Phone</label>
                   <input
                     type="text"
-                    value={editData.phone ?? store.phone ?? ''}
-                    onChange={e => setEditData({ ...editData, phone: e.target.value })}
+                    value={editData.phone ?? ''}
+                    onChange={e => setEditData((prev: any) => ({ ...prev, phone: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1">Website</label>
+                  <label className="block text-xs font-bold text-stone-500 mb-1">Visit Official Site (Website URL)</label>
                   <input
                     type="text"
-                    value={editData.website ?? store.website ?? ''}
-                    onChange={e => setEditData({ ...editData, website: e.target.value })}
+                    value={editData.website ?? ''}
+                    onChange={e => setEditData((prev: any) => ({ ...prev, website: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+                    placeholder="https://yourstore.com"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-stone-500 mb-1">Address</label>
                   <input
                     type="text"
-                    value={editData.address ?? store.address ?? ''}
-                    onChange={e => setEditData({ ...editData, address: e.target.value })}
+                    value={editData.address ?? ''}
+                    onChange={e => setEditData((prev: any) => ({ ...prev, address: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-stone-500 mb-1">Header Image</label>
+                  <label className="block text-xs font-bold text-stone-500 mb-2">Main Header Image</label>
                   <div className="mb-2">
                     <img
-                      src={editData.headerImageUrl ?? getStoreHeaderImage(store.id, store.headerImageUrl)}
+                      src={editData.headerImageUrl ? editData.headerImageUrl : getStoreHeaderImage(store.id, store.headerImageUrl)}
                       alt="Header preview"
                       className="w-full h-32 object-cover rounded-xl border border-stone-200"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/400x200/065f46/ffffff?text=Image+Error`; }}
@@ -219,15 +263,15 @@ const OwnedStoresSection: React.FC = () => {
                   <div className="flex gap-2 mb-2">
                     <input
                       type="text"
-                      value={editData.headerImageUrl ?? store.headerImageUrl ?? ''}
-                      onChange={e => setEditData({ ...editData, headerImageUrl: e.target.value })}
+                      value={editData.headerImageUrl ?? ''}
+                      onChange={e => setEditData((prev: any) => ({ ...prev, headerImageUrl: e.target.value }))}
                       className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
                       placeholder="Custom image URL (or pick from defaults below)"
                     />
-                    {(editData.headerImageUrl || store.headerImageUrl) && (
+                    {editData.headerImageUrl && (
                       <button
                         type="button"
-                        onClick={() => setEditData({ ...editData, headerImageUrl: '' })}
+                        onClick={() => setEditData((prev: any) => ({ ...prev, headerImageUrl: '' }))}
                         className="px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-500 hover:bg-stone-100 transition whitespace-nowrap"
                       >
                         Use Default
@@ -239,9 +283,9 @@ const OwnedStoresSection: React.FC = () => {
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setEditData({ ...editData, headerImageUrl: url })}
+                        onClick={() => setEditData((prev: any) => ({ ...prev, headerImageUrl: url }))}
                         className={`rounded-lg overflow-hidden border-2 transition ${
-                          (editData.headerImageUrl ?? store.headerImageUrl) === url ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-stone-200 hover:border-emerald-300'
+                          editData.headerImageUrl === url ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-stone-200 hover:border-emerald-300'
                         }`}
                       >
                         <img src={url} alt={`Default ${i + 1}`} className="w-full h-16 object-cover" loading="lazy" />
@@ -249,7 +293,94 @@ const OwnedStoresSection: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-500 mb-2">Featured Selection</label>
+                  <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
+                    {(editData.featuredOfferings || []).map((item: string, idx: number) => (
+                      <span key={idx} className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-full">
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => removeOffering(idx)}
+                          className="ml-1 text-emerald-500 hover:text-red-500 transition leading-none"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    {(editData.featuredOfferings || []).length === 0 && (
+                      <span className="text-xs text-stone-400 italic">No items yet. Add some below.</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newOffering}
+                      onChange={e => setNewOffering(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOffering(); } }}
+                      placeholder="e.g. Flower, Edibles, Concentrates…"
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={addOffering}
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-400 transition"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-500 mb-2">Store Hours</label>
+                  <div className="space-y-2 mb-3">
+                    {(editData.hours || []).map((h: { day: string; time: string }, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2 border border-stone-200">
+                        <span className="text-xs font-bold text-stone-600 w-24 shrink-0">{h.day}</span>
+                        <span className="text-xs text-stone-700 flex-1">{h.time}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeHour(idx)}
+                          className="text-stone-400 hover:text-red-500 transition text-sm leading-none"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {(editData.hours || []).length === 0 && (
+                      <p className="text-xs text-stone-400 italic">No hours set. Add below.</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <select
+                      value={newHourDay}
+                      onChange={e => setNewHourDay(e.target.value)}
+                      className="bg-stone-50 border border-stone-200 rounded-xl p-2.5 text-sm focus:border-emerald-400 outline-none"
+                    >
+                      {DAYS_OF_WEEK.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input
+                      type="text"
+                      value={newHourTime}
+                      onChange={e => setNewHourTime(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addHour(); } }}
+                      placeholder="e.g. 10:00 AM - 9:00 PM"
+                      className="flex-1 min-w-0 bg-stone-50 border border-stone-200 rounded-xl p-2.5 text-sm focus:border-emerald-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={addHour}
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-400 transition"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => handleSave(store.id)}
                     disabled={saving}
@@ -269,10 +400,10 @@ const OwnedStoresSection: React.FC = () => {
               <div className="mt-3">
                 <div className="flex gap-4 text-sm text-stone-500 mb-3">
                   {store.phone && <span>{store.phone}</span>}
-                  {store.website && <a href={store.website} target="_blank" rel="noopener" className="text-emerald-600 hover:underline">{store.website}</a>}
+                  {store.website && <a href={store.website} target="_blank" rel="noopener" className="text-emerald-600 hover:underline truncate max-w-xs">{store.website}</a>}
                 </div>
                 <button
-                  onClick={() => { setEditing(store.id); setEditData({}); }}
+                  onClick={() => startEditing(store)}
                   className="text-sm font-bold text-emerald-600 hover:text-emerald-500 transition"
                 >
                   Edit Store Info
