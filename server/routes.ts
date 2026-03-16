@@ -1399,8 +1399,10 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
 
     if (Array.isArray(media) && media.length > 0) {
       const allowedDomains = ['.b-cdn.net', '.bunnycdn.com', '.bunny.net', '.mediadelivery.net'];
-      for (let i = 0; i < Math.min(media.length, 10); i++) {
-        const m = media[i];
+      const hasVideo = media.some((m: any) => m.mediaType === 'video');
+      const validMedia = hasVideo ? media.filter((m: any) => m.mediaType === 'video').slice(0, 1) : media.slice(0, 10);
+      for (let i = 0; i < validMedia.length; i++) {
+        const m = validMedia[i];
         if (m.cdnUrl && typeof m.cdnUrl === 'string') {
           try {
             const url = new URL(m.cdnUrl);
@@ -1492,6 +1494,12 @@ router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdm
     const { action, notes } = req.body;
     if (action !== 'approve' && action !== 'reject') {
       res.status(400).json({ error: 'Action must be approve or reject' });
+      return;
+    }
+    const existing = await getPostById(id);
+    if (!existing) { res.status(404).json({ error: 'Post not found' }); return; }
+    if (existing.contentTier !== 'raw' || existing.status !== 'pending_moderation') {
+      res.status(400).json({ error: 'Only raw posts in pending moderation can be moderated' });
       return;
     }
     const newStatus: PostStatus = action === 'approve' ? 'published' : 'rejected';
