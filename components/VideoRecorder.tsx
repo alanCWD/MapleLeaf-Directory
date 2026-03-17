@@ -77,6 +77,14 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (step === 'recording' && streamRef.current && videoRef.current && !previewUrl) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [step]);
+
   const stopStream = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -139,7 +147,8 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
     };
 
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType });
+      const baseMimeType = mimeType.split(';')[0].trim();
+      const blob = new Blob(chunksRef.current, { type: baseMimeType });
       const url = URL.createObjectURL(blob);
       const question = questions[currentQuestionIndex];
 

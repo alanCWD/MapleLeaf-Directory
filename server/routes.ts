@@ -910,7 +910,8 @@ router.post('/stores/:id/media/stitch', isAuthenticated as RequestHandler, requi
     }
 
     for (const file of files) {
-      if (!ALLOWED_VIDEO_MIMES.includes(file.mimetype)) {
+      const baseMime = file.mimetype.split(';')[0].trim();
+      if (!ALLOWED_VIDEO_MIMES.includes(baseMime) && !baseMime.startsWith('video/')) {
         res.status(400).json({ error: `Invalid file type: ${file.mimetype}. Only video files are accepted.` });
         return;
       }
