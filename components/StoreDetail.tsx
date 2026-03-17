@@ -287,7 +287,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-transparent"></div>
-        <div className="relative pt-32 md:pt-48 pb-8 md:pb-12 px-8 md:px-12">
+        <div className="relative pt-32 md:pt-48 pb-8 md:pb-12 px-4 md:px-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="text-white">
               <div className="flex flex-wrap gap-2 mb-4">
@@ -342,8 +342,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 mt-12 grid lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-12">
+      <div className="max-w-7xl mx-auto px-4 mt-12 grid lg:grid-cols-3 gap-8 lg:gap-12 overflow-x-hidden">
+        <div className="lg:col-span-2 space-y-12 min-w-0">
           {store.verificationStatus === 'ai_suggested' && (
             <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6">
               <div className="flex items-start gap-3">
@@ -423,7 +423,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             </section>
           )}
 
-          <div className="flex gap-1 border-b border-stone-200 mb-8">
+          <div className="flex flex-wrap gap-1 border-b border-stone-200 mb-8">
             {[
               { key: 'reviews' as const, label: 'Reviews', count: weightedReviews.length },
               { key: 'posts' as const, label: 'Community Posts', count: storeMedia.length + storePosts.length },
@@ -778,7 +778,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           )}
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-8 min-w-0">
           <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
 
           <PresenceCheckin storeId={store.id} storeName={store.name} />
