@@ -200,7 +200,7 @@ const App: React.FC = () => {
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-stone-50 w-full max-w-full overflow-x-hidden">
         <Navbar />
-        <main className="flex-grow">
+        <main className="flex-grow overflow-x-hidden w-full">
           <Routes>
             <Route path="/" element={
               <>

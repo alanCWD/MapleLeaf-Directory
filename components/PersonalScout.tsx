@@ -107,7 +107,7 @@ export const PersonalScout: React.FC<PersonalScoutProps> = ({ stores, onRecommen
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 z-40 bg-emerald-500 text-white p-4 rounded-[28px] shadow-2xl flex items-center gap-3 hover:scale-110 active:scale-95 transition-all group ring-8 ring-emerald-500/10"
+        className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-40 bg-emerald-500 text-white p-4 rounded-[28px] shadow-2xl flex items-center gap-3 hover:scale-105 active:scale-95 transition-all group ring-2 ring-emerald-500/20"
       >
         <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl group-hover:rotate-12 transition-transform">✨</div>
         <div className="text-left pr-4">

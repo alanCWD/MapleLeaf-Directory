@@ -36,7 +36,7 @@ export const LeadBanner: React.FC = () => {
           type="email" 
           required
           placeholder="Enter your email" 
-          className="bg-white/10 border border-white/20 text-white placeholder-stone-400 px-6 py-4 rounded-2xl focus:outline-none focus:border-emerald-400 focus:bg-white/20 min-w-[280px] backdrop-blur-md transition-all font-medium"
+          className="bg-white/10 border border-white/20 text-white placeholder-stone-400 px-6 py-4 rounded-2xl focus:outline-none focus:border-emerald-400 focus:bg-white/20 w-full sm:min-w-[280px] backdrop-blur-md transition-all font-medium"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
