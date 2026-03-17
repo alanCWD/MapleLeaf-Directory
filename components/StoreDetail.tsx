@@ -33,7 +33,7 @@ interface InsightsData {
 
 export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore }) => {
   const { id } = useParams<{ id: string }>();
-  const { user, isAuthenticated, isOwner: isOwnerOrAdmin, isAdmin } = useAuth();
+  const { user, isAuthenticated, isOwner: isOwnerOrAdmin, isAdmin, isCreator } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
@@ -485,6 +485,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                 <MediaGallery media={storeMedia} isLoading={isLoadingMedia} isAuthenticated={isAuthenticated} />
               </div>
 
+              {isCreator && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
@@ -534,18 +535,13 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   <div className="text-center py-16 bg-white rounded-[32px] border border-stone-200">
                     <div className="text-4xl mb-4">&#x1F4DD;</div>
                     <p className="text-stone-400 font-bold">No creator posts for this store yet</p>
-                    {isAuthenticated ? (
-                      <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
-                        Create a Post
-                      </Link>
-                    ) : (
-                      <a href="#/auth" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
-                        Sign In to Post
-                      </a>
-                    )}
+                    <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
+                      Create a Post
+                    </Link>
                   </div>
                 )}
               </div>
+              )}
             </section>
           )}
 
@@ -556,17 +552,55 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                 <span className="w-2 h-8 bg-purple-500 rounded-full"></span>
                 Community Reviews
               </h2>
-              <button 
-                onClick={() => setShowReviewForm(!showReviewForm)}
-                className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10"
-              >
-                {showReviewForm ? 'Cancel Review' : 'Write a Review'}
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => { setShowReviewForm(true); setReviewVideoMode('recorder'); }}
+                  className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/10 flex items-center gap-2 text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Share Your Experience
+                </button>
+                <button
+                  onClick={() => { setShowReviewForm(true); setReviewVideoMode('uploader'); }}
+                  className="bg-stone-800 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-stone-700 transition shadow-lg flex items-center gap-2 text-sm"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload Video
+                </button>
+                {showReviewForm && (
+                  <button
+                    onClick={() => { setShowReviewForm(false); setReviewVideoMode('none'); }}
+                    className="text-stone-500 px-5 py-2.5 rounded-xl font-bold hover:text-stone-700 border border-stone-200 hover:bg-stone-50 transition text-sm"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
 
             {showReviewForm && (
               <div className="bg-white p-8 rounded-3xl border border-emerald-200 shadow-sm mb-12 animate-fade-in">
-                <h3 className="text-lg font-bold text-stone-900 mb-6">Rate your experience</h3>
+                {!isAuthenticated ? (
+                  <div className="text-center py-10">
+                    <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-bold text-stone-900 mb-2">Sign In to Submit a Review</h3>
+                    <p className="text-stone-500 text-sm mb-6 max-w-xs mx-auto">Create an account or sign in to share your experience and help the community.</p>
+                    <a
+                      href="#/auth"
+                      className="inline-block bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/20"
+                    >
+                      Sign In to Submit Review
+                    </a>
+                  </div>
+                ) : (
                 <form onSubmit={handleAddReview} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
@@ -660,6 +694,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     {isSubmittingReview ? 'Posting...' : reviewVideoAssetId ? 'Post Video Review' : 'Post Review'}
                   </button>
                 </form>
+                )}
               </div>
             )}
 
