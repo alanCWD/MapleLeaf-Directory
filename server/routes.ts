@@ -1333,15 +1333,18 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
     }
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
     const filename = `${crypto.randomUUID()}${ext}`;
+    const useBunny = isBunnyStorageConfigured();
+    console.log(`[ImageUpload] bunnyConfigured=${useBunny} zone=${process.env.BUNNY_STORAGE_ZONE || '(unset)'} hostname=${process.env.BUNNY_STORAGE_HOSTNAME || 'storage.bunnycdn.com'} cdnUrl=${process.env.BUNNY_STORAGE_CDN_URL || '(unset)'}`);
     let cdnUrl: string;
-    if (isBunnyStorageConfigured()) {
+    if (useBunny) {
       cdnUrl = await uploadImageToStorage(req.file.buffer, filename);
     } else {
       cdnUrl = await uploadImageLocal(req.file.buffer, filename);
     }
+    console.log(`[ImageUpload] Success — cdnUrl=${cdnUrl}`);
     res.json({ cdnUrl, filename });
   } catch (error: any) {
-    console.error('Error uploading image:', error);
+    console.error('[ImageUpload] Error:', error.message);
     res.status(500).json({ error: error.message || 'Failed to upload image' });
   }
 });
