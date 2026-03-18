@@ -605,6 +605,10 @@ export interface AdminVideoReview {
   contentRating: string;
   moderationNotes: string | null;
   createdAt: string;
+  reviewText: string | null;
+  reviewRating: number | null;
+  reviewerId: string | null;
+  reviewCreatedAt: string | null;
 }
 
 export async function fetchAdminVideoReviews(): Promise<AdminVideoReview[]> {

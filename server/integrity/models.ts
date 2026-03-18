@@ -440,7 +440,7 @@ export async function getReviewsWithBadges(storeId: string): Promise<(WeightedRe
 export async function updateMediaModeration(
   id: number,
   data: { moderationStatus?: string; contentRating?: string; moderationNotes?: string }
-): Promise<StoreMedia | null> {
+): Promise<(StoreMedia & { moderationStatus: string; contentRating: string; moderationNotes: string | null }) | null> {
   const setClauses: string[] = ['updated_at = NOW()'];
   const params: any[] = [id];
   let idx = 2;
@@ -463,14 +463,23 @@ export async function updateMediaModeration(
     params
   );
   if (result.rows.length === 0) return null;
-  return mediaSnakeToCamel(result.rows[0]);
+  const row = result.rows[0];
+  return {
+    ...mediaSnakeToCamel(row),
+    moderationStatus: row.moderation_status || 'approved',
+    contentRating: row.content_rating || 'clean',
+    moderationNotes: row.moderation_notes || null,
+  };
 }
 
 export async function getVideoReviews(): Promise<any[]> {
   const result = await pool.query(
-    `SELECT sm.*, s.name AS store_name
+    `SELECT sm.*, s.name AS store_name,
+            ir.content_text AS review_text, ir.rating AS review_rating,
+            ir.user_id AS reviewer_id, ir.created_at AS review_created_at
      FROM store_media sm
      LEFT JOIN stores s ON s.id = sm.store_id
+     LEFT JOIN integrity_reviews ir ON ir.video_asset_id = sm.id
      WHERE sm.media_type = 'review'
      ORDER BY sm.created_at DESC`
   );
@@ -480,5 +489,9 @@ export async function getVideoReviews(): Promise<any[]> {
     moderationStatus: row.moderation_status || 'approved',
     contentRating: row.content_rating || 'clean',
     moderationNotes: row.moderation_notes || null,
+    reviewText: row.review_text || null,
+    reviewRating: row.review_rating ? parseFloat(row.review_rating) : null,
+    reviewerId: row.reviewer_id || row.user_id || null,
+    reviewCreatedAt: row.review_created_at ? row.review_created_at.toISOString() : null,
   }));
 }

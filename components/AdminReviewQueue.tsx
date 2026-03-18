@@ -434,7 +434,18 @@ export const AdminReviewQueue: React.FC = () => {
                         {vr.storeName && (
                           <p className="text-sm text-stone-500 mb-1">Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline">{vr.storeName}</Link></p>
                         )}
-                        <p className="text-xs text-stone-400 mb-3">{new Date(vr.createdAt).toLocaleDateString()}</p>
+                        <div className="flex items-center gap-3 text-xs text-stone-400 mb-2">
+                          {vr.reviewerId && <span>Reviewer: <span className="font-mono text-stone-600">{vr.reviewerId.slice(0, 12)}…</span></span>}
+                          {vr.reviewRating && (
+                            <span className="flex gap-0.5 text-amber-500">
+                              {[1,2,3,4,5].map(i => <span key={i}>{i <= Math.round(vr.reviewRating!) ? '★' : '☆'}</span>)}
+                            </span>
+                          )}
+                          <span>{new Date(vr.reviewCreatedAt || vr.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        {vr.reviewText && (
+                          <p className="text-sm text-stone-600 italic bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 mb-3">"{vr.reviewText}"</p>
+                        )}
 
                         <div className="flex flex-col gap-3">
                           <input
