@@ -227,7 +227,7 @@ export async function createStoreMedia(data: {
 
 export async function getStoreMedia(storeId: string): Promise<StoreMedia[]> {
   const result = await pool.query(
-    `SELECT * FROM store_media WHERE store_id = $1 ORDER BY created_at DESC`,
+    `SELECT * FROM store_media WHERE store_id = $1 AND media_type != 'review' ORDER BY created_at DESC`,
     [storeId]
   );
   return result.rows.map(mediaSnakeToCamel);
