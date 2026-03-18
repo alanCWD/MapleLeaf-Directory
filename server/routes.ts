@@ -49,6 +49,8 @@ import {
   evaluateUserBadges,
   getUserBadges,
   getReviewsWithBadges,
+  updateMediaModeration,
+  getVideoReviews,
   awardBadge,
   revokeBadge,
   getCurrentQRPayload,
@@ -1469,6 +1471,46 @@ router.get('/posts/pending', isAuthenticated as RequestHandler, requireAdmin, as
   } catch (error) {
     console.error('Error fetching pending posts:', error);
     res.status(500).json({ error: 'Failed to fetch pending posts' });
+  }
+});
+
+router.get('/admin/media/video-reviews', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
+  try {
+    const reviews = await getVideoReviews();
+    res.json(reviews);
+  } catch (error) {
+    console.error('Error fetching video reviews:', error);
+    res.status(500).json({ error: 'Failed to fetch video reviews' });
+  }
+});
+
+router.post('/admin/media/:id/moderate', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid media ID' }); return; }
+    const { moderationStatus, contentRating, moderationNotes } = req.body;
+    const validStatuses = ['approved', 'disapproved'];
+    const validRatings = ['clean', 'raw'];
+    if (moderationStatus && !validStatuses.includes(moderationStatus)) {
+      res.status(400).json({ error: 'moderationStatus must be approved or disapproved' });
+      return;
+    }
+    if (contentRating && !validRatings.includes(contentRating)) {
+      res.status(400).json({ error: 'contentRating must be clean or raw' });
+      return;
+    }
+    const updated = await updateMediaModeration(id, { moderationStatus, contentRating, moderationNotes });
+    if (!updated) { res.status(404).json({ error: 'Media not found' }); return; }
+    const adminId = getUserId(req)!;
+    await createAuditLog(adminId, 'media_moderate', 'store_media', String(id), {
+      moderationStatus,
+      contentRating,
+      moderationNotes: moderationNotes || null,
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error moderating media:', error);
+    res.status(500).json({ error: 'Failed to moderate media' });
   }
 });
 

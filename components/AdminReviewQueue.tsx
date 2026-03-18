@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, CreatorPost } from '../types';
-import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchPendingPosts, moderatePost } from '../services/api';
+import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchPendingPosts, moderatePost, fetchAdminVideoReviews, moderateVideoReview, AdminVideoReview } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { useAuth } from '../hooks/useAuth';
 
@@ -10,24 +10,28 @@ export const AdminReviewQueue: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [claims, setClaims] = useState<any[]>([]);
   const [pendingPosts, setPendingPosts] = useState<CreatorPost[]>([]);
+  const [videoReviews, setVideoReviews] = useState<AdminVideoReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [postNotes, setPostNotes] = useState<Record<number, string>>({});
-  const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts'>('stores');
+  const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
+  const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts' | 'videos'>('stores');
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
   const loadQueue = async () => {
     setIsLoading(true);
     try {
-      const [storeData, claimData, postsData] = await Promise.all([
+      const [storeData, claimData, postsData, videoData] = await Promise.all([
         fetchReviewQueue(),
         getAdminClaimsAPI(),
         fetchPendingPosts(),
+        fetchAdminVideoReviews(),
       ]);
       setStores(storeData);
       setClaims(claimData);
       setPendingPosts(postsData);
+      setVideoReviews(videoData);
     } catch (err: any) {
       console.error('Failed to load review queue:', err);
     } finally {
@@ -117,6 +121,18 @@ export const AdminReviewQueue: React.FC = () => {
     }
   };
 
+  const handleVideoModerate = async (id: number, data: { moderationStatus?: string; contentRating?: string }) => {
+    setActionInProgress(`video-${id}`);
+    try {
+      const updated = await moderateVideoReview(id, { ...data, moderationNotes: videoNotes[id] });
+      setVideoReviews(prev => prev.map(v => v.id === id ? { ...v, ...updated } : v));
+    } catch (err) {
+      console.error('Video moderation failed:', err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
       <div className="bg-white rounded-[40px] border border-stone-200 shadow-2xl overflow-hidden">
@@ -130,7 +146,7 @@ export const AdminReviewQueue: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-sm font-bold border border-amber-500/30">
-                {stores.length} stores | {claims.length} claims | {pendingPosts.length} posts
+                {stores.length} stores | {claims.length} claims | {pendingPosts.length} posts | {videoReviews.length} videos
               </span>
               <button
                 onClick={loadQueue}
@@ -158,6 +174,12 @@ export const AdminReviewQueue: React.FC = () => {
               className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'posts' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
               Creator Posts ({pendingPosts.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('videos')}
+              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'videos' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              Video Reviews ({videoReviews.length})
             </button>
           </div>
         </div>
@@ -292,7 +314,7 @@ export const AdminReviewQueue: React.FC = () => {
                 ))}
               </div>
             )
-          ) : (
+          ) : activeTab === 'posts' ? (
             pendingPosts.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-4xl mb-4">✅</div>
@@ -370,7 +392,102 @@ export const AdminReviewQueue: React.FC = () => {
                 ))}
               </div>
             )
-          )}
+          ) : activeTab === 'videos' ? (
+            videoReviews.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-4xl mb-4">🎬</div>
+                <p className="text-stone-500 font-bold text-lg">No video reviews yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {videoReviews.map((vr) => (
+                  <div key={vr.id} className={`border rounded-2xl p-6 ${vr.moderationStatus === 'disapproved' ? 'border-red-200 bg-red-50/30' : 'border-stone-200 bg-stone-50/50'}`}>
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {vr.embedUrl ? (
+                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
+                          <iframe
+                            src={vr.embedUrl}
+                            className="absolute inset-0 w-full h-full"
+                            allow="autoplay; fullscreen"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : vr.thumbnailUrl ? (
+                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                          <img src={vr.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl bg-stone-200 flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
+                          <span className="text-stone-400 text-3xl">🎬</span>
+                        </div>
+                      )}
+                      <div className="flex-grow">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <h4 className="font-black text-stone-900">{vr.title || 'Video Review'}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.moderationStatus === 'disapproved' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {vr.moderationStatus === 'disapproved' ? 'Disapproved' : 'Approved'}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.contentRating === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-600'}`}>
+                            {vr.contentRating === 'raw' ? '🔥 Raw' : 'Clean'}
+                          </span>
+                        </div>
+                        {vr.storeName && (
+                          <p className="text-sm text-stone-500 mb-1">Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline">{vr.storeName}</Link></p>
+                        )}
+                        <p className="text-xs text-stone-400 mb-3">{new Date(vr.createdAt).toLocaleDateString()}</p>
+
+                        <div className="flex flex-col gap-3">
+                          <input
+                            type="text"
+                            placeholder="Moderation notes (optional)"
+                            value={videoNotes[vr.id] || ''}
+                            onChange={(e) => setVideoNotes(prev => ({ ...prev, [vr.id]: e.target.value }))}
+                            className="bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            {vr.moderationStatus === 'disapproved' ? (
+                              <button
+                                onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'approved' })}
+                                disabled={actionInProgress === `video-${vr.id}`}
+                                className="px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                              >
+                                Re-approve
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'disapproved' })}
+                                disabled={actionInProgress === `video-${vr.id}`}
+                                className="px-4 py-2 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                              >
+                                Disapprove
+                              </button>
+                            )}
+                            {vr.contentRating === 'raw' ? (
+                              <button
+                                onClick={() => handleVideoModerate(vr.id, { contentRating: 'clean' })}
+                                disabled={actionInProgress === `video-${vr.id}`}
+                                className="px-4 py-2 rounded-xl text-sm font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition disabled:opacity-50"
+                              >
+                                Mark Clean
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleVideoModerate(vr.id, { contentRating: 'raw' })}
+                                disabled={actionInProgress === `video-${vr.id}`}
+                                className="px-4 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
+                              >
+                                Mark Raw
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : null}
         </div>
       </div>
     </div>

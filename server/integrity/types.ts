@@ -58,6 +58,8 @@ export interface WeightedReview {
   createdAt: string;
   embedUrl?: string | null;
   thumbnailUrl?: string | null;
+  contentRating?: string | null;
+  moderationStatus?: string | null;
 }
 
 export interface RecorderQuestion {

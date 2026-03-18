@@ -254,6 +254,8 @@ export interface WeightedReview {
   reviewerBadges: UserBadge[];
   embedUrl?: string | null;
   thumbnailUrl?: string | null;
+  contentRating?: string | null;
+  moderationStatus?: string | null;
 }
 
 export async function initMediaUpload(
@@ -588,4 +590,34 @@ export async function fetchAuditLogs(filters: {
   if (filters.limit) params.set('limit', String(filters.limit));
   const qs = params.toString();
   return apiFetch<AuditLogsResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
+}
+
+export interface AdminVideoReview {
+  id: number;
+  storeId: string;
+  storeName: string | null;
+  userId: string | null;
+  bunnyVideoId: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  embedUrl: string | null;
+  moderationStatus: string;
+  contentRating: string;
+  moderationNotes: string | null;
+  createdAt: string;
+}
+
+export async function fetchAdminVideoReviews(): Promise<AdminVideoReview[]> {
+  return apiFetch<AdminVideoReview[]>('/admin/media/video-reviews');
+}
+
+export async function moderateVideoReview(
+  id: number,
+  data: { moderationStatus?: string; contentRating?: string; moderationNotes?: string }
+): Promise<AdminVideoReview> {
+  return apiFetch<AdminVideoReview>(`/admin/media/${id}/moderate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
 }

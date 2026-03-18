@@ -16,6 +16,8 @@ export {
   getUserBadges,
   getUsersWithBadge,
   getReviewsWithBadges,
+  updateMediaModeration,
+  getVideoReviews,
 } from './models';
 
 export type { UserBadge } from './models';

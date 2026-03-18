@@ -26,6 +26,8 @@ function reviewSnakeToCamel(row: Record<string, any>): WeightedReview {
     ? JSON.parse(row.trust_weight)
     : row.trust_weight || { base: 0.5, videoBonus: 0, scoutBonus: 0, geoDeviation: 0, presenceBonus: 0, final: 0.5 };
 
+  const disapproved = row.moderation_status === 'disapproved';
+
   return {
     id: row.id,
     storeId: row.store_id,
@@ -38,8 +40,10 @@ function reviewSnakeToCamel(row: Record<string, any>): WeightedReview {
     isFlagged: row.is_flagged ?? false,
     disclosures: row.disclosures || null,
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
-    embedUrl: row.embed_url || null,
-    thumbnailUrl: row.thumbnail_url || null,
+    embedUrl: disapproved ? null : (row.embed_url || null),
+    thumbnailUrl: disapproved ? null : (row.thumbnail_url || null),
+    contentRating: row.content_rating || 'clean',
+    moderationStatus: row.moderation_status || 'approved',
   };
 }
 
@@ -152,6 +156,16 @@ export async function ensureIntegrityTables(): Promise<void> {
 
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_creator BOOLEAN DEFAULT false
+  `);
+
+  await pool.query(`
+    ALTER TABLE store_media ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(50) DEFAULT 'approved'
+  `);
+  await pool.query(`
+    ALTER TABLE store_media ADD COLUMN IF NOT EXISTS content_rating VARCHAR(20) DEFAULT 'clean'
+  `);
+  await pool.query(`
+    ALTER TABLE store_media ADD COLUMN IF NOT EXISTS moderation_notes TEXT
   `);
 
   await pool.query(`
@@ -393,7 +407,7 @@ export async function getUsersWithBadge(badgeType: string): Promise<UserBadge[]>
 
 export async function getReviewsWithBadges(storeId: string): Promise<(WeightedReview & { reviewerBadges: UserBadge[] })[]> {
   const reviews = await pool.query(
-    `SELECT ir.*, sm.embed_url, sm.thumbnail_url
+    `SELECT ir.*, sm.embed_url, sm.thumbnail_url, sm.moderation_status, sm.content_rating
      FROM integrity_reviews ir
      LEFT JOIN store_media sm ON sm.id = ir.video_asset_id
      WHERE ir.store_id = $1
@@ -420,5 +434,51 @@ export async function getReviewsWithBadges(storeId: string): Promise<(WeightedRe
   return reviews.rows.map((row: any) => ({
     ...reviewSnakeToCamel(row),
     reviewerBadges: badgesByUser[row.user_id] || [],
+  }));
+}
+
+export async function updateMediaModeration(
+  id: number,
+  data: { moderationStatus?: string; contentRating?: string; moderationNotes?: string }
+): Promise<StoreMedia | null> {
+  const setClauses: string[] = ['updated_at = NOW()'];
+  const params: any[] = [id];
+  let idx = 2;
+
+  if (data.moderationStatus !== undefined) {
+    setClauses.push(`moderation_status = $${idx++}`);
+    params.push(data.moderationStatus);
+  }
+  if (data.contentRating !== undefined) {
+    setClauses.push(`content_rating = $${idx++}`);
+    params.push(data.contentRating);
+  }
+  if (data.moderationNotes !== undefined) {
+    setClauses.push(`moderation_notes = $${idx++}`);
+    params.push(data.moderationNotes);
+  }
+
+  const result = await pool.query(
+    `UPDATE store_media SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *`,
+    params
+  );
+  if (result.rows.length === 0) return null;
+  return mediaSnakeToCamel(result.rows[0]);
+}
+
+export async function getVideoReviews(): Promise<any[]> {
+  const result = await pool.query(
+    `SELECT sm.*, s.name AS store_name
+     FROM store_media sm
+     LEFT JOIN stores s ON s.id = sm.store_id
+     WHERE sm.media_type = 'review'
+     ORDER BY sm.created_at DESC`
+  );
+  return result.rows.map(row => ({
+    ...mediaSnakeToCamel(row),
+    storeName: row.store_name || null,
+    moderationStatus: row.moderation_status || 'approved',
+    contentRating: row.content_rating || 'clean',
+    moderationNotes: row.moderation_notes || null,
   }));
 }
