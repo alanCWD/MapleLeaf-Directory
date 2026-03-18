@@ -1,10 +1,36 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 const BUNNY_STORAGE_ZONE = () => process.env.BUNNY_STORAGE_ZONE || '';
 const BUNNY_STORAGE_API_KEY = () => process.env.BUNNY_STORAGE_API_KEY || '';
 const BUNNY_STORAGE_CDN_URL = () => process.env.BUNNY_STORAGE_CDN_URL || '';
 const BUNNY_STORAGE_HOSTNAME = () => process.env.BUNNY_STORAGE_HOSTNAME || 'storage.bunnycdn.com';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LOCAL_UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
+
 export function isBunnyStorageConfigured(): boolean {
   return !!(BUNNY_STORAGE_ZONE() && BUNNY_STORAGE_API_KEY());
+}
+
+export async function uploadImageLocal(
+  buffer: Buffer,
+  filename: string,
+  folder: string = 'posts'
+): Promise<string> {
+  const dir = path.join(LOCAL_UPLOADS_DIR, folder);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, filename), buffer);
+  return `/uploads/${folder}/${filename}`;
+}
+
+export async function deleteImageLocal(
+  filename: string,
+  folder: string = 'posts'
+): Promise<void> {
+  const filepath = path.join(LOCAL_UPLOADS_DIR, folder, filename);
+  try { fs.unlinkSync(filepath); } catch { }
 }
 
 export async function uploadImageToStorage(

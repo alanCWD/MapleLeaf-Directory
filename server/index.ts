@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
@@ -10,6 +11,11 @@ import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = isProduction ? 5000 : 3001;
+
+const __dirnameLocal = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(__dirnameLocal, '..', 'uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));

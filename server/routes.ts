@@ -81,7 +81,7 @@ import {
   moderateCleanContent,
 } from './posts.ts';
 import type { PostStatus } from '../types';
-import { uploadImageToStorage, isBunnyStorageConfigured } from './bunnyStorage.ts';
+import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal } from './bunnyStorage.ts';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -1331,13 +1331,14 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
-    if (!isBunnyStorageConfigured()) {
-      res.status(503).json({ error: 'Image storage is not configured' });
-      return;
-    }
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
     const filename = `${crypto.randomUUID()}${ext}`;
-    const cdnUrl = await uploadImageToStorage(req.file.buffer, filename);
+    let cdnUrl: string;
+    if (isBunnyStorageConfigured()) {
+      cdnUrl = await uploadImageToStorage(req.file.buffer, filename);
+    } else {
+      cdnUrl = await uploadImageLocal(req.file.buffer, filename);
+    }
     res.json({ cdnUrl, filename });
   } catch (error: any) {
     console.error('Error uploading image:', error);
