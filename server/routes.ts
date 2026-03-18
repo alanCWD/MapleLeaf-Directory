@@ -1499,6 +1499,12 @@ router.post('/admin/media/:id/moderate', isAuthenticated as RequestHandler, requ
       res.status(400).json({ error: 'contentRating must be clean or raw' });
       return;
     }
+    const existing = await getMediaById(id);
+    if (!existing) { res.status(404).json({ error: 'Media not found' }); return; }
+    if ((existing as any).mediaType !== 'review') {
+      res.status(400).json({ error: 'Only video reviews can be moderated via this endpoint' });
+      return;
+    }
     const updated = await updateMediaModeration(id, { moderationStatus, contentRating, moderationNotes });
     if (!updated) { res.status(404).json({ error: 'Media not found' }); return; }
     const adminId = getUserId(req)!;

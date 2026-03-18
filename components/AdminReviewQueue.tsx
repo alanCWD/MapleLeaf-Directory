@@ -32,6 +32,11 @@ export const AdminReviewQueue: React.FC = () => {
       setClaims(claimData);
       setPendingPosts(postsData);
       setVideoReviews(videoData);
+      const preloadedNotes: Record<number, string> = {};
+      for (const vr of videoData) {
+        if (vr.moderationNotes) preloadedNotes[vr.id] = vr.moderationNotes;
+      }
+      setVideoNotes(preloadedNotes);
     } catch (err: any) {
       console.error('Failed to load review queue:', err);
     } finally {
