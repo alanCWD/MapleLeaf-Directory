@@ -56,6 +56,8 @@ export interface WeightedReview {
   isFlagged: boolean;
   disclosures: Record<string, any> | null;
   createdAt: string;
+  embedUrl?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface RecorderQuestion {

@@ -53,6 +53,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [reviewVideoAssetId, setReviewVideoAssetId] = useState<number | undefined>(undefined);
   const [storePosts, setStorePosts] = useState<CreatorPost[]>([]);
   const [activeTab, setActiveTab] = useState<'reviews' | 'posts'>('reviews');
+  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -739,6 +740,34 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                         {new Date(wr.createdAt).toLocaleDateString()}
                       </span>
                     </div>
+                    {wr.embedUrl && (
+                      <button
+                        onClick={() => setVideoModalUrl(wr.embedUrl!)}
+                        className="relative w-full rounded-2xl overflow-hidden mb-3 group block"
+                        style={{ aspectRatio: '16/9' }}
+                      >
+                        {wr.thumbnailUrl ? (
+                          <img
+                            src={wr.thumbnailUrl}
+                            alt="Video review thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-stone-900 flex items-center justify-center">
+                            <svg className="w-12 h-12 text-stone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition">
+                          <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                            <svg className="w-6 h-6 text-stone-900 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </div>
+                      </button>
+                    )}
                     <p className="text-stone-600 leading-relaxed italic">"{wr.contentText}"</p>
                   </div>
                 </div>
@@ -964,6 +993,35 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
               }}
               onCancel={() => setShowVideoUploader(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {videoModalUrl && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setVideoModalUrl(null)}
+        >
+          <div
+            className="relative w-full max-w-3xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setVideoModalUrl(null)}
+              className="absolute -top-12 right-0 text-white/70 hover:text-white transition p-2"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="relative w-full rounded-2xl overflow-hidden bg-black" style={{ aspectRatio: '16/9' }}>
+              <iframe
+                src={`${videoModalUrl}?autoplay=true`}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+            </div>
           </div>
         </div>
       )}

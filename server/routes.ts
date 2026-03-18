@@ -61,7 +61,7 @@ import {
 import type { RecorderQuestion } from './integrity/types.ts';
 import multer from 'multer';
 import { createJobDir, stitchClips, uploadStitchedToBunny, cleanupJobDir } from './videoStitcher.ts';
-import { createVideo, generateTusCredentials, getEmbedUrl } from './bunnyStream.ts';
+import { createVideo, generateTusCredentials, getEmbedUrl, getThumbnailUrl } from './bunnyStream.ts';
 import { createStoreMedia, updateMediaStatus } from './integrity/models.ts';
 import {
   createPost,
@@ -959,6 +959,7 @@ router.post('/stores/:id/media/stitch', isAuthenticated as RequestHandler, requi
         bunnyLibraryId: String(bunnyVideo.videoLibraryId),
         title,
         embedUrl: getEmbedUrl(bunnyVideo.guid),
+        thumbnailUrl: getThumbnailUrl(bunnyVideo.guid),
         mediaType: 'review',
         status: 'processing',
       });

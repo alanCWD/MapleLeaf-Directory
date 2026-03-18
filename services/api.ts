@@ -252,6 +252,8 @@ export interface WeightedReview {
   disclosures: Record<string, unknown> | null;
   createdAt: string;
   reviewerBadges: UserBadge[];
+  embedUrl?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export async function initMediaUpload(

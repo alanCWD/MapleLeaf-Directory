@@ -39,6 +39,7 @@ export async function initUpload(
     bunnyLibraryId: String(bunnyVideo.videoLibraryId),
     title,
     embedUrl,
+    thumbnailUrl: getThumbnailUrl(bunnyVideo.guid),
     mediaType,
     status: 'uploading',
   });

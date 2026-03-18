@@ -38,6 +38,8 @@ function reviewSnakeToCamel(row: Record<string, any>): WeightedReview {
     isFlagged: row.is_flagged ?? false,
     disclosures: row.disclosures || null,
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
+    embedUrl: row.embed_url || null,
+    thumbnailUrl: row.thumbnail_url || null,
   };
 }
 
@@ -391,7 +393,11 @@ export async function getUsersWithBadge(badgeType: string): Promise<UserBadge[]>
 
 export async function getReviewsWithBadges(storeId: string): Promise<(WeightedReview & { reviewerBadges: UserBadge[] })[]> {
   const reviews = await pool.query(
-    `SELECT * FROM integrity_reviews WHERE store_id = $1 ORDER BY created_at DESC`,
+    `SELECT ir.*, sm.embed_url, sm.thumbnail_url
+     FROM integrity_reviews ir
+     LEFT JOIN store_media sm ON sm.id = ir.video_asset_id
+     WHERE ir.store_id = $1
+     ORDER BY ir.created_at DESC`,
     [storeId]
   );
 
