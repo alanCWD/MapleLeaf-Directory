@@ -766,83 +766,64 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
             )}
 
             <div className="space-y-6">
-              {weightedReviews.length > 0 && (() => {
-                const videoReviews = weightedReviews.filter(wr => wr.embedUrl);
-                const textReviews = weightedReviews.filter(wr => !wr.embedUrl);
-                return (
-                  <>
-                    {videoReviews.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {videoReviews.map(wr => (
-                          <div key={`wr-${wr.id}`} className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
-                            <RawContentThumbnail
-                              embedUrl={wr.embedUrl!}
-                              thumbnailUrl={wr.thumbnailUrl ?? null}
-                              contentRating={wr.contentRating ?? 'clean'}
-                              onPlay={setVideoModalUrl}
-                            />
-                            <div className="p-3 flex flex-col gap-1.5">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <div className="flex gap-0.5 text-xs text-amber-500">
-                                  {[...Array(5)].map((_, i) => (
-                                    <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
-                                  ))}
-                                </div>
-                                <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                  {((wr.trustWeight?.final ?? 0) * 100).toFixed(0)}%
-                                  {wr.trustWeight?.scoutBonus > 0 && <span className="text-blue-600">⚡</span>}
-                                </span>
-                                {wr.reviewerBadges?.slice(0, 2).map(b => (
-                                  <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={false} />
-                                ))}
-                              </div>
-                              {wr.contentText && (
-                                <p className="text-stone-600 text-xs leading-snug italic line-clamp-3">"{wr.contentText}"</p>
-                              )}
-                              <span className="text-[10px] text-stone-400 mt-auto">
-                                {new Date(wr.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
+              {weightedReviews.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {weightedReviews.map(wr => (
+                    <div key={`wr-${wr.id}`} className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+                      {wr.embedUrl ? (
+                        <RawContentThumbnail
+                          embedUrl={wr.embedUrl}
+                          thumbnailUrl={wr.thumbnailUrl ?? null}
+                          contentRating={wr.contentRating ?? 'clean'}
+                          onPlay={setVideoModalUrl}
+                        />
+                      ) : (
+                        <div className="relative w-full bg-gradient-to-br from-stone-800 to-stone-900 flex flex-col items-center justify-center p-4" style={{ aspectRatio: '9/16' }}>
+                          <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-3 flex-shrink-0">
+                            <span className="text-emerald-300 font-black text-base">{wr.userId?.charAt(0)?.toUpperCase() || 'U'}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    {textReviews.map(wr => (
-                      <div key={`wr-${wr.id}`} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-6">
-                        <div className="flex-shrink-0">
-                          <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold text-lg">
-                            <span>{wr.userId?.charAt(0)?.toUpperCase() || 'U'}</span>
+                          <div className="flex gap-0.5 text-amber-400 text-sm mb-3">
+                            {[...Array(5)].map((_, i) => (
+                              <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
+                            ))}
                           </div>
+                          {wr.contentText && (
+                            <p className="text-white/80 text-xs leading-relaxed italic text-center overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical' }}>
+                              "{wr.contentText}"
+                            </p>
+                          )}
                         </div>
-                        <div className="flex-grow">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className="flex gap-1 text-sm text-amber-500">
-                                {[...Array(5)].map((_, i) => (
-                                  <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
-                                ))}
-                              </div>
-                              <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                Trust: {((wr.trustWeight?.final ?? 0) * 100).toFixed(0)}%
-                                {wr.trustWeight?.scoutBonus > 0 && (
-                                  <span className="text-blue-600" title="Scout bonus">⚡</span>
-                                )}
-                              </span>
-                              {wr.reviewerBadges?.map(b => (
-                                <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={false} />
+                      )}
+                      <div className="p-3 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {wr.embedUrl && (
+                            <div className="flex gap-0.5 text-xs text-amber-500">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
                               ))}
                             </div>
-                            <span className="text-xs font-medium text-stone-400 uppercase tracking-widest">
-                              {new Date(wr.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-stone-600 leading-relaxed italic">"{wr.contentText}"</p>
+                          )}
+                          <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                            {((wr.trustWeight?.final ?? 0) * 100).toFixed(0)}%
+                            {wr.trustWeight?.scoutBonus > 0 && <span className="text-blue-600">⚡</span>}
+                          </span>
+                          {wr.reviewerBadges?.slice(0, 2).map(b => (
+                            <BadgeIcon key={b.badgeType} badgeType={b.badgeType as any} size="sm" showLabel={false} />
+                          ))}
                         </div>
+                        {wr.embedUrl && wr.contentText && (
+                          <p className="text-stone-500 text-[11px] leading-snug italic overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                            "{wr.contentText}"
+                          </p>
+                        )}
+                        <span className="text-[10px] text-stone-400 mt-auto pt-0.5">
+                          {new Date(wr.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
-                    ))}
-                  </>
-                );
-              })()}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {store.reviews && store.reviews.length > 0 ? (
                 store.reviews.map(review => (
