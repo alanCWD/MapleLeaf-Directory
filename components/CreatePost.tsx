@@ -8,6 +8,7 @@ import * as tus from 'tus-js-client';
 interface MediaItem {
   mediaType: 'image' | 'video';
   cdnUrl: string;
+  previewUrl?: string;
   bunnyId?: string;
   caption: string;
   file?: File;
@@ -64,9 +65,11 @@ export const CreatePost: React.FC = () => {
         setError(`${file.name} is too large (max 20MB)`);
         continue;
       }
+      const blobUrl = URL.createObjectURL(file);
       const item: MediaItem = {
         mediaType: 'image',
-        cdnUrl: URL.createObjectURL(file),
+        cdnUrl: '',
+        previewUrl: blobUrl,
         caption: '',
         file,
         uploading: true,
@@ -77,7 +80,7 @@ export const CreatePost: React.FC = () => {
         const result = await uploadPostImage(file);
         setMediaItems(prev =>
           prev.map(m =>
-            m.file === file ? { ...m, cdnUrl: result.cdnUrl, uploading: false } : m
+            m.file === file ? { ...m, cdnUrl: result.cdnUrl, previewUrl: blobUrl, uploading: false } : m
           )
         );
       } catch (err: any) {
@@ -443,7 +446,11 @@ export const CreatePost: React.FC = () => {
                         <p className="text-xs text-red-500 text-center">{item.error}</p>
                       </div>
                     ) : (
-                      <img src={item.cdnUrl} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={item.previewUrl || item.cdnUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     )}
                     <button
                       onClick={() => removeMedia(idx)}
