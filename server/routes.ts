@@ -86,6 +86,26 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import heicConvert from 'heic-convert';
+
+const HEIC_MIMETYPES = new Set(['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']);
+
+function isHeicBuffer(buffer: Buffer, mimetype: string): boolean {
+  if (HEIC_MIMETYPES.has(mimetype)) return true;
+  if (buffer.length >= 12) {
+    const ftyp = buffer.subarray(4, 8).toString('ascii');
+    const brand = buffer.subarray(8, 12).toString('ascii');
+    if (ftyp === 'ftyp' && ['heic', 'heix', 'mif1', 'msf1', 'hevc', 'hevx', 'heim', 'heis'].includes(brand)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function convertHeicToJpegBuffer(buffer: Buffer): Promise<Buffer> {
+  const result = await (heicConvert as any)({ buffer, format: 'JPEG', quality: 0.92 });
+  return Buffer.from(result);
+}
 
 const clipUpload = multer({
   dest: '/tmp/video-stitch/uploads',
@@ -1332,13 +1352,17 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
-    const meta = await sharp(req.file.buffer).metadata();
+    let sourceBuffer = req.file.buffer;
+    if (isHeicBuffer(sourceBuffer, req.file.mimetype)) {
+      sourceBuffer = await convertHeicToJpegBuffer(sourceBuffer);
+    }
+    const meta = await sharp(sourceBuffer).metadata();
     const validFormats = new Set(['jpeg', 'png', 'webp', 'heif']);
     if (!meta.format || !validFormats.has(meta.format)) {
       res.status(400).json({ error: 'Uploaded file is not a supported image format' });
       return;
     }
-    const convertedBuffer = await sharp(req.file.buffer)
+    const convertedBuffer = await sharp(sourceBuffer)
       .rotate()
       .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85, mozjpeg: true })
