@@ -1479,7 +1479,7 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
   }
 });
 
-router.get('/posts', async (req: Request, res: Response) => {
+router.get('/posts', async (req: any, res: Response) => {
   try {
     const { storeId, page, limit } = req.query;
     const result = await listPublishedPosts({
@@ -1487,6 +1487,21 @@ router.get('/posts', async (req: Request, res: Response) => {
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 20,
     });
+    const authenticated = req.isAuthenticated && req.isAuthenticated();
+    if (!authenticated) {
+      result.posts = result.posts.map(post => {
+        if (post.contentTier === 'raw') {
+          return {
+            ...post,
+            title: 'Raw Content',
+            subtitle: null,
+            bodyText: null,
+            media: [],
+          };
+        }
+        return post;
+      });
+    }
     res.json(result);
   } catch (error) {
     console.error('Error listing posts:', error);
@@ -1561,7 +1576,7 @@ router.post('/admin/media/:id/moderate', isAuthenticated as RequestHandler, requ
   }
 });
 
-router.get('/posts/:id', async (req: Request, res: Response) => {
+router.get('/posts/:id', async (req: any, res: Response) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
@@ -1569,6 +1584,11 @@ router.get('/posts/:id', async (req: Request, res: Response) => {
     if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
     if (post.status !== 'published') {
       res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const authenticated = req.isAuthenticated && req.isAuthenticated();
+    if (post.contentTier === 'raw' && !authenticated) {
+      res.status(403).json({ error: 'Sign in to view raw content' });
       return;
     }
     res.json(post);
@@ -1594,7 +1614,8 @@ router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdm
       return;
     }
     const newStatus: PostStatus = action === 'approve' ? 'published' : 'rejected';
-    const post = await updatePostStatus(id, newStatus, notes);
+    const newTier: ContentTier | undefined = action === 'approve' ? 'clean' : undefined;
+    const post = await updatePostStatus(id, newStatus, notes, newTier);
     if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
 
     const adminId = getUserId(req)!;

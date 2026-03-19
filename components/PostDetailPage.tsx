@@ -19,7 +19,7 @@ export const PostDetailPage: React.FC = () => {
     setIsLoading(true);
     fetchPostById(parseInt(id))
       .then(setPost)
-      .catch(() => setError('Post not found'))
+      .catch((err: Error) => setError(err.message || 'Post not found'))
       .finally(() => setIsLoading(false));
   }, [id]);
 
@@ -52,14 +52,28 @@ export const PostDetailPage: React.FC = () => {
   }
 
   if (error || !post) {
+    const isRawGate = error === 'Sign in to view raw content';
     return (
       <div className="max-w-3xl mx-auto px-4 py-24 text-center">
-        <div className="text-6xl mb-6">📭</div>
-        <h2 className="text-2xl font-black text-stone-900 mb-4">Post Not Found</h2>
-        <p className="text-stone-500 font-medium mb-8">{error || 'This post may have been removed or is not yet published.'}</p>
-        <Link to="/posts" className="inline-block bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition">
-          Browse Posts
-        </Link>
+        <div className="text-6xl mb-6">{isRawGate ? '🔒' : '📭'}</div>
+        <h2 className="text-2xl font-black text-stone-900 mb-4">
+          {isRawGate ? 'Raw Content — Sign In Required' : 'Post Not Found'}
+        </h2>
+        <p className="text-stone-500 font-medium mb-8">
+          {isRawGate
+            ? 'This is Raw content. Sign in to read unfiltered posts from creators.'
+            : error || 'This post may have been removed or is not yet published.'}
+        </p>
+        <div className="flex gap-3 justify-center">
+          {isRawGate && (
+            <a href="#/auth" className="inline-block bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition">
+              Sign In
+            </a>
+          )}
+          <Link to="/posts" className="inline-block bg-stone-100 text-stone-700 px-8 py-3 rounded-2xl font-bold hover:bg-stone-200 transition">
+            Culture Hub
+          </Link>
+        </div>
       </div>
     );
   }

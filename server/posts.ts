@@ -177,12 +177,19 @@ export async function listPendingPosts(): Promise<CreatorPost[]> {
 export async function updatePostStatus(
   id: number,
   status: PostStatus,
-  moderationNotes?: string
+  moderationNotes?: string,
+  contentTier?: ContentTier
 ): Promise<CreatorPost | null> {
+  const fields = [`status = $1`, `moderation_notes = $2`, `updated_at = NOW()`];
+  const values: any[] = [status, moderationNotes || null];
+  if (contentTier) {
+    fields.push(`content_tier = $${values.length + 1}`);
+    values.push(contentTier);
+  }
+  values.push(id);
   const result = await pool.query(
-    `UPDATE creator_posts SET status = $1, moderation_notes = $2, updated_at = NOW()
-     WHERE id = $3 RETURNING *`,
-    [status, moderationNotes || null, id]
+    `UPDATE creator_posts SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`,
+    values
   );
   if (result.rows.length === 0) return null;
   return postSnakeToCamel(result.rows[0]);
