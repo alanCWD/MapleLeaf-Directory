@@ -96,11 +96,11 @@ const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+      cb(new Error('Only JPEG, PNG, WebP, and HEIC images are allowed'));
     }
   },
 });
@@ -1330,6 +1330,12 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    const meta = await sharp(req.file.buffer).metadata();
+    const validFormats = new Set(['jpeg', 'png', 'webp', 'heif', 'gif', 'avif', 'tiff']);
+    if (!meta.format || !validFormats.has(meta.format)) {
+      res.status(400).json({ error: 'Uploaded file is not a supported image format' });
       return;
     }
     const convertedBuffer = await sharp(req.file.buffer)
