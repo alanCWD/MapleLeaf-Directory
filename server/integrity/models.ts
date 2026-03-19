@@ -476,8 +476,12 @@ function deriveStreamThumbnail(embedUrl: string | null, thumbnailUrl: string | n
   if (thumbnailUrl) return thumbnailUrl;
   if (!embedUrl) return null;
   try {
-    const match = embedUrl.match(/\/embed\/(\d+)\/([a-f0-9-]+)/);
-    if (match) return `https://vz-${match[1]}.b-cdn.net/${match[2]}/thumbnail.jpg`;
+    const match = embedUrl.match(/\/embed\/\d+\/([a-f0-9-]+)/);
+    if (match) {
+      const videoId = match[1];
+      const hostname = process.env.BUNNY_CDN_HOSTNAME || `vz-${process.env.BUNNY_STREAM_LIBRARY_ID}.b-cdn.net`;
+      return `https://${hostname}/${videoId}/thumbnail.jpg`;
+    }
   } catch {}
   return null;
 }

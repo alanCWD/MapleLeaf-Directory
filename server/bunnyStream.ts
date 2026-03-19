@@ -119,7 +119,8 @@ export function getEmbedUrl(videoId: string): string {
 }
 
 export function getThumbnailUrl(videoId: string): string {
-  return `https://vz-${BUNNY_LIBRARY_ID()}.b-cdn.net/${videoId}/thumbnail.jpg`;
+  const cdnHostname = BUNNY_CDN_HOSTNAME() || `vz-${BUNNY_LIBRARY_ID()}.b-cdn.net`;
+  return `https://${cdnHostname}/${videoId}/thumbnail.jpg`;
 }
 
 export function getVideoStatusLabel(status: number): string {

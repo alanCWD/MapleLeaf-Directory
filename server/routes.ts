@@ -1541,6 +1541,7 @@ router.get('/admin/posts', isAuthenticated as RequestHandler, requireAdmin, asyn
   }
 });
 
+
 router.get('/admin/media/video-reviews', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
   try {
     const reviews = await getVideoReviews();

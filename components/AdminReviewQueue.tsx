@@ -171,7 +171,7 @@ export const AdminReviewQueue: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-sm font-bold border border-amber-500/30">
-                {stores.length} stores | {claims.length} claims | {allPosts.length} posts | {videoReviews.length} videos
+                {stores.length} stores | {claims.length} claims | {allPosts.length} posts | {videoReviews.length} reviews
               </span>
               <button
                 onClick={loadQueue}
@@ -181,30 +181,30 @@ export const AdminReviewQueue: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="flex gap-2 mt-6">
+          <div className="flex flex-wrap gap-2 mt-6">
             <button
               onClick={() => setActiveTab('stores')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'stores' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`px-3 md:px-5 py-2 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'stores' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
-              Store Reviews ({stores.length})
+              Stores ({stores.length})
             </button>
             <button
               onClick={() => setActiveTab('claims')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'claims' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`px-3 md:px-5 py-2 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'claims' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
-              Ownership Claims ({claims.length})
+              Claims ({claims.length})
             </button>
             <button
               onClick={() => setActiveTab('posts')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'posts' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`px-3 md:px-5 py-2 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'posts' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
-              Creator Posts ({allPosts.filter(p => p.status === 'pending_moderation').length} pending)
+              Posts ({allPosts.length})
             </button>
             <button
               onClick={() => setActiveTab('videos')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'videos' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`px-3 md:px-5 py-2 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'videos' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
-              Video Reviews ({videoReviews.length})
+              Reviews ({videoReviews.length})
             </button>
           </div>
         </div>
@@ -507,7 +507,7 @@ export const AdminReviewQueue: React.FC = () => {
                       </div>
 
                       {isPlaying && vr.embedUrl && (
-                        <div className="mb-4 rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
+                        <div className="mb-4 -mx-6 md:mx-0 md:rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
                           <iframe
                             src={vr.embedUrl}
                             className="absolute inset-0 w-full h-full"
