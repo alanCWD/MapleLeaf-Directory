@@ -28,6 +28,7 @@ function postSnakeToCamel(row: Record<string, any>): CreatorPost {
     updatedAt: row.updated_at ? row.updated_at.toISOString() : new Date().toISOString(),
     authorName: row.author_name || undefined,
     authorImageUrl: row.author_image_url || undefined,
+    authorBadge: row.author_badge_type || null,
     storeName: row.store_name || undefined,
   };
 }
@@ -183,10 +184,23 @@ export async function listAllPosts(): Promise<CreatorPost[]> {
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
             u.profile_image_url as author_image_url,
-            s.name as store_name
+            s.name as store_name,
+            top_badge.badge_type as author_badge_type
      FROM creator_posts p
      LEFT JOIN users u ON p.user_id = u.id
      LEFT JOIN stores s ON p.store_id = s.id
+     LEFT JOIN LATERAL (
+       SELECT badge_type FROM user_badges WHERE user_id = p.user_id
+       ORDER BY CASE badge_type
+         WHEN 'founding_bc_architect' THEN 7
+         WHEN 'bc_culture_guide' THEN 6
+         WHEN 'provincial_connector' THEN 5
+         WHEN 'cross_region_contributor' THEN 4
+         WHEN 'regional_builder' THEN 3
+         WHEN 'local_scout' THEN 2
+         ELSE 1
+       END DESC LIMIT 1
+     ) top_badge ON true
      ORDER BY p.created_at DESC`
   );
   const posts = result.rows.map(postSnakeToCamel);

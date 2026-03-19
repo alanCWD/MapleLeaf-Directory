@@ -17,7 +17,27 @@ export const AdminReviewQueue: React.FC = () => {
   const [postNotes, setPostNotes] = useState<Record<number, string>>({});
   const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts' | 'videos'>('stores');
+  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
+
+  const BADGE_LABELS: Record<string, string> = {
+    explorer: 'Explorer',
+    local_scout: 'Local Scout',
+    regional_builder: 'Regional Builder',
+    cross_region_contributor: 'Cross-Region',
+    provincial_connector: 'Provincial Connector',
+    bc_culture_guide: 'BC Culture Guide',
+    founding_bc_architect: 'Founding Architect',
+  };
+  const BADGE_COLORS: Record<string, string> = {
+    explorer: 'bg-stone-100 text-stone-600',
+    local_scout: 'bg-blue-100 text-blue-700',
+    regional_builder: 'bg-indigo-100 text-indigo-700',
+    cross_region_contributor: 'bg-violet-100 text-violet-700',
+    provincial_connector: 'bg-purple-100 text-purple-700',
+    bc_culture_guide: 'bg-emerald-100 text-emerald-700',
+    founding_bc_architect: 'bg-amber-100 text-amber-700',
+  };
 
   const loadQueue = async () => {
     setIsLoading(true);
@@ -350,8 +370,13 @@ export const AdminReviewQueue: React.FC = () => {
                           {post.subtitle && (
                             <p className="text-sm text-stone-500 font-medium">{post.subtitle}</p>
                           )}
-                          <div className="flex items-center gap-2 mt-2 text-xs text-stone-400">
-                            <span>By: {post.authorName || 'Unknown'}</span>
+                          <div className="flex items-center gap-2 flex-wrap mt-2 text-xs text-stone-400">
+                            <span>By: <span className="text-stone-600 font-medium">{post.authorName || 'Unknown'}</span></span>
+                            {post.authorBadge && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${BADGE_COLORS[post.authorBadge] || 'bg-stone-100 text-stone-600'}`}>
+                                {BADGE_LABELS[post.authorBadge] || post.authorBadge}
+                              </span>
+                            )}
                             {post.storeName && <span>| Store: {post.storeName}</span>}
                             <span>| {new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
@@ -377,16 +402,16 @@ export const AdminReviewQueue: React.FC = () => {
                         </div>
                       )}
 
-                      {isPending && (
-                        <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-amber-200/50">
-                          <input
-                            type="text"
-                            placeholder="Moderation notes (optional)"
-                            value={postNotes[post.id] || ''}
-                            onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
-                            className="flex-grow bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
-                          />
-                          <div className="flex gap-2">
+                      <div className={`flex flex-col gap-3 pt-4 border-t ${isPending ? 'border-amber-200/50' : 'border-stone-200/50'}`}>
+                        <textarea
+                          rows={2}
+                          placeholder="Admin notes (optional)"
+                          value={postNotes[post.id] || ''}
+                          onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
+                          className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none resize-none"
+                        />
+                        {isPending && (
+                          <div className="flex gap-2 flex-wrap">
                             <button
                               onClick={() => handlePostModerate(post.id, 'approve')}
                               disabled={actionInProgress === `post-${post.id}`}
@@ -402,8 +427,8 @@ export const AdminReviewQueue: React.FC = () => {
                               Reject
                             </button>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -417,11 +442,64 @@ export const AdminReviewQueue: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {videoReviews.map((vr) => (
-                  <div key={vr.id} className={`border rounded-2xl p-6 ${vr.moderationStatus === 'disapproved' ? 'border-red-200 bg-red-50/30' : 'border-stone-200 bg-stone-50/50'}`}>
-                    <div className="flex flex-col md:flex-row gap-6">
-                      {vr.embedUrl ? (
-                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
+                {videoReviews.map((vr) => {
+                  const isDisapproved = vr.moderationStatus === 'disapproved';
+                  const isPlaying = playingVideoId === vr.id;
+                  const thumb = vr.thumbnailUrl;
+                  return (
+                    <div key={vr.id} className={`border rounded-2xl p-6 ${isDisapproved ? 'border-red-200 bg-red-50/20' : 'border-stone-200 bg-stone-50/30'}`}>
+                      <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
+                        <div className="flex-grow">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <h4 className="font-black text-stone-900 text-lg">{vr.title || 'Video Review'}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.contentRating === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {vr.contentRating === 'raw' ? '🔥 Raw' : '✨ Clean'}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isDisapproved ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {isDisapproved ? '❌ Disapproved' : '✅ Approved'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap text-xs text-stone-400">
+                            {vr.storeName && (
+                              <span>Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline font-medium">{vr.storeName}</Link></span>
+                            )}
+                            {vr.reviewRating && (
+                              <span className="flex gap-0.5 text-amber-500">
+                                {[1,2,3,4,5].map(i => <span key={i}>{i <= Math.round(vr.reviewRating!) ? '★' : '☆'}</span>)}
+                              </span>
+                            )}
+                            <span>| {new Date(vr.reviewCreatedAt || vr.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          {vr.moderationNotes && (
+                            <p className="text-xs text-stone-500 mt-1 italic">Notes: {vr.moderationNotes}</p>
+                          )}
+                        </div>
+                        {(thumb || vr.embedUrl) && (
+                          <div
+                            className="flex-shrink-0 w-32 h-20 rounded-xl overflow-hidden border border-stone-200 bg-stone-900 relative cursor-pointer"
+                            onClick={() => setPlayingVideoId(isPlaying ? null : vr.id)}
+                          >
+                            {thumb && !isPlaying && (
+                              <>
+                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors">
+                                  <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow">
+                                    <span className="text-stone-900 text-sm ml-0.5">▶</span>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                            {(!thumb || isPlaying) && (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-white text-2xl">🎬</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {isPlaying && vr.embedUrl && (
+                        <div className="mb-4 rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
                           <iframe
                             src={vr.embedUrl}
                             className="absolute inset-0 w-full h-full"
@@ -429,90 +507,62 @@ export const AdminReviewQueue: React.FC = () => {
                             allowFullScreen
                           />
                         </div>
-                      ) : vr.thumbnailUrl ? (
-                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                          <img src={vr.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ) : (
-                        <div className="flex-shrink-0 w-full md:w-64 rounded-xl bg-stone-200 flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
-                          <span className="text-stone-400 text-3xl">🎬</span>
+                      )}
+
+                      {vr.reviewText && (
+                        <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4">
+                          <p className="text-sm text-stone-700 italic">"{vr.reviewText}"</p>
                         </div>
                       )}
-                      <div className="flex-grow">
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <h4 className="font-black text-stone-900">{vr.title || 'Video Review'}</h4>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.moderationStatus === 'disapproved' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {vr.moderationStatus === 'disapproved' ? 'Disapproved' : 'Approved'}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.contentRating === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-600'}`}>
-                            {vr.contentRating === 'raw' ? '🔥 Raw' : 'Clean'}
-                          </span>
-                        </div>
-                        {vr.storeName && (
-                          <p className="text-sm text-stone-500 mb-1">Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline">{vr.storeName}</Link></p>
-                        )}
-                        <div className="flex items-center gap-3 text-xs text-stone-400 mb-2">
-                          {vr.reviewerId && <span>Reviewer: <span className="font-mono text-stone-600">{vr.reviewerId.slice(0, 12)}…</span></span>}
-                          {vr.reviewRating && (
-                            <span className="flex gap-0.5 text-amber-500">
-                              {[1,2,3,4,5].map(i => <span key={i}>{i <= Math.round(vr.reviewRating!) ? '★' : '☆'}</span>)}
-                            </span>
-                          )}
-                          <span>{new Date(vr.reviewCreatedAt || vr.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        {vr.reviewText && (
-                          <p className="text-sm text-stone-600 italic bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 mb-3">"{vr.reviewText}"</p>
-                        )}
 
-                        <div className="flex flex-col gap-3">
-                          <input
-                            type="text"
-                            placeholder="Moderation notes (optional)"
-                            value={videoNotes[vr.id] || ''}
-                            onChange={(e) => setVideoNotes(prev => ({ ...prev, [vr.id]: e.target.value }))}
-                            className="bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
-                          />
-                          <div className="flex flex-wrap gap-2">
-                            {vr.moderationStatus === 'disapproved' ? (
-                              <button
-                                onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'approved' })}
-                                disabled={actionInProgress === `video-${vr.id}`}
-                                className="px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
-                              >
-                                Re-approve
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'disapproved' })}
-                                disabled={actionInProgress === `video-${vr.id}`}
-                                className="px-4 py-2 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                              >
-                                Disapprove
-                              </button>
-                            )}
-                            {vr.contentRating === 'raw' ? (
-                              <button
-                                onClick={() => handleVideoModerate(vr.id, { contentRating: 'clean' })}
-                                disabled={actionInProgress === `video-${vr.id}`}
-                                className="px-4 py-2 rounded-xl text-sm font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition disabled:opacity-50"
-                              >
-                                Mark Clean
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleVideoModerate(vr.id, { contentRating: 'raw' })}
-                                disabled={actionInProgress === `video-${vr.id}`}
-                                className="px-4 py-2 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
-                              >
-                                Mark Raw
-                              </button>
-                            )}
-                          </div>
+                      <div className="flex flex-col gap-3 pt-4 border-t border-stone-200/50">
+                        <textarea
+                          rows={2}
+                          placeholder="Admin notes (optional)"
+                          value={videoNotes[vr.id] || ''}
+                          onChange={(e) => setVideoNotes(prev => ({ ...prev, [vr.id]: e.target.value }))}
+                          className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none resize-none"
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          {isDisapproved ? (
+                            <button
+                              onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'approved' })}
+                              disabled={actionInProgress === `video-${vr.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                            >
+                              Re-approve
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'disapproved' })}
+                              disabled={actionInProgress === `video-${vr.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                            >
+                              Disapprove
+                            </button>
+                          )}
+                          {vr.contentRating === 'raw' ? (
+                            <button
+                              onClick={() => handleVideoModerate(vr.id, { contentRating: 'clean' })}
+                              disabled={actionInProgress === `video-${vr.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition disabled:opacity-50"
+                            >
+                              Mark Clean
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleVideoModerate(vr.id, { contentRating: 'raw' })}
+                              disabled={actionInProgress === `video-${vr.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
+                            >
+                              Mark Raw
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : null}

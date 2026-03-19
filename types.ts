@@ -142,6 +142,8 @@ export interface UploadCredentials {
 export type ContentTier = 'clean' | 'raw';
 export type PostStatus = 'draft' | 'pending_moderation' | 'published' | 'rejected';
 
+export type BadgeType = 'explorer' | 'local_scout' | 'regional_builder' | 'cross_region_contributor' | 'provincial_connector' | 'bc_culture_guide' | 'founding_bc_architect';
+
 export interface CreatorPost {
   id: number;
   userId: string;
@@ -156,6 +158,7 @@ export interface CreatorPost {
   updatedAt: string;
   authorName?: string;
   authorImageUrl?: string;
+  authorBadge?: string | null;
   storeName?: string;
   media?: PostMedia[];
 }
