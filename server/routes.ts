@@ -1333,7 +1333,7 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
       return;
     }
     const meta = await sharp(req.file.buffer).metadata();
-    const validFormats = new Set(['jpeg', 'png', 'webp', 'heif', 'gif', 'avif', 'tiff']);
+    const validFormats = new Set(['jpeg', 'png', 'webp', 'heif']);
     if (!meta.format || !validFormats.has(meta.format)) {
       res.status(400).json({ error: 'Uploaded file is not a supported image format' });
       return;
