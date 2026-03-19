@@ -44,6 +44,12 @@ export const Navbar: React.FC = () => {
           
           <div className="hidden md:flex items-center gap-4">
             <Link 
+              to="/posts" 
+              className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
+            >
+              Hub
+            </Link>
+            <Link 
               to="/submit" 
               className="text-stone-600 px-4 py-2.5 rounded-2xl font-bold hover:text-emerald-500 hover:bg-emerald-50 transition-all text-sm whitespace-nowrap"
             >
@@ -177,6 +183,13 @@ export const Navbar: React.FC = () => {
                 className="flex items-center justify-center bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-emerald-400 transition shadow-lg shadow-emerald-900/10 active:scale-95"
               >
                 Claim Store
+              </Link>
+              <Link 
+                to="/posts" 
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center justify-center py-4 text-stone-600 font-bold hover:text-emerald-500"
+              >
+                Hub
               </Link>
               <Link 
                 to="/submit" 

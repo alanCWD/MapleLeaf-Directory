@@ -71,7 +71,7 @@ export const PostDetailPage: React.FC = () => {
     <div className="max-w-3xl mx-auto px-4 py-12">
       <Link to="/posts" className="text-xs font-bold text-stone-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center gap-1 mb-6">
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-        Back to Posts
+        Back to Culture Hub
       </Link>
 
       <article className="bg-white rounded-[32px] border border-stone-200 shadow-sm overflow-hidden">

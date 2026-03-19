@@ -80,7 +80,7 @@ import {
   setUserCreatorStatus,
   moderateCleanContent,
 } from './posts.ts';
-import type { PostStatus } from '../types';
+import type { PostStatus, ContentTier } from '../types';
 import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal } from './bunnyStorage.ts';
 import sharp from 'sharp';
 import path from 'path';
@@ -1412,18 +1412,23 @@ router.post('/posts', isAuthenticated as RequestHandler, requireCreator, async (
       res.status(400).json({ error: 'Title is required' });
       return;
     }
-    const tier = contentTier === 'raw' ? 'raw' : 'clean';
-    let status: PostStatus = 'published';
+    const SCOUT_PLUS_BADGES = ['local_scout', 'regional_builder', 'cross_region_contributor', 'provincial_connector', 'bc_culture_guide', 'founding_bc_architect'];
+    const userBadgesForPost = await getUserBadges(userId);
+    const hasScoutPlus = userBadgesForPost.some(b => SCOUT_PLUS_BADGES.includes(b.badgeType));
+
+    const requestedClean = contentTier === 'clean';
+    const tier: ContentTier = (requestedClean && hasScoutPlus) ? 'clean' : 'raw';
+    let status: PostStatus = 'pending_moderation';
     let moderationNotes: string | null = null;
 
     if (tier === 'clean') {
       const check = await moderateCleanContent(title, subtitle, bodyText);
-      if (!check.passed) {
+      if (check.passed) {
+        status = 'published';
+      } else {
         status = 'rejected';
         moderationNotes = check.reason || 'Failed auto-moderation';
       }
-    } else {
-      status = 'pending_moderation';
     }
 
     const post = await createPost({

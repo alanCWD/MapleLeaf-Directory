@@ -25,7 +25,7 @@ export const CreatePost: React.FC = () => {
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [bodyText, setBodyText] = useState('');
-  const [contentTier, setContentTier] = useState<ContentTier>('clean');
+  const [contentTier, setContentTier] = useState<ContentTier>('raw');
   const [storeId, setStoreId] = useState('');
   const [storeSearch, setStoreSearch] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
@@ -272,7 +272,7 @@ export const CreatePost: React.FC = () => {
         </p>
         <div className="flex gap-3 justify-center">
           <Link to="/posts" className="bg-emerald-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-400 transition">
-            Browse Posts
+            Browse Culture Hub
           </Link>
           <Link to="/" className="bg-stone-100 text-stone-700 px-8 py-3 rounded-2xl font-bold hover:bg-stone-200 transition">
             Back to Directory
@@ -307,7 +307,7 @@ export const CreatePost: React.FC = () => {
             </Link>
           )}
           <Link to="/posts" className="bg-stone-100 text-stone-700 px-8 py-3 rounded-2xl font-bold hover:bg-stone-200 transition">
-            All Posts
+            Culture Hub
           </Link>
           <button onClick={() => { setSuccess(null); setTitle(''); setSubtitle(''); setBodyText(''); setMediaItems([]); setStoreId(''); setMediaMode('none'); removeVideo(); }} className="bg-stone-100 text-stone-700 px-8 py-3 rounded-2xl font-bold hover:bg-stone-200 transition">
             Create Another
@@ -316,6 +316,9 @@ export const CreatePost: React.FC = () => {
       </div>
     );
   }
+
+  const SCOUT_PLUS_BADGES = ['local_scout', 'regional_builder', 'cross_region_contributor', 'provincial_connector', 'bc_culture_guide', 'founding_bc_architect'];
+  const canSelectClean = user?.badges?.some(b => SCOUT_PLUS_BADGES.includes(b.badgeType)) ?? false;
 
   const isVideoUploading = videoState === 'initializing' || videoState === 'uploading' || videoState === 'processing';
   const hasVideo = videoState === 'done' && videoData;
@@ -326,7 +329,7 @@ export const CreatePost: React.FC = () => {
       <div className="mb-8">
         <Link to="/posts" className="text-xs font-bold text-stone-400 hover:text-emerald-600 uppercase tracking-widest transition-colors flex items-center gap-1">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-          Back to Posts
+          Back to Culture Hub
         </Link>
         <h1 className="text-3xl font-black text-stone-900 mt-3 tracking-tight">Create a Post</h1>
         <p className="text-stone-500 font-medium mt-1">Share your experience with the community</p>
@@ -336,20 +339,32 @@ export const CreatePost: React.FC = () => {
         <div>
           <label className="block text-xs font-black uppercase tracking-widest text-stone-500 mb-3">Content Tier</label>
           <div className="flex gap-3">
-            <button
-              onClick={() => setContentTier('clean')}
-              className={`flex-1 p-4 rounded-2xl border-2 text-left transition-all ${
-                contentTier === 'clean'
-                  ? 'border-emerald-400 bg-emerald-50'
-                  : 'border-stone-200 bg-stone-50 hover:border-stone-300'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">&#x2728;</span>
-                <span className="font-black text-stone-900">Clean</span>
-              </div>
-              <p className="text-xs text-stone-500">Auto-moderated. Publishes immediately if content passes checks.</p>
-            </button>
+            <div className={`relative flex-1 ${!canSelectClean ? 'cursor-not-allowed' : ''}`} title={!canSelectClean ? 'Reach Local Scout rank to unlock Clean posts' : undefined}>
+              <button
+                onClick={() => canSelectClean && setContentTier('clean')}
+                disabled={!canSelectClean}
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
+                  !canSelectClean
+                    ? 'border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed'
+                    : contentTier === 'clean'
+                    ? 'border-emerald-400 bg-emerald-50'
+                    : 'border-stone-200 bg-stone-50 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">&#x2728;</span>
+                  <span className="font-black text-stone-900">Clean</span>
+                  {!canSelectClean && (
+                    <span className="ml-auto text-[10px] font-black uppercase tracking-widest bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">🔒 Scout+</span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-500">
+                  {canSelectClean
+                    ? 'Auto-moderated. Publishes immediately if content passes checks.'
+                    : 'Reach Local Scout rank to submit Clean posts.'}
+                </p>
+              </button>
+            </div>
             <button
               onClick={() => setContentTier('raw')}
               className={`flex-1 p-4 rounded-2xl border-2 text-left transition-all ${
