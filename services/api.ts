@@ -612,6 +612,7 @@ export interface AdminVideoReview {
   reviewText: string | null;
   reviewRating: number | null;
   reviewerId: string | null;
+  reviewerBadge: string | null;
   reviewCreatedAt: string | null;
 }
 

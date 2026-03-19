@@ -410,24 +410,22 @@ export const AdminReviewQueue: React.FC = () => {
                           onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
                           className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none resize-none"
                         />
-                        {isPending && (
-                          <div className="flex gap-2 flex-wrap">
-                            <button
-                              onClick={() => handlePostModerate(post.id, 'approve')}
-                              disabled={actionInProgress === `post-${post.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handlePostModerate(post.id, 'reject')}
-                              disabled={actionInProgress === `post-${post.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => handlePostModerate(post.id, 'approve')}
+                            disabled={actionInProgress === `post-${post.id}`}
+                            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handlePostModerate(post.id, 'reject')}
+                            disabled={actionInProgress === `post-${post.id}`}
+                            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -460,8 +458,18 @@ export const AdminReviewQueue: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap text-xs text-stone-400">
+                            {vr.reviewerId && (
+                              <span className="flex items-center gap-1.5">
+                                <span>Reviewer: {vr.reviewerId.slice(0, 8)}…</span>
+                                {vr.reviewerBadge && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${BADGE_COLORS[vr.reviewerBadge] || 'bg-stone-100 text-stone-600'}`}>
+                                    {BADGE_LABELS[vr.reviewerBadge] || vr.reviewerBadge}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             {vr.storeName && (
-                              <span>Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline font-medium">{vr.storeName}</Link></span>
+                              <span>| Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline font-medium">{vr.storeName}</Link></span>
                             )}
                             {vr.reviewRating && (
                               <span className="flex gap-0.5 text-amber-500">

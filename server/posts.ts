@@ -33,16 +33,28 @@ function postSnakeToCamel(row: Record<string, any>): CreatorPost {
   };
 }
 
+function deriveThumbnailFromEmbedUrl(cdnUrl: string | null): string | null {
+  if (!cdnUrl) return null;
+  try {
+    const match = cdnUrl.match(/\/embed\/(\d+)\/([a-f0-9-]+)/);
+    if (match) return `https://vz-${match[1]}.b-cdn.net/${match[2]}/thumbnail.jpg`;
+  } catch {}
+  return null;
+}
+
 function mediaSnakeToCamel(row: Record<string, any>): PostMedia {
   const bunnyId = row.bunny_id || null;
   const mediaType: 'image' | 'video' = row.media_type === 'video' ? 'video' : 'image';
+  const cdnUrl: string = row.cdn_url;
   return {
     id: row.id,
     postId: row.post_id,
     mediaType,
     bunnyId,
-    cdnUrl: row.cdn_url,
-    thumbnailUrl: mediaType === 'video' && bunnyId ? getThumbnailUrl(bunnyId) : null,
+    cdnUrl,
+    thumbnailUrl: mediaType === 'video'
+      ? (deriveThumbnailFromEmbedUrl(cdnUrl) ?? (bunnyId ? getThumbnailUrl(bunnyId) : null))
+      : null,
     caption: row.caption || null,
     displayOrder: row.display_order ?? 0,
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),

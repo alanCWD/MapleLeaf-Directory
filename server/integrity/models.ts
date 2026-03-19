@@ -472,14 +472,38 @@ export async function updateMediaModeration(
   };
 }
 
+function deriveStreamThumbnail(embedUrl: string | null, thumbnailUrl: string | null): string | null {
+  if (thumbnailUrl) return thumbnailUrl;
+  if (!embedUrl) return null;
+  try {
+    const match = embedUrl.match(/\/embed\/(\d+)\/([a-f0-9-]+)/);
+    if (match) return `https://vz-${match[1]}.b-cdn.net/${match[2]}/thumbnail.jpg`;
+  } catch {}
+  return null;
+}
+
 export async function getVideoReviews(): Promise<any[]> {
   const result = await pool.query(
     `SELECT sm.*, s.name AS store_name,
             ir.content_text AS review_text, ir.rating AS review_rating,
-            ir.user_id AS reviewer_id, ir.created_at AS review_created_at
+            ir.user_id AS reviewer_id, ir.created_at AS review_created_at,
+            top_badge.badge_type AS reviewer_badge_type
      FROM store_media sm
      LEFT JOIN stores s ON s.id = sm.store_id
      LEFT JOIN integrity_reviews ir ON ir.video_asset_id = sm.id
+     LEFT JOIN LATERAL (
+       SELECT badge_type FROM user_badges
+       WHERE user_id = COALESCE(ir.user_id, sm.user_id)
+       ORDER BY CASE badge_type
+         WHEN 'founding_bc_architect' THEN 7
+         WHEN 'bc_culture_guide' THEN 6
+         WHEN 'provincial_connector' THEN 5
+         WHEN 'cross_region_contributor' THEN 4
+         WHEN 'regional_builder' THEN 3
+         WHEN 'local_scout' THEN 2
+         ELSE 1
+       END DESC LIMIT 1
+     ) top_badge ON true
      WHERE sm.media_type = 'review'
      ORDER BY sm.created_at DESC`
   );
@@ -492,6 +516,8 @@ export async function getVideoReviews(): Promise<any[]> {
     reviewText: row.review_text || null,
     reviewRating: row.review_rating ? parseFloat(row.review_rating) : null,
     reviewerId: row.reviewer_id || row.user_id || null,
+    reviewerBadge: row.reviewer_badge_type || null,
     reviewCreatedAt: row.review_created_at ? row.review_created_at.toISOString() : null,
+    thumbnailUrl: deriveStreamThumbnail(row.embed_url, row.thumbnail_url),
   }));
 }
