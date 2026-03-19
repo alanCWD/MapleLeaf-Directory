@@ -166,6 +166,7 @@ export interface PostMedia {
   mediaType: 'image' | 'video';
   bunnyId: string | null;
   cdnUrl: string;
+  thumbnailUrl?: string | null;
   caption: string | null;
   displayOrder: number;
   createdAt: string;

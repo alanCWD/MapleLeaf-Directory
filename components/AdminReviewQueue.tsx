@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, CreatorPost } from '../types';
-import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchPendingPosts, moderatePost, fetchAdminVideoReviews, moderateVideoReview, AdminVideoReview } from '../services/api';
+import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost, fetchAdminVideoReviews, moderateVideoReview, AdminVideoReview } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { useAuth } from '../hooks/useAuth';
 
 export const AdminReviewQueue: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [claims, setClaims] = useState<any[]>([]);
-  const [pendingPosts, setPendingPosts] = useState<CreatorPost[]>([]);
+  const [allPosts, setAllPosts] = useState<CreatorPost[]>([]);
   const [videoReviews, setVideoReviews] = useState<AdminVideoReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
@@ -25,12 +25,12 @@ export const AdminReviewQueue: React.FC = () => {
       const [storeData, claimData, postsData, videoData] = await Promise.all([
         fetchReviewQueue(),
         getAdminClaimsAPI(),
-        fetchPendingPosts(),
+        fetchAllAdminPosts(),
         fetchAdminVideoReviews(),
       ]);
       setStores(storeData);
       setClaims(claimData);
-      setPendingPosts(postsData);
+      setAllPosts(postsData);
       setVideoReviews(videoData);
       const preloadedNotes: Record<number, string> = {};
       for (const vr of videoData) {
@@ -117,8 +117,8 @@ export const AdminReviewQueue: React.FC = () => {
   const handlePostModerate = async (postId: number, action: 'approve' | 'reject') => {
     setActionInProgress(`post-${postId}`);
     try {
-      await moderatePost(postId, action, postNotes[postId]);
-      setPendingPosts(prev => prev.filter(p => p.id !== postId));
+      const updated = await moderatePost(postId, action, postNotes[postId]);
+      setAllPosts(prev => prev.map(p => p.id === postId ? { ...p, status: updated.status, contentTier: updated.contentTier } : p));
     } catch (err) {
       console.error('Post moderation failed:', err);
     } finally {
@@ -151,7 +151,7 @@ export const AdminReviewQueue: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="bg-amber-500/20 text-amber-300 px-4 py-2 rounded-xl text-sm font-bold border border-amber-500/30">
-                {stores.length} stores | {claims.length} claims | {pendingPosts.length} posts | {videoReviews.length} videos
+                {stores.length} stores | {claims.length} claims | {allPosts.length} posts | {videoReviews.length} videos
               </span>
               <button
                 onClick={loadQueue}
@@ -178,7 +178,7 @@ export const AdminReviewQueue: React.FC = () => {
               onClick={() => setActiveTab('posts')}
               className={`px-6 py-2 rounded-xl text-sm font-bold transition ${activeTab === 'posts' ? 'bg-white text-stone-900' : 'bg-white/10 text-white hover:bg-white/20'}`}
             >
-              Creator Posts ({pendingPosts.length})
+              Creator Posts ({allPosts.filter(p => p.status === 'pending_moderation').length} pending)
             </button>
             <button
               onClick={() => setActiveTab('videos')}
@@ -320,81 +320,93 @@ export const AdminReviewQueue: React.FC = () => {
               </div>
             )
           ) : activeTab === 'posts' ? (
-            pendingPosts.length === 0 ? (
+            allPosts.length === 0 ? (
               <div className="text-center py-16">
-                <div className="text-4xl mb-4">✅</div>
-                <p className="text-stone-500 font-bold text-lg">No creator posts pending review.</p>
+                <div className="text-4xl mb-4">📝</div>
+                <p className="text-stone-500 font-bold text-lg">No creator posts yet.</p>
               </div>
             ) : (
               <div className="space-y-6">
-                {pendingPosts.map((post) => (
-                  <div key={post.id} className="border border-amber-200 rounded-2xl p-6 bg-amber-50/30">
-                    <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-black text-stone-900 text-lg">{post.title}</h4>
-                          <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
-                            🔥 Raw
-                          </span>
+                {allPosts.map((post) => {
+                  const isPending = post.status === 'pending_moderation';
+                  const isPublished = post.status === 'published';
+                  const isRejected = post.status === 'rejected';
+                  const videoMedia = post.media?.find(m => m.mediaType === 'video');
+                  const imageMedia = post.media?.find(m => m.mediaType === 'image');
+                  const thumbSrc = videoMedia?.thumbnailUrl || (imageMedia?.cdnUrl);
+                  return (
+                    <div key={post.id} className={`border rounded-2xl p-6 ${isPending ? 'border-amber-200 bg-amber-50/30' : isRejected ? 'border-red-200 bg-red-50/20' : 'border-stone-200 bg-stone-50/30'}`}>
+                      <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <h4 className="font-black text-stone-900 text-lg">{post.title}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isPending ? 'bg-amber-200 text-amber-800' : isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>
+                              {isPending ? '⏳ Pending' : isPublished ? '✅ Published' : '❌ Rejected'}
+                            </span>
+                          </div>
+                          {post.subtitle && (
+                            <p className="text-sm text-stone-500 font-medium">{post.subtitle}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-stone-400">
+                            <span>By: {post.authorName || 'Unknown'}</span>
+                            {post.storeName && <span>| Store: {post.storeName}</span>}
+                            <span>| {new Date(post.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          {post.moderationNotes && (
+                            <p className="text-xs text-stone-500 mt-1 italic">Notes: {post.moderationNotes}</p>
+                          )}
                         </div>
-                        {post.subtitle && (
-                          <p className="text-sm text-stone-500 font-medium">{post.subtitle}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 text-xs text-stone-400">
-                          <span>By: {post.authorName || 'Unknown'}</span>
-                          {post.storeName && <span>| Store: {post.storeName}</span>}
-                          <span>| {new Date(post.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {post.bodyText && (
-                      <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4 max-h-40 overflow-y-auto">
-                        <p className="text-sm text-stone-700 whitespace-pre-wrap">{post.bodyText}</p>
-                      </div>
-                    )}
-
-                    {post.media && post.media.length > 0 && (
-                      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                        {post.media.map((m, i) => (
-                          <div key={i} className="w-20 h-20 rounded-xl overflow-hidden border border-stone-200 flex-shrink-0 bg-stone-100">
-                            {m.mediaType === 'image' ? (
-                              <img src={m.cdnUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-stone-400 text-xl">🎬</div>
+                        {thumbSrc && (
+                          <div className="flex-shrink-0 w-24 h-16 rounded-xl overflow-hidden border border-stone-200 bg-stone-100 relative">
+                            <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+                            {videoMedia && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <span className="text-white text-lg">▶</span>
+                              </div>
                             )}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
 
-                    <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-amber-200/50">
-                      <input
-                        type="text"
-                        placeholder="Moderation notes (optional)"
-                        value={postNotes[post.id] || ''}
-                        onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
-                        className="flex-grow bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handlePostModerate(post.id, 'approve')}
-                          disabled={actionInProgress === `post-${post.id}`}
-                          className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handlePostModerate(post.id, 'reject')}
-                          disabled={actionInProgress === `post-${post.id}`}
-                          className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </div>
+                      {post.bodyText && (
+                        <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4 max-h-40 overflow-y-auto">
+                          <p className="text-sm text-stone-700 whitespace-pre-wrap">{post.bodyText}</p>
+                        </div>
+                      )}
+
+                      {isPending && (
+                        <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-amber-200/50">
+                          <input
+                            type="text"
+                            placeholder="Moderation notes (optional)"
+                            value={postNotes[post.id] || ''}
+                            onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
+                            className="flex-grow bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'approve')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'reject')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : activeTab === 'videos' ? (

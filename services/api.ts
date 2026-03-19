@@ -508,6 +508,10 @@ export async function fetchPendingPosts(): Promise<CreatorPost[]> {
   return apiFetch<CreatorPost[]>('/posts/pending');
 }
 
+export async function fetchAllAdminPosts(): Promise<CreatorPost[]> {
+  return apiFetch<CreatorPost[]>('/admin/posts');
+}
+
 export async function fetchPostById(id: number): Promise<CreatorPost> {
   return apiFetch<CreatorPost>(`/posts/${id}`);
 }

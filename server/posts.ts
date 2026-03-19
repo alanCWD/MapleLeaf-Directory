@@ -1,6 +1,7 @@
 import { pool } from './db';
 import { GoogleGenAI } from "@google/genai";
 import type { CreatorPost, PostMedia, ContentTier, PostStatus } from '../types';
+import { getThumbnailUrl } from './bunnyStream.ts';
 
 let ai: GoogleGenAI | null = null;
 const getAI = () => {
@@ -32,12 +33,15 @@ function postSnakeToCamel(row: Record<string, any>): CreatorPost {
 }
 
 function mediaSnakeToCamel(row: Record<string, any>): PostMedia {
+  const bunnyId = row.bunny_id || null;
+  const mediaType: 'image' | 'video' = row.media_type === 'video' ? 'video' : 'image';
   return {
     id: row.id,
     postId: row.post_id,
-    mediaType: row.media_type,
-    bunnyId: row.bunny_id || null,
+    mediaType,
+    bunnyId,
     cdnUrl: row.cdn_url,
+    thumbnailUrl: mediaType === 'video' && bunnyId ? getThumbnailUrl(bunnyId) : null,
     caption: row.caption || null,
     displayOrder: row.display_order ?? 0,
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
@@ -166,6 +170,24 @@ export async function listPendingPosts(): Promise<CreatorPost[]> {
      LEFT JOIN stores s ON p.store_id = s.id
      WHERE p.status = 'pending_moderation'
      ORDER BY p.created_at ASC`
+  );
+  const posts = result.rows.map(postSnakeToCamel);
+  for (const post of posts) {
+    post.media = await getPostMedia(post.id);
+  }
+  return posts;
+}
+
+export async function listAllPosts(): Promise<CreatorPost[]> {
+  const result = await pool.query(
+    `SELECT p.*,
+            COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
+            u.profile_image_url as author_image_url,
+            s.name as store_name
+     FROM creator_posts p
+     LEFT JOIN users u ON p.user_id = u.id
+     LEFT JOIN stores s ON p.store_id = s.id
+     ORDER BY p.created_at DESC`
   );
   const posts = result.rows.map(postSnakeToCamel);
   for (const post of posts) {

@@ -43,7 +43,9 @@ export const PostFeed: React.FC<PostFeedProps> = ({ storeId: propStoreId, storeN
 
   const renderPostCard = (post: CreatorPost) => {
     const heroImage = post.media?.find(m => m.mediaType === 'image');
+    const heroVideo = post.media?.find(m => m.mediaType === 'video');
     const isRawLocked = post.contentTier === 'raw' && !isAuthenticated;
+    const videoThumb = heroVideo?.thumbnailUrl;
 
     const cardInner = (
       <>
@@ -54,6 +56,21 @@ export const PostFeed: React.FC<PostFeedProps> = ({ storeId: propStoreId, storeN
               alt=""
               className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isRawLocked ? 'blur-sm scale-105' : ''}`}
             />
+          </div>
+        ) : videoThumb ? (
+          <div className="aspect-[16/10] overflow-hidden bg-stone-900 relative">
+            <img
+              src={videoThumb}
+              alt=""
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isRawLocked ? 'blur-sm scale-105' : ''}`}
+            />
+            {!isRawLocked && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                  <span className="text-stone-900 text-lg ml-1">▶</span>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="aspect-[16/10] bg-gradient-to-br from-emerald-50 to-stone-50 flex items-center justify-center">

@@ -71,6 +71,7 @@ import {
   listPublishedPosts,
   listUserPosts,
   listPendingPosts,
+  listAllPosts,
   updatePostStatus,
   updatePost,
   deletePost,
@@ -1527,6 +1528,16 @@ router.get('/posts/pending', isAuthenticated as RequestHandler, requireAdmin, as
   } catch (error) {
     console.error('Error fetching pending posts:', error);
     res.status(500).json({ error: 'Failed to fetch pending posts' });
+  }
+});
+
+router.get('/admin/posts', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
+  try {
+    const posts = await listAllPosts();
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching all posts for admin:', error);
+    res.status(500).json({ error: 'Failed to fetch posts' });
   }
 });
 
