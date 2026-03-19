@@ -82,6 +82,7 @@ import {
 } from './posts.ts';
 import type { PostStatus } from '../types';
 import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal } from './bunnyStorage.ts';
+import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -1331,17 +1332,18 @@ router.post('/posts/upload-image', isAuthenticated as RequestHandler, requireCre
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
-    const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
-    const filename = `${crypto.randomUUID()}${ext}`;
-    const useBunny = isBunnyStorageConfigured();
-    console.log(`[ImageUpload] bunnyConfigured=${useBunny} zone=${process.env.BUNNY_STORAGE_ZONE || '(unset)'} hostname=${process.env.BUNNY_STORAGE_HOSTNAME || 'storage.bunnycdn.com'} cdnUrl=${process.env.BUNNY_STORAGE_CDN_URL || '(unset)'}`);
+    const convertedBuffer = await sharp(req.file.buffer)
+      .rotate()
+      .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+    const filename = `${crypto.randomUUID()}.jpg`;
     let cdnUrl: string;
-    if (useBunny) {
-      cdnUrl = await uploadImageToStorage(req.file.buffer, filename);
+    if (isBunnyStorageConfigured()) {
+      cdnUrl = await uploadImageToStorage(convertedBuffer, filename);
     } else {
-      cdnUrl = await uploadImageLocal(req.file.buffer, filename);
+      cdnUrl = await uploadImageLocal(convertedBuffer, filename);
     }
-    console.log(`[ImageUpload] Success — cdnUrl=${cdnUrl}`);
     res.json({ cdnUrl, filename });
   } catch (error: any) {
     console.error('[ImageUpload] Error:', error.message);
