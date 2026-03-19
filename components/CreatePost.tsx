@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createCreatorPost, uploadPostImage, initPostVideoUpload, fetchStores } from '../services/api';
+import { createCreatorPost, uploadPostImage, initPostVideoUpload, fetchStores, fetchBadgeProgress } from '../services/api';
 import type { Store, ContentTier } from '../types';
 import * as tus from 'tus-js-client';
 
@@ -43,10 +43,23 @@ export const CreatePost: React.FC = () => {
   const [videoError, setVideoError] = useState('');
   const [videoData, setVideoData] = useState<{ videoId: string; embedUrl: string } | null>(null);
   const uploadRef = useRef<tus.Upload | null>(null);
+  const [hasScoutPlusBadge, setHasScoutPlusBadge] = useState(false);
+
+  const SCOUT_PLUS_BADGE_TYPES = ['local_scout', 'regional_builder', 'cross_region_contributor', 'provincial_connector', 'bc_culture_guide', 'founding_bc_architect'];
 
   useEffect(() => {
     fetchStores().then(setStores).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchBadgeProgress()
+      .then(progress => {
+        const hasScout = progress.badges.some(b => SCOUT_PLUS_BADGE_TYPES.includes(b.badgeType));
+        setHasScoutPlusBadge(hasScout);
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   const filteredStores = storeSearch.trim()
     ? stores.filter(s => s.name.toLowerCase().includes(storeSearch.toLowerCase())).slice(0, 8)
@@ -317,8 +330,7 @@ export const CreatePost: React.FC = () => {
     );
   }
 
-  const SCOUT_PLUS_BADGES = ['local_scout', 'regional_builder', 'cross_region_contributor', 'provincial_connector', 'bc_culture_guide', 'founding_bc_architect'];
-  const canSelectClean = user?.badges?.some(b => SCOUT_PLUS_BADGES.includes(b.badgeType)) ?? false;
+  const canSelectClean = hasScoutPlusBadge;
 
   const isVideoUploading = videoState === 'initializing' || videoState === 'uploading' || videoState === 'processing';
   const hasVideo = videoState === 'done' && videoData;
