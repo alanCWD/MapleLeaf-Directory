@@ -54,6 +54,14 @@ export const CreatePost: React.FC = () => {
 
   const selectedStore = stores.find(s => s.id === storeId);
 
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -65,11 +73,14 @@ export const CreatePost: React.FC = () => {
         setError(`${file.name} is too large (max 20MB)`);
         continue;
       }
-      const blobUrl = URL.createObjectURL(file);
+
+      let previewUrl = '';
+      try { previewUrl = await readFileAsDataUrl(file); } catch { /* preview optional */ }
+
       const item: MediaItem = {
         mediaType: 'image',
         cdnUrl: '',
-        previewUrl: blobUrl,
+        previewUrl,
         caption: '',
         file,
         uploading: true,
@@ -80,7 +91,7 @@ export const CreatePost: React.FC = () => {
         const result = await uploadPostImage(file);
         setMediaItems(prev =>
           prev.map(m =>
-            m.file === file ? { ...m, cdnUrl: result.cdnUrl, previewUrl: blobUrl, uploading: false } : m
+            m.file === file ? { ...m, cdnUrl: result.cdnUrl, uploading: false } : m
           )
         );
       } catch (err: any) {
