@@ -18,6 +18,7 @@ export const AdminReviewQueue: React.FC = () => {
   const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts' | 'videos'>('stores');
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+  const [playingPostId, setPlayingPostId] = useState<number | null>(null);
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
   const BADGE_LABELS: Record<string, string> = {
@@ -134,7 +135,7 @@ export const AdminReviewQueue: React.FC = () => {
     }
   };
 
-  const handlePostModerate = async (postId: number, action: 'approve' | 'reject') => {
+  const handlePostModerate = async (postId: number, action: 'approve' | 'reject' | 'mark_raw' | 'mark_clean') => {
     setActionInProgress(`post-${postId}`);
     try {
       const updated = await moderatePost(postId, action, postNotes[postId]);
@@ -351,20 +352,22 @@ export const AdminReviewQueue: React.FC = () => {
                   const isPending = post.status === 'pending_moderation';
                   const isPublished = post.status === 'published';
                   const isRejected = post.status === 'rejected';
+                  const isPostPlaying = playingPostId === post.id;
                   const videoMedia = post.media?.find(m => m.mediaType === 'video');
                   const imageMedia = post.media?.find(m => m.mediaType === 'image');
-                  const thumbSrc = videoMedia?.thumbnailUrl || (imageMedia?.cdnUrl);
+                  const thumb = videoMedia?.thumbnailUrl || (imageMedia?.cdnUrl) || null;
+                  const embedUrl = videoMedia?.cdnUrl || null;
                   return (
-                    <div key={post.id} className={`border rounded-2xl p-6 ${isPending ? 'border-amber-200 bg-amber-50/30' : isRejected ? 'border-red-200 bg-red-50/20' : 'border-stone-200 bg-stone-50/30'}`}>
+                    <div key={post.id} className={`border rounded-2xl p-6 ${isRejected ? 'border-red-200 bg-red-50/20' : isPending ? 'border-amber-200 bg-amber-50/30' : 'border-stone-200 bg-stone-50/30'}`}>
                       <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
-                        <div>
+                        <div className="flex-grow">
                           <div className="flex items-center gap-2 flex-wrap mb-2">
                             <h4 className="font-black text-stone-900 text-lg">{post.title}</h4>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                               {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
                             </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isPending ? 'bg-amber-200 text-amber-800' : isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>
-                              {isPending ? '⏳ Pending' : isPublished ? '✅ Published' : '❌ Rejected'}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isRejected ? 'bg-red-100 text-red-700' : isPending ? 'bg-amber-200 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {isRejected ? '❌ Rejected' : isPending ? '⏳ Pending' : '✅ Published'}
                             </span>
                           </div>
                           {post.subtitle && (
@@ -384,17 +387,42 @@ export const AdminReviewQueue: React.FC = () => {
                             <p className="text-xs text-stone-500 mt-1 italic">Notes: {post.moderationNotes}</p>
                           )}
                         </div>
-                        {thumbSrc && (
-                          <div className="flex-shrink-0 w-24 h-16 rounded-xl overflow-hidden border border-stone-200 bg-stone-100 relative">
-                            <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
-                            {videoMedia && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                <span className="text-white text-lg">▶</span>
+                        {(thumb || embedUrl) && (
+                          <div
+                            className="flex-shrink-0 w-32 h-20 rounded-xl overflow-hidden border border-stone-200 bg-stone-900 relative cursor-pointer"
+                            onClick={() => videoMedia ? setPlayingPostId(isPostPlaying ? null : post.id) : undefined}
+                          >
+                            {thumb && !isPostPlaying && (
+                              <>
+                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                {videoMedia && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors">
+                                    <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow">
+                                      <span className="text-stone-900 text-sm ml-0.5">▶</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {(!thumb || isPostPlaying) && (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-white text-2xl">🎬</span>
                               </div>
                             )}
                           </div>
                         )}
                       </div>
+
+                      {isPostPlaying && embedUrl && (
+                        <div className="mb-4 -mx-6 md:mx-0 md:rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
+                          <iframe
+                            src={embedUrl}
+                            className="absolute inset-0 w-full h-full"
+                            allow="autoplay; fullscreen"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
 
                       {post.bodyText && (
                         <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4 max-h-40 overflow-y-auto">
@@ -402,7 +430,7 @@ export const AdminReviewQueue: React.FC = () => {
                         </div>
                       )}
 
-                      <div className={`flex flex-col gap-3 pt-4 border-t ${isPending ? 'border-amber-200/50' : 'border-stone-200/50'}`}>
+                      <div className="flex flex-col gap-3 pt-4 border-t border-stone-200/50">
                         <textarea
                           rows={2}
                           placeholder="Admin notes (optional)"
@@ -410,21 +438,41 @@ export const AdminReviewQueue: React.FC = () => {
                           onChange={(e) => setPostNotes(prev => ({ ...prev, [post.id]: e.target.value }))}
                           className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none resize-none"
                         />
-                        <div className="flex gap-2 flex-wrap">
-                          <button
-                            onClick={() => handlePostModerate(post.id, 'approve')}
-                            disabled={actionInProgress === `post-${post.id}`}
-                            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handlePostModerate(post.id, 'reject')}
-                            disabled={actionInProgress === `post-${post.id}`}
-                            className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
+                        <div className="flex flex-wrap gap-2">
+                          {isPublished ? (
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'reject')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'approve')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
+                            >
+                              {isRejected ? 'Re-approve' : 'Approve'}
+                            </button>
+                          )}
+                          {post.contentTier === 'raw' ? (
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'mark_clean')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition disabled:opacity-50"
+                            >
+                              Mark Clean
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handlePostModerate(post.id, 'mark_raw')}
+                              disabled={actionInProgress === `post-${post.id}`}
+                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
+                            >
+                              Mark Raw
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

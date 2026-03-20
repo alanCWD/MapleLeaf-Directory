@@ -516,7 +516,7 @@ export async function fetchPostById(id: number): Promise<CreatorPost> {
   return apiFetch<CreatorPost>(`/posts/${id}`);
 }
 
-export async function moderatePost(id: number, action: 'approve' | 'reject', notes?: string): Promise<CreatorPost> {
+export async function moderatePost(id: number, action: 'approve' | 'reject' | 'mark_raw' | 'mark_clean', notes?: string): Promise<CreatorPost> {
   return apiFetch<CreatorPost>(`/posts/${id}/moderate`, {
     method: 'POST',
     body: JSON.stringify({ action, notes }),

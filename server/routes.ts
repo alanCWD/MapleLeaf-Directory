@@ -73,6 +73,7 @@ import {
   listPendingPosts,
   listAllPosts,
   updatePostStatus,
+  updatePostContentTier,
   updatePost,
   deletePost,
   adminDeletePost,
@@ -1615,19 +1616,22 @@ router.post('/posts/:id/moderate', isAuthenticated as RequestHandler, requireAdm
     const id = parseInt(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
     const { action, notes } = req.body;
-    if (action !== 'approve' && action !== 'reject') {
-      res.status(400).json({ error: 'Action must be approve or reject' });
+    const validActions = ['approve', 'reject', 'mark_raw', 'mark_clean'];
+    if (!validActions.includes(action)) {
+      res.status(400).json({ error: `Action must be one of: ${validActions.join(', ')}` });
       return;
     }
     const existing = await getPostById(id);
     if (!existing) { res.status(404).json({ error: 'Post not found' }); return; }
-    if (existing.contentTier !== 'raw' || existing.status !== 'pending_moderation') {
-      res.status(400).json({ error: 'Only raw posts in pending moderation can be moderated' });
-      return;
+
+    let post: CreatorPost | null;
+    if (action === 'mark_raw' || action === 'mark_clean') {
+      const tier: ContentTier = action === 'mark_raw' ? 'raw' : 'clean';
+      post = await updatePostContentTier(id, tier);
+    } else {
+      const newStatus: PostStatus = action === 'approve' ? 'published' : 'rejected';
+      post = await updatePostStatus(id, newStatus, notes);
     }
-    const newStatus: PostStatus = action === 'approve' ? 'published' : 'rejected';
-    const newTier: ContentTier | undefined = action === 'approve' ? 'clean' : undefined;
-    const post = await updatePostStatus(id, newStatus, notes, newTier);
     if (!post) { res.status(404).json({ error: 'Post not found' }); return; }
 
     const adminId = getUserId(req)!;

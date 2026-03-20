@@ -247,6 +247,18 @@ export async function updatePostStatus(
   return postSnakeToCamel(result.rows[0]);
 }
 
+export async function updatePostContentTier(
+  id: number,
+  tier: ContentTier
+): Promise<CreatorPost | null> {
+  const result = await pool.query(
+    `UPDATE creator_posts SET content_tier = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [tier, id]
+  );
+  if (result.rows.length === 0) return null;
+  return postSnakeToCamel(result.rows[0]);
+}
+
 export async function deletePost(id: number, userId: string): Promise<boolean> {
   const result = await pool.query(
     `DELETE FROM creator_posts WHERE id = $1 AND user_id = $2`,
