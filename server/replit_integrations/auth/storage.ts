@@ -12,6 +12,10 @@ export interface User {
   isCreator: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
+  socialLinkPlatform: string | null;
+  socialLinkUrl: string | null;
+  socialLinkPublic: boolean;
+  socialLinkVerified: boolean;
 }
 
 export interface UpsertUser {
@@ -48,6 +52,10 @@ class AuthStorage implements IAuthStorage {
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      socialLinkPlatform: row.social_link_platform || null,
+      socialLinkUrl: row.social_link_url || null,
+      socialLinkPublic: row.social_link_public ?? false,
+      socialLinkVerified: row.social_link_verified ?? false,
     };
   }
 
@@ -83,6 +91,10 @@ class AuthStorage implements IAuthStorage {
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      socialLinkPlatform: row.social_link_platform || null,
+      socialLinkUrl: row.social_link_url || null,
+      socialLinkPublic: row.social_link_public ?? false,
+      socialLinkVerified: row.social_link_verified ?? false,
     };
   }
 }

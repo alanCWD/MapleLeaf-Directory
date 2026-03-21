@@ -2,11 +2,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { updateUserProfile } from '../services/api';
 
+const PLATFORM_CONFIG: Record<string, { label: string; placeholder: string; isUrl: boolean; icon: string }> = {
+  instagram: { label: 'Instagram', placeholder: 'https://instagram.com/yourname', isUrl: true, icon: '📸' },
+  facebook:  { label: 'Facebook',  placeholder: 'https://facebook.com/yourname',  isUrl: true, icon: '📘' },
+  x:         { label: 'X (Twitter)', placeholder: 'https://x.com/yourname',       isUrl: true, icon: '🐦' },
+  reddit:    { label: 'Reddit',    placeholder: 'https://reddit.com/user/yourname', isUrl: true, icon: '🟠' },
+  discord:   { label: 'Discord',   placeholder: 'yourUsername (2–32 chars)',        isUrl: false, icon: '💬' },
+};
+
 export const ProfileSettings: React.FC = () => {
   const { user, isAuthenticated, isLoading, refetch } = useAuth();
   const [handle, setHandle] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [socialPlatform, setSocialPlatform] = useState('');
+  const [socialUrl, setSocialUrl] = useState('');
+  const [socialPublic, setSocialPublic] = useState(false);
+  const [socialVerified, setSocialVerified] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -15,6 +27,10 @@ export const ProfileSettings: React.FC = () => {
   useEffect(() => {
     if (user) {
       setHandle(user.handle || '');
+      setSocialPlatform(user.socialLinkPlatform || '');
+      setSocialUrl(user.socialLinkUrl || '');
+      setSocialPublic(user.socialLinkPublic ?? false);
+      setSocialVerified(user.socialLinkVerified ?? false);
     }
   }, [user]);
 
@@ -27,14 +43,39 @@ export const ProfileSettings: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handlePlatformChange = (platform: string) => {
+    setSocialPlatform(platform);
+    setSocialUrl('');
+    setSocialVerified(false);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    if (socialPlatform && !socialUrl.trim()) {
+      setError('Please enter your social link or remove the platform selection.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await updateUserProfile({ handle: handle.trim(), avatarFile: avatarFile || undefined });
-      setSuccess('Profile updated!');
+      const result = await updateUserProfile({
+        handle: handle.trim(),
+        avatarFile: avatarFile || undefined,
+        socialLinkPlatform: socialPlatform || undefined,
+        socialLinkUrl: socialUrl.trim() || undefined,
+        socialLinkPublic: socialPublic,
+      });
+      setSocialVerified(result.socialLinkVerified);
+      setSuccess(
+        result.socialLinkVerified
+          ? 'Profile updated! Your social link was verified.'
+          : socialUrl.trim() && socialPlatform && socialPlatform !== 'discord'
+          ? 'Profile updated. (Social link could not be automatically verified — it may still be visible.)'
+          : 'Profile updated!'
+      );
       setAvatarFile(null);
       await refetch();
     } catch (err: any) {
@@ -67,6 +108,7 @@ export const ProfileSettings: React.FC = () => {
 
   const currentAvatar = avatarPreview || user.avatarUrl || user.profileImageUrl;
   const initials = (handle?.[0] || user.firstName?.[0] || user.email?.[0] || 'U').toUpperCase();
+  const platformConfig = socialPlatform ? PLATFORM_CONFIG[socialPlatform] : null;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12">
@@ -124,6 +166,65 @@ export const ProfileSettings: React.FC = () => {
             />
           </div>
           <p className="text-xs text-stone-400 mt-1.5">Letters, numbers, and underscores only. This replaces your name everywhere on the site.</p>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block text-sm font-black text-stone-700">
+            Social Media Link <span className="font-normal text-stone-400">(optional)</span>
+          </label>
+
+          <div className="grid grid-cols-5 gap-2">
+            {Object.entries(PLATFORM_CONFIG).map(([key, cfg]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handlePlatformChange(socialPlatform === key ? '' : key)}
+                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border-2 text-xs font-bold transition ${
+                  socialPlatform === key
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                    : 'border-stone-200 bg-stone-50 text-stone-500 hover:border-stone-300'
+                }`}
+              >
+                <span className="text-lg">{cfg.icon}</span>
+                <span className="truncate w-full text-center text-[10px]">{cfg.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {socialPlatform && platformConfig && (
+            <div className="space-y-3 pt-1">
+              <div className="border-2 border-stone-200 rounded-2xl overflow-hidden focus-within:border-emerald-400 transition-colors bg-stone-50">
+                <input
+                  type={platformConfig.isUrl ? 'url' : 'text'}
+                  value={socialUrl}
+                  onChange={e => { setSocialUrl(e.target.value); setSocialVerified(false); }}
+                  placeholder={platformConfig.placeholder}
+                  className="w-full px-4 py-3 bg-transparent font-medium text-stone-900 placeholder-stone-300 outline-none text-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <div
+                    onClick={() => setSocialPublic(v => !v)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${socialPublic ? 'bg-emerald-500' : 'bg-stone-300'}`}
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${socialPublic ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm font-bold text-stone-700">
+                    {socialPublic ? 'Visible on your public profile' : 'Private (not shown publicly)'}
+                  </span>
+                </label>
+
+                {socialVerified && (
+                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    Verified
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (

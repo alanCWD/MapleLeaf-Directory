@@ -622,12 +622,39 @@ router.get('/user/profile/self', isAuthenticated as RequestHandler, async (req: 
 
 const RESERVED_HANDLES = new Set(['me', 'self', 'admin', 'api', 'auth', 'profile', 'settings', 'store', 'posts', 'submit', 'owners', 'badges', 'anonymous']);
 
+const SOCIAL_PLATFORMS: Record<string, { pattern: RegExp | null; isUrl: boolean }> = {
+  instagram: { pattern: /^https?:\/\/(www\.)?instagram\.com\/[a-zA-Z0-9_.]{1,30}\/?$/, isUrl: true },
+  facebook:  { pattern: /^https?:\/\/(www\.)?facebook\.com\/[a-zA-Z0-9.]{1,100}\/?$/, isUrl: true },
+  x:         { pattern: /^https?:\/\/(www\.)?(x|twitter)\.com\/[a-zA-Z0-9_]{1,15}\/?$/, isUrl: true },
+  reddit:    { pattern: /^https?:\/\/(www\.)?reddit\.com\/(user|u)\/[a-zA-Z0-9_-]{3,20}\/?$/, isUrl: true },
+  discord:   { pattern: /^.{2,32}$/, isUrl: false },
+};
+
+async function checkUrlHead(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' });
+    clearTimeout(timeout);
+    return response.ok || response.status === 405 || response.status === 403;
+  } catch {
+    return false;
+  }
+}
+
 router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.single('avatar'), async (req: any, res) => {
   try {
     const userId = getUserId(req)!;
-    const { handle } = req.body;
+    const { handle, socialLinkPlatform, socialLinkUrl, socialLinkPublic } = req.body;
 
-    const updateData: { handle?: string | null; customProfileImageUrl?: string | null } = {};
+    const updateData: {
+      handle?: string | null;
+      customProfileImageUrl?: string | null;
+      socialLinkPlatform?: string | null;
+      socialLinkUrl?: string | null;
+      socialLinkPublic?: boolean;
+      socialLinkVerified?: boolean;
+    } = {};
 
     if (handle !== undefined) {
       const cleaned = (handle || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
@@ -669,6 +696,42 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
       updateData.customProfileImageUrl = url;
     }
 
+    if (socialLinkPlatform !== undefined || socialLinkUrl !== undefined) {
+      const platform = (socialLinkPlatform || '').trim().toLowerCase();
+      const linkUrl = (socialLinkUrl || '').trim();
+
+      if (platform && !SOCIAL_PLATFORMS[platform]) {
+        res.status(400).json({ error: 'Invalid social platform. Must be one of: instagram, facebook, x, reddit, discord' });
+        return;
+      }
+
+      if (platform && linkUrl) {
+        const config = SOCIAL_PLATFORMS[platform];
+        if (config.pattern && !config.pattern.test(linkUrl)) {
+          res.status(400).json({ error: `Invalid ${platform} URL format` });
+          return;
+        }
+        updateData.socialLinkPlatform = platform;
+        updateData.socialLinkUrl = linkUrl;
+        let verified = false;
+        if (config.isUrl) {
+          verified = await checkUrlHead(linkUrl);
+        }
+        updateData.socialLinkVerified = verified;
+      } else if (!platform && !linkUrl) {
+        updateData.socialLinkPlatform = null;
+        updateData.socialLinkUrl = null;
+        updateData.socialLinkVerified = false;
+      } else if (platform && !linkUrl) {
+        res.status(400).json({ error: 'Social link URL is required when a platform is selected' });
+        return;
+      }
+    }
+
+    if (socialLinkPublic !== undefined) {
+      updateData.socialLinkPublic = socialLinkPublic === true || socialLinkPublic === 'true';
+    }
+
     const result = await updateUserProfile(userId, updateData);
     res.json(result);
   } catch (error: any) {
@@ -690,12 +753,18 @@ router.get('/user/profile/:handle', async (req: any, res) => {
       return;
     }
     const content = await getUserPublicProfile(userInfo.id);
-    res.json({
+    const payload: any = {
       handle: userInfo.handle,
       avatarUrl: userInfo.avatarUrl,
       posts: content.posts,
       reviews: content.reviews,
-    });
+    };
+    if (userInfo.socialLinkPublic && userInfo.socialLinkPlatform && userInfo.socialLinkUrl) {
+      payload.socialLinkPlatform = userInfo.socialLinkPlatform;
+      payload.socialLinkUrl = userInfo.socialLinkUrl;
+      payload.socialLinkVerified = userInfo.socialLinkVerified;
+    }
+    res.json(payload);
   } catch (error) {
     console.error('Error fetching public profile:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });

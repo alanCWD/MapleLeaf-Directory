@@ -195,6 +195,10 @@ export interface AdminUser {
   postsCount: number;
   reviewsCount: number;
   badges: UserBadge[];
+  socialLinkPlatform: string | null;
+  socialLinkUrl: string | null;
+  socialLinkPublic: boolean;
+  socialLinkVerified: boolean;
 }
 
 export async function getAdminUsersAPI(): Promise<AdminUser[]> {
@@ -650,15 +654,34 @@ export interface PublicUserProfile {
     reviewText: string | null;
     createdAt: string;
   }>;
+  socialLinkPlatform?: string | null;
+  socialLinkUrl?: string | null;
+  socialLinkVerified?: boolean;
 }
 
 export async function fetchUserProfile(handle: string): Promise<PublicUserProfile> {
   return apiFetch<PublicUserProfile>(`/user/profile/${handle}`);
 }
 
-export async function updateUserProfile(data: { handle?: string; avatarFile?: File }): Promise<{ handle: string | null; avatarUrl: string | null }> {
+export async function updateUserProfile(data: {
+  handle?: string;
+  avatarFile?: File;
+  socialLinkPlatform?: string;
+  socialLinkUrl?: string;
+  socialLinkPublic?: boolean;
+}): Promise<{
+  handle: string | null;
+  avatarUrl: string | null;
+  socialLinkPlatform: string | null;
+  socialLinkUrl: string | null;
+  socialLinkPublic: boolean;
+  socialLinkVerified: boolean;
+}> {
   const form = new FormData();
   if (data.handle !== undefined) form.append('handle', data.handle);
   if (data.avatarFile) form.append('avatar', data.avatarFile);
+  if (data.socialLinkPlatform !== undefined) form.append('socialLinkPlatform', data.socialLinkPlatform);
+  if (data.socialLinkUrl !== undefined) form.append('socialLinkUrl', data.socialLinkUrl);
+  if (data.socialLinkPublic !== undefined) form.append('socialLinkPublic', String(data.socialLinkPublic));
   return apiFetch(`/user/profile`, { method: 'PATCH', body: form });
 }

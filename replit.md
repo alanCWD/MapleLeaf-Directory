@@ -32,3 +32,15 @@ The application utilizes a split frontend/backend architecture. The frontend is 
 -   **Geocoding/Verification (Optional):** Google Places API
 -   **Video Processing:** FFmpeg (server-side for video auto-stitching)
 -   **Multipart File Uploads:** Multer (for video stitching endpoint)
+
+## User Profile System
+Users can set a public `@handle` (2–30 chars, letters/numbers/underscores, reserved handles blocked), upload a custom avatar (stored via Bunny CDN or local fallback), and add one optional social media link. Social link fields:
+- `social_link_platform` — one of: instagram, facebook, x, reddit, discord
+- `social_link_url` — full URL (instagram/facebook/x/reddit) or plain username string (discord)
+- `social_link_public` — boolean toggle (default false); only public links appear on public profiles
+- `social_link_verified` — boolean set by server-side HTTP HEAD check at save time (non-Discord only)
+
+**ProfileSettings.tsx**: 5-button platform picker → URL/username input → public toggle → Save
+**UserProfilePage.tsx**: shows social link badge in header only when public (clickable link for URL platforms, plain text for Discord)
+**AdminUsers.tsx**: always shows social link for admin users (with private indicator if not public)
+**API**: `PATCH /api/user/profile` (FormData); `GET /api/user/profile/:handle` (conditionally exposes social link)

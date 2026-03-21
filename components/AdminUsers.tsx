@@ -324,6 +324,31 @@ export const AdminUsers: React.FC = () => {
                           {u.email && u.firstName && (
                             <p className="text-xs text-stone-500 mt-0.5">{u.email}</p>
                           )}
+                          {u.socialLinkPlatform && u.socialLinkUrl && (
+                            <div className="mt-1">
+                              {u.socialLinkPlatform !== 'discord' ? (
+                                <a
+                                  href={u.socialLinkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-500 hover:text-emerald-600 transition-colors"
+                                >
+                                  <span>{{ instagram: '📸', facebook: '📘', x: '🐦', reddit: '🟠', discord: '💬' }[u.socialLinkPlatform] || '🔗'}</span>
+                                  <span className="truncate max-w-[180px]">{u.socialLinkUrl}</span>
+                                  {u.socialLinkVerified && (
+                                    <svg className="w-2.5 h-2.5 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                  )}
+                                  {!u.socialLinkPublic && <span className="text-stone-300 ml-0.5">(private)</span>}
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-500">
+                                  <span>💬</span>
+                                  <span>{u.socialLinkUrl}</span>
+                                  {!u.socialLinkPublic && <span className="text-stone-300 ml-0.5">(private)</span>}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex items-center gap-3 mt-2 text-xs text-stone-400 flex-wrap">
                             <span>Joined: {new Date(u.createdAt).toLocaleDateString()}</span>
                             <span className="font-semibold text-violet-500">{u.postsCount} post{u.postsCount !== 1 ? 's' : ''}</span>

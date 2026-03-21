@@ -14,6 +14,10 @@ export interface AuthUser {
   createdAt: string | null;
   updatedAt: string | null;
   badges: UserBadge[];
+  socialLinkPlatform: string | null;
+  socialLinkUrl: string | null;
+  socialLinkPublic: boolean;
+  socialLinkVerified: boolean;
 }
 
 export function useAuth() {

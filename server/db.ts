@@ -370,6 +370,10 @@ export async function ensureUserProfileColumns(): Promise<void> {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS handle TEXT UNIQUE`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_profile_image_url TEXT`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_handle ON users(handle)`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_platform VARCHAR(20)`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_url TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_public BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_verified BOOLEAN DEFAULT FALSE`);
   console.log('[DB] user profile columns ensured');
 }
 
