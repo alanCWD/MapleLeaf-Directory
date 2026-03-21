@@ -158,7 +158,8 @@ export const AdminUsers: React.FC = () => {
     const matchesSearch = !searchQuery ||
       (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (u.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.lastName || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (u.lastName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.handle || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = !roleFilter || u.role === roleFilter;
     const matchesBadge = !badgeFilter || (u.badges && u.badges.some(b => b.badgeType === badgeFilter));
     return matchesSearch && matchesRole && matchesBadge;
@@ -279,11 +280,11 @@ export const AdminUsers: React.FC = () => {
                   >
                     <div className="flex flex-col md:flex-row justify-between gap-4">
                       <div className="flex items-start gap-4">
-                        {u.profileImageUrl ? (
-                          <img src={u.profileImageUrl} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-stone-200 flex-shrink-0" />
+                        {u.avatarUrl ? (
+                          <img src={u.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-stone-200 flex-shrink-0" />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-lg flex-shrink-0">
-                            {(u.firstName?.[0] || u.email?.[0] || 'U').toUpperCase()}
+                            {(u.handle?.[0] || u.firstName?.[0] || u.email?.[0] || 'U').toUpperCase()}
                           </div>
                         )}
                         <div>
@@ -315,12 +316,19 @@ export const AdminUsers: React.FC = () => {
                               </span>
                             ))}
                           </div>
-                          {u.email && u.firstName && (
-                            <p className="text-sm text-stone-500 mt-0.5">{u.email}</p>
+                          {u.handle && (
+                            <Link to={`/profile/${u.handle}`} className="text-sm font-bold text-emerald-600 hover:text-emerald-500 transition mt-0.5 block">
+                              @{u.handle}
+                            </Link>
                           )}
-                          <div className="flex items-center gap-4 mt-2 text-xs text-stone-400">
+                          {u.email && u.firstName && (
+                            <p className="text-xs text-stone-500 mt-0.5">{u.email}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2 text-xs text-stone-400 flex-wrap">
                             <span>Joined: {new Date(u.createdAt).toLocaleDateString()}</span>
-                            <span>{u.favoritesCount} favorite{u.favoritesCount !== 1 ? 's' : ''}</span>
+                            <span className="font-semibold text-violet-500">{u.postsCount} post{u.postsCount !== 1 ? 's' : ''}</span>
+                            <span className="font-semibold text-blue-500">{u.reviewsCount} review{u.reviewsCount !== 1 ? 's' : ''}</span>
+                            <span>{u.favoritesCount} fav{u.favoritesCount !== 1 ? 's' : ''}</span>
                             <span>{u.claimsCount} claim{u.claimsCount !== 1 ? 's' : ''}</span>
                           </div>
                         </div>

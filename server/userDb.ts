@@ -157,16 +157,25 @@ export interface AdminUser {
   updatedAt: string;
   favoritesCount: number;
   claimsCount: number;
+  handle: string | null;
+  avatarUrl: string | null;
+  postsCount: number;
+  reviewsCount: number;
 }
 
 export async function getAllUsers(): Promise<AdminUser[]> {
   const result = await pool.query(
     `SELECT u.*,
+       COALESCE(u.custom_profile_image_url, u.profile_image_url) as avatar_url,
        COALESCE(fav.cnt, 0) as favorites_count,
-       COALESCE(cl.cnt, 0) as claims_count
+       COALESCE(cl.cnt, 0) as claims_count,
+       COALESCE(p.cnt, 0) as posts_count,
+       COALESCE(r.cnt, 0) as reviews_count
      FROM users u
      LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM user_favorites GROUP BY user_id) fav ON fav.user_id = u.id
      LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM store_claims GROUP BY user_id) cl ON cl.user_id = u.id
+     LEFT JOIN (SELECT author_id, COUNT(*) as cnt FROM creator_posts GROUP BY author_id) p ON p.author_id = u.id
+     LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM integrity_reviews GROUP BY user_id) r ON r.user_id = u.id
      ORDER BY u.created_at DESC`
   );
   return result.rows.map(formatUser);
@@ -298,6 +307,10 @@ function formatUser(row: any): AdminUser {
     updatedAt: row.updated_at?.toISOString() || new Date().toISOString(),
     favoritesCount: parseInt(row.favorites_count) || 0,
     claimsCount: parseInt(row.claims_count) || 0,
+    handle: row.handle || null,
+    avatarUrl: row.avatar_url || null,
+    postsCount: parseInt(row.posts_count) || 0,
+    reviewsCount: parseInt(row.reviews_count) || 0,
   };
 }
 

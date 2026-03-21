@@ -184,12 +184,16 @@ export interface AdminUser {
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
+  avatarUrl: string | null;
+  handle: string | null;
   role: string;
   isCreator: boolean;
   createdAt: string;
   updatedAt: string;
   favoritesCount: number;
   claimsCount: number;
+  postsCount: number;
+  reviewsCount: number;
   badges: UserBadge[];
 }
 
