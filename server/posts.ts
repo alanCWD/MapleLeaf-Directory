@@ -27,6 +27,7 @@ function postSnakeToCamel(row: Record<string, any>): CreatorPost {
     createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
     updatedAt: row.updated_at ? row.updated_at.toISOString() : new Date().toISOString(),
     authorName: row.author_name || undefined,
+    authorHandle: row.author_handle || null,
     authorImageUrl: row.author_image_url || undefined,
     authorBadge: row.author_badge_type || null,
     storeName: row.store_name || undefined,
@@ -96,7 +97,8 @@ export async function getPostById(id: number): Promise<CreatorPost | null> {
   const result = await pool.query(
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
-            u.profile_image_url as author_image_url,
+            u.handle as author_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as author_image_url,
             s.name as store_name
      FROM creator_posts p
      LEFT JOIN users u ON p.user_id = u.id
@@ -137,7 +139,8 @@ export async function listPublishedPosts(options: {
   const postsResult = await pool.query(
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
-            u.profile_image_url as author_image_url,
+            u.handle as author_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as author_image_url,
             s.name as store_name
      FROM creator_posts p
      LEFT JOIN users u ON p.user_id = u.id
@@ -160,7 +163,8 @@ export async function listUserPosts(userId: string): Promise<CreatorPost[]> {
   const result = await pool.query(
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
-            u.profile_image_url as author_image_url,
+            u.handle as author_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as author_image_url,
             s.name as store_name
      FROM creator_posts p
      LEFT JOIN users u ON p.user_id = u.id
@@ -180,7 +184,8 @@ export async function listPendingPosts(): Promise<CreatorPost[]> {
   const result = await pool.query(
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
-            u.profile_image_url as author_image_url,
+            u.handle as author_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as author_image_url,
             s.name as store_name
      FROM creator_posts p
      LEFT JOIN users u ON p.user_id = u.id
@@ -199,7 +204,8 @@ export async function listAllPosts(): Promise<CreatorPost[]> {
   const result = await pool.query(
     `SELECT p.*,
             COALESCE(u.first_name || ' ' || u.last_name, u.email, 'Anonymous') as author_name,
-            u.profile_image_url as author_image_url,
+            u.handle as author_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as author_image_url,
             s.name as store_name,
             top_badge.badge_type as author_badge_type
      FROM creator_posts p

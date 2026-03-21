@@ -21,6 +21,8 @@ import { VerificationFilter } from './components/VerificationFilter';
 import { PostFeed } from './components/PostFeed';
 import { PostDetailPage } from './components/PostDetailPage';
 import { CreatePost } from './components/CreatePost';
+import { ProfileSettings } from './components/ProfileSettings';
+import { UserProfilePage } from './components/UserProfilePage';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
 import { useAuth } from './hooks/useAuth';
@@ -409,6 +411,8 @@ const App: React.FC = () => {
             <Route path="/submit" element={<CommunitySubmit />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/badges" element={<BadgeProgress />} />
+            <Route path="/settings/profile" element={<ProfileSettings />} />
+            <Route path="/profile/:handle" element={<UserProfilePage />} />
           </Routes>
         </main>
         <footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">

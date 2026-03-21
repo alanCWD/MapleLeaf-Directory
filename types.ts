@@ -157,6 +157,7 @@ export interface CreatorPost {
   createdAt: string;
   updatedAt: string;
   authorName?: string;
+  authorHandle?: string | null;
   authorImageUrl?: string;
   authorBadge?: string | null;
   storeName?: string;

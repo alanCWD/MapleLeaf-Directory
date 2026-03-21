@@ -366,6 +366,13 @@ export async function ensureHeaderImageColumn(): Promise<void> {
   console.log('[DB] header_image_url column ensured');
 }
 
+export async function ensureUserProfileColumns(): Promise<void> {
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS handle TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_profile_image_url TEXT`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_handle ON users(handle)`);
+  console.log('[DB] user profile columns ensured');
+}
+
 export async function createAuditLog(
   adminUserId: string,
   action: string,

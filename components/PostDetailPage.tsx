@@ -140,7 +140,17 @@ export const PostDetailPage: React.FC = () => {
           )}
 
           <div className="flex items-center gap-3 mb-8 pb-6 border-b border-stone-100">
-            {post.authorImageUrl ? (
+            {post.authorHandle ? (
+              <Link to={`/profile/${post.authorHandle}`}>
+                {post.authorImageUrl ? (
+                  <img src={post.authorImageUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-stone-200 hover:border-emerald-400 transition-colors" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black hover:bg-emerald-400 transition-colors">
+                    {post.authorHandle[0].toUpperCase()}
+                  </div>
+                )}
+              </Link>
+            ) : post.authorImageUrl ? (
               <img src={post.authorImageUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-stone-200" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black">
@@ -148,7 +158,13 @@ export const PostDetailPage: React.FC = () => {
               </div>
             )}
             <div>
-              <p className="font-bold text-stone-900 text-sm">{post.authorName || 'Anonymous'}</p>
+              {post.authorHandle ? (
+                <Link to={`/profile/${post.authorHandle}`} className="font-bold text-emerald-600 hover:text-emerald-500 text-sm transition-colors">
+                  @{post.authorHandle}
+                </Link>
+              ) : (
+                <p className="font-bold text-stone-900 text-sm">{post.authorName || 'Anonymous'}</p>
+              )}
               <p className="text-xs text-stone-400">{formatDate(post.createdAt)}</p>
             </div>
           </div>

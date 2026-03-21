@@ -630,3 +630,29 @@ export async function moderateVideoReview(
     body: JSON.stringify(data),
   });
 }
+
+export interface PublicUserProfile {
+  handle: string | null;
+  avatarUrl: string | null;
+  firstName: string | null;
+  posts: import('../types').CreatorPost[];
+  reviews: Array<{
+    id: number;
+    storeId: string;
+    storeName: string;
+    rating: number;
+    reviewText: string | null;
+    createdAt: string;
+  }>;
+}
+
+export async function fetchUserProfile(handle: string): Promise<PublicUserProfile> {
+  return apiFetch<PublicUserProfile>(`/user/profile/${handle}`);
+}
+
+export async function updateUserProfile(data: { handle?: string; avatarFile?: File }): Promise<{ handle: string | null; customProfileImageUrl: string | null }> {
+  const form = new FormData();
+  if (data.handle !== undefined) form.append('handle', data.handle);
+  if (data.avatarFile) form.append('avatar', data.avatarFile);
+  return apiFetch(`/user/profile`, { method: 'PATCH', body: form });
+}

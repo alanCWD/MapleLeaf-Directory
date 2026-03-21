@@ -7,6 +7,8 @@ export interface AuthUser {
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
   role: string;
   isCreator: boolean;
   createdAt: string | null;

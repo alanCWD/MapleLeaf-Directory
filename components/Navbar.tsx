@@ -21,11 +21,12 @@ export const Navbar: React.FC = () => {
     return () => document.removeEventListener('click', handler);
   }, [showUserMenu]);
 
-  const avatar = user?.profileImageUrl ? (
-    <img src={user.profileImageUrl} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />
+  const avatarSrc = user?.avatarUrl || user?.profileImageUrl;
+  const avatar = avatarSrc ? (
+    <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />
   ) : (
     <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-sm">
-      {(user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+      {(user?.handle?.[0] || user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
     </div>
   );
 
@@ -71,7 +72,7 @@ export const Navbar: React.FC = () => {
               >
                 <div className="flex items-center gap-2 pl-3 pr-1 py-1 rounded-full hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-200">
                   <span className="text-sm font-bold text-stone-700 max-w-[100px] truncate">
-                    {user.firstName || 'Account'}
+                    {user.handle ? `@${user.handle}` : (user.firstName || 'Account')}
                   </span>
                   {avatar}
                 </div>
@@ -124,9 +125,13 @@ export const Navbar: React.FC = () => {
           style={{ maxWidth: 'calc(100vw - 2rem)' }}
         >
           <div className="p-4 border-b border-stone-100 bg-stone-50">
-            <p className="font-bold text-stone-900 text-sm truncate">
-              {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}
-            </p>
+            {user.handle ? (
+              <p className="font-bold text-emerald-700 text-sm truncate">@{user.handle}</p>
+            ) : (
+              <p className="font-bold text-stone-900 text-sm truncate">
+                {user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User'}
+              </p>
+            )}
             {user.email && <p className="text-xs text-stone-500 truncate">{user.email}</p>}
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700">
               {user.role}
@@ -161,6 +166,9 @@ export const Navbar: React.FC = () => {
                 </a>
               </>
             )}
+            <a href="#/settings/profile" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+              Profile Settings
+            </a>
             <a href="#/badges" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
               My Badges
             </a>

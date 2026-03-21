@@ -189,6 +189,102 @@ export async function deleteUser(userId: string): Promise<void> {
   }
 }
 
+export async function updateUserProfile(userId: string, data: {
+  handle?: string | null;
+  customProfileImageUrl?: string | null;
+}): Promise<{ handle: string | null; avatarUrl: string | null }> {
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if ('handle' in data) {
+    fields.push(`handle = $${idx++}`);
+    values.push(data.handle || null);
+  }
+  if ('customProfileImageUrl' in data) {
+    fields.push(`custom_profile_image_url = $${idx++}`);
+    values.push(data.customProfileImageUrl || null);
+  }
+  if (fields.length === 0) {
+    const r = await pool.query('SELECT handle, custom_profile_image_url, profile_image_url FROM users WHERE id = $1', [userId]);
+    const row = r.rows[0] || {};
+    return { handle: row.handle || null, avatarUrl: row.custom_profile_image_url || row.profile_image_url || null };
+  }
+  fields.push('updated_at = now()');
+  values.push(userId);
+  const result = await pool.query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING handle, custom_profile_image_url, profile_image_url`,
+    values
+  );
+  const row = result.rows[0] || {};
+  return {
+    handle: row.handle || null,
+    avatarUrl: row.custom_profile_image_url || row.profile_image_url || null,
+  };
+}
+
+export async function getUserByHandle(handle: string): Promise<{ id: string; handle: string; avatarUrl: string | null; firstName: string | null } | null> {
+  const result = await pool.query(
+    'SELECT id, handle, custom_profile_image_url, profile_image_url, first_name FROM users WHERE LOWER(handle) = LOWER($1)',
+    [handle]
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    handle: row.handle,
+    avatarUrl: row.custom_profile_image_url || row.profile_image_url || null,
+    firstName: row.first_name || null,
+  };
+}
+
+export async function getUserPublicProfile(userId: string): Promise<{
+  posts: any[];
+  reviews: any[];
+}> {
+  const postsResult = await pool.query(
+    `SELECT p.id, p.title, p.subtitle, p.created_at, p.content_tier, p.store_id,
+            s.name as store_name
+     FROM creator_posts p
+     LEFT JOIN stores s ON p.store_id = s.id
+     WHERE p.user_id = $1 AND p.status = 'published'
+     ORDER BY p.created_at DESC
+     LIMIT 50`,
+    [userId]
+  );
+
+  const reviewsResult = await pool.query(
+    `SELECT ir.id, ir.rating, ir.content_text, ir.created_at, ir.store_id,
+            s.name as store_name
+     FROM integrity_reviews ir
+     LEFT JOIN stores s ON ir.store_id = s.id
+     WHERE ir.user_id = $1
+     ORDER BY ir.created_at DESC
+     LIMIT 50`,
+    [userId]
+  );
+
+  return {
+    posts: postsResult.rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      subtitle: r.subtitle || null,
+      createdAt: r.created_at?.toISOString() || new Date().toISOString(),
+      contentTier: r.content_tier,
+      storeId: r.store_id || null,
+      storeName: r.store_name || null,
+    })),
+    reviews: reviewsResult.rows.map(r => ({
+      id: r.id,
+      rating: r.rating,
+      contentText: r.content_text || null,
+      createdAt: r.created_at?.toISOString() || new Date().toISOString(),
+      storeId: r.store_id || null,
+      storeName: r.store_name || null,
+    })),
+  };
+}
+
 function formatUser(row: any): AdminUser {
   return {
     id: row.id,

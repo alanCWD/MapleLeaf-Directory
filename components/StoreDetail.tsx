@@ -552,12 +552,12 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                 <MediaGallery media={storeMedia} isLoading={isLoadingMedia} isAuthenticated={isAuthenticated} />
               </div>
 
-              {isCreator && (
+              {storePosts.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
                     <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
-                    Creator Posts
+                    Posts About This Store
                   </h2>
                   <Link
                     to={`/posts?storeId=${store?.id}`}
@@ -566,7 +566,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     View All
                   </Link>
                 </div>
-                {storePosts.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   {storePosts.map(post => {
                     const heroImage = post.media?.find(m => m.mediaType === 'image');
@@ -586,27 +585,22 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                             <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
                               post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                             }`}>
-                              {post.contentTier === 'raw' ? '\uD83D\uDD25 Raw' : '\u2728 Clean'}
+                              {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
                             </span>
                             <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
                           <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
                           {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
-                          <p className="text-[10px] text-stone-400 mt-1">By {post.authorName || 'Anonymous'}</p>
+                          <p className="text-[10px] text-stone-400 mt-1">
+                            {post.authorHandle ? (
+                              <span>@{post.authorHandle}</span>
+                            ) : (post.authorName || 'Anonymous')}
+                          </p>
                         </div>
                       </Link>
                     );
                   })}
                 </div>
-                ) : (
-                  <div className="text-center py-16 bg-white rounded-[32px] border border-stone-200">
-                    <div className="text-4xl mb-4">&#x1F4DD;</div>
-                    <p className="text-stone-400 font-bold">No creator posts for this store yet</p>
-                    <Link to="/posts/create" className="inline-block mt-4 bg-emerald-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-emerald-400 transition">
-                      Create a Post
-                    </Link>
-                  </div>
-                )}
               </div>
               )}
             </section>

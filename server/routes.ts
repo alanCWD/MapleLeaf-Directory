@@ -34,6 +34,9 @@ import {
   setUserRole,
   getAllUsers,
   deleteUser,
+  updateUserProfile,
+  getUserByHandle,
+  getUserPublicProfile,
 } from './userDb.ts';
 import {
   initUpload,
@@ -602,6 +605,95 @@ router.get('/user/claims', isAuthenticated as RequestHandler, async (req: any, r
   } catch (error) {
     console.error('Error fetching claims:', error);
     res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+router.get('/user/profile/me', isAuthenticated as RequestHandler, async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const user = await authStorage.getUser(userId);
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ handle: user.handle, avatarUrl: user.avatarUrl });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.single('avatar'), async (req: any, res) => {
+  try {
+    const userId = getUserId(req)!;
+    const { handle } = req.body;
+
+    const updateData: { handle?: string | null; customProfileImageUrl?: string | null } = {};
+
+    if (handle !== undefined) {
+      const cleaned = (handle || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (handle.trim() && cleaned.length < 2) {
+        res.status(400).json({ error: 'Handle must be at least 2 characters (letters, numbers, underscores only)' });
+        return;
+      }
+      if (cleaned.length > 30) {
+        res.status(400).json({ error: 'Handle must be 30 characters or fewer' });
+        return;
+      }
+      if (cleaned) {
+        const existing = await getUserByHandle(cleaned);
+        if (existing && existing.id !== userId) {
+          res.status(409).json({ error: 'That handle is already taken' });
+          return;
+        }
+      }
+      updateData.handle = cleaned || null;
+    }
+
+    if (req.file) {
+      let buffer = req.file.buffer;
+      if (isHeicBuffer(buffer, req.file.mimetype)) {
+        buffer = await convertHeicToJpegBuffer(buffer);
+      }
+      const processed = await sharp(buffer).resize(400, 400, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer();
+      const filename = `avatar-${userId}-${Date.now()}.jpg`;
+      let url: string;
+      if (isBunnyStorageConfigured()) {
+        url = await uploadImageToStorage(processed, filename, 'avatars');
+      } else {
+        url = await uploadImageLocal(processed, filename, 'avatars');
+      }
+      updateData.customProfileImageUrl = url;
+    }
+
+    const result = await updateUserProfile(userId, updateData);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error updating user profile:', error);
+    if (error?.code === '23505') {
+      res.status(409).json({ error: 'That handle is already taken' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+router.get('/user/profile/:handle', async (req: any, res) => {
+  try {
+    const { handle } = req.params;
+    const userInfo = await getUserByHandle(handle);
+    if (!userInfo) {
+      res.status(404).json({ error: 'Profile not found' });
+      return;
+    }
+    const content = await getUserPublicProfile(userInfo.id);
+    res.json({
+      handle: userInfo.handle,
+      avatarUrl: userInfo.avatarUrl,
+      firstName: userInfo.firstName,
+      posts: content.posts,
+      reviews: content.reviews,
+    });
+  } catch (error) {
+    console.error('Error fetching public profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
 

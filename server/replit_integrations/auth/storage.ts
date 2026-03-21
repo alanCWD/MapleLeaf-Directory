@@ -6,6 +6,8 @@ export interface User {
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
   role: string;
   isCreator: boolean;
   createdAt: Date | null;
@@ -25,6 +27,10 @@ export interface IAuthStorage {
   upsertUser(user: UpsertUser): Promise<User>;
 }
 
+function resolveAvatarUrl(row: any): string | null {
+  return row.custom_profile_image_url || row.profile_image_url || null;
+}
+
 class AuthStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -36,6 +42,8 @@ class AuthStorage implements IAuthStorage {
       firstName: row.first_name,
       lastName: row.last_name,
       profileImageUrl: row.profile_image_url,
+      handle: row.handle || null,
+      avatarUrl: resolveAvatarUrl(row),
       role: row.role || 'user',
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
@@ -69,6 +77,8 @@ class AuthStorage implements IAuthStorage {
       firstName: row.first_name,
       lastName: row.last_name,
       profileImageUrl: row.profile_image_url,
+      handle: row.handle || null,
+      avatarUrl: resolveAvatarUrl(row),
       role: row.role || 'user',
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,

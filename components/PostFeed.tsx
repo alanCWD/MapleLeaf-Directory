@@ -109,12 +109,22 @@ export const PostFeed: React.FC<PostFeedProps> = ({ storeId: propStoreId, storeN
               <img src={post.authorImageUrl} alt="" className={`w-6 h-6 rounded-full object-cover ${isRawLocked ? 'blur-sm' : ''}`} />
             ) : (
               <div className={`w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black ${isRawLocked ? 'blur-sm' : ''}`}>
-                {(post.authorName?.[0] || 'A').toUpperCase()}
+                {(post.authorHandle?.[0] || post.authorName?.[0] || 'A').toUpperCase()}
               </div>
             )}
-            <span className={`text-xs font-bold text-stone-600 truncate ${isRawLocked ? 'blur-sm' : ''}`}>
-              {post.authorName || 'Anonymous'}
-            </span>
+            {post.authorHandle ? (
+              <Link
+                to={`/profile/${post.authorHandle}`}
+                className={`text-xs font-bold text-emerald-600 hover:text-emerald-500 truncate transition-colors ${isRawLocked ? 'blur-sm pointer-events-none' : ''}`}
+                onClick={e => e.stopPropagation()}
+              >
+                @{post.authorHandle}
+              </Link>
+            ) : (
+              <span className={`text-xs font-bold text-stone-600 truncate ${isRawLocked ? 'blur-sm' : ''}`}>
+                {post.authorName || 'Anonymous'}
+              </span>
+            )}
             <span className="text-xs text-stone-300 ml-auto">{formatDate(post.createdAt)}</span>
           </div>
         </div>

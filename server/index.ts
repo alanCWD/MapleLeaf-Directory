@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns } from './db.ts';
 import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 
 const app = express();
@@ -27,6 +27,7 @@ async function startServer() {
   await initIntegrityEngine();
   await initAuditLogTable();
   await ensureHeaderImageColumn();
+  await ensureUserProfileColumns();
 
   app.use('/api', router);
 
