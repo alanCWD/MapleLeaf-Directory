@@ -3,8 +3,9 @@ import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, Media
 const API_BASE = '/api';
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const isFormData = options?.body instanceof FormData;
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    ...(isFormData ? {} : { headers: { 'Content-Type': 'application/json' } }),
     credentials: 'include',
     ...options,
   });

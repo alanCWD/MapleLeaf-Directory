@@ -277,7 +277,7 @@ export async function getUserPublicProfile(userId: string): Promise<{
     reviews: reviewsResult.rows.map(r => ({
       id: r.id,
       rating: r.rating,
-      contentText: r.content_text || null,
+      reviewText: r.content_text || null,
       createdAt: r.created_at?.toISOString() || new Date().toISOString(),
       storeId: r.store_id || null,
       storeName: r.store_name || null,

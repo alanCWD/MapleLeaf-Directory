@@ -44,6 +44,8 @@ function reviewSnakeToCamel(row: Record<string, any>): WeightedReview {
     thumbnailUrl: disapproved ? null : (row.thumbnail_url || null),
     contentRating: row.content_rating || 'clean',
     moderationStatus: row.moderation_status || 'approved',
+    reviewerHandle: row.reviewer_handle || null,
+    reviewerAvatarUrl: row.reviewer_avatar_url || null,
   };
 }
 
@@ -317,7 +319,13 @@ export async function createReview(data: {
 
 export async function getReviewsByStore(storeId: string): Promise<WeightedReview[]> {
   const result = await pool.query(
-    `SELECT * FROM integrity_reviews WHERE store_id = $1 ORDER BY created_at DESC`,
+    `SELECT ir.*,
+            u.handle as reviewer_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as reviewer_avatar_url
+     FROM integrity_reviews ir
+     LEFT JOIN users u ON ir.user_id = u.id
+     WHERE ir.store_id = $1
+     ORDER BY ir.created_at DESC`,
     [storeId]
   );
   return result.rows.map(reviewSnakeToCamel);
@@ -407,9 +415,12 @@ export async function getUsersWithBadge(badgeType: string): Promise<UserBadge[]>
 
 export async function getReviewsWithBadges(storeId: string): Promise<(WeightedReview & { reviewerBadges: UserBadge[] })[]> {
   const reviews = await pool.query(
-    `SELECT ir.*, sm.embed_url, sm.thumbnail_url, sm.moderation_status, sm.content_rating
+    `SELECT ir.*, sm.embed_url, sm.thumbnail_url, sm.moderation_status, sm.content_rating,
+            u.handle as reviewer_handle,
+            COALESCE(u.custom_profile_image_url, u.profile_image_url) as reviewer_avatar_url
      FROM integrity_reviews ir
      LEFT JOIN store_media sm ON sm.id = ir.video_asset_id
+     LEFT JOIN users u ON ir.user_id = u.id
      WHERE ir.store_id = $1
      ORDER BY ir.created_at DESC`,
     [storeId]

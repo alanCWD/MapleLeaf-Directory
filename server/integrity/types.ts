@@ -60,6 +60,8 @@ export interface WeightedReview {
   thumbnailUrl?: string | null;
   contentRating?: string | null;
   moderationStatus?: string | null;
+  reviewerHandle?: string | null;
+  reviewerAvatarUrl?: string | null;
 }
 
 export interface RecorderQuestion {

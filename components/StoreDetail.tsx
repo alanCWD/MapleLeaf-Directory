@@ -773,9 +773,21 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                         />
                       ) : (
                         <div className="relative w-full bg-gradient-to-br from-stone-800 to-stone-900 flex flex-col items-center justify-center p-4" style={{ aspectRatio: '9/16' }}>
-                          <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-3 flex-shrink-0">
-                            <span className="text-emerald-300 font-black text-base">{wr.userId?.charAt(0)?.toUpperCase() || 'U'}</span>
-                          </div>
+                          {wr.reviewerHandle ? (
+                            <Link to={`/profile/${wr.reviewerHandle}`} className="mb-3 flex-shrink-0">
+                              {wr.reviewerAvatarUrl ? (
+                                <img src={wr.reviewerAvatarUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-emerald-400/60 hover:border-emerald-400 transition-colors" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center hover:bg-emerald-500/30 transition-colors">
+                                  <span className="text-emerald-300 font-black text-base">{wr.reviewerHandle[0].toUpperCase()}</span>
+                                </div>
+                              )}
+                            </Link>
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-3 flex-shrink-0">
+                              <span className="text-emerald-300 font-black text-base">{wr.userId?.charAt(0)?.toUpperCase() || 'U'}</span>
+                            </div>
+                          )}
                           <div className="flex gap-0.5 text-amber-400 text-sm mb-3">
                             {[...Array(5)].map((_, i) => (
                               <span key={i}>{i < wr.rating ? '★' : '☆'}</span>
@@ -810,6 +822,14 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                             "{wr.contentText}"
                           </p>
                         )}
+                        {wr.reviewerHandle ? (
+                          <Link
+                            to={`/profile/${wr.reviewerHandle}`}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-500 font-bold truncate transition-colors"
+                          >
+                            @{wr.reviewerHandle}
+                          </Link>
+                        ) : null}
                         <span className="text-[10px] text-stone-400 mt-auto pt-0.5">
                           {new Date(wr.createdAt).toLocaleDateString()}
                         </span>
