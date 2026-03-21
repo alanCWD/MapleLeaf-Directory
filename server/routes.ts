@@ -706,7 +706,10 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
         return;
       }
 
-      if (platform && linkUrl) {
+      if (!platform && linkUrl) {
+        res.status(400).json({ error: 'A platform must be selected when providing a social link URL' });
+        return;
+      } else if (platform && linkUrl) {
         const config = SOCIAL_PLATFORMS[platform];
         if (config.pattern && !config.pattern.test(linkUrl)) {
           res.status(400).json({ error: `Invalid ${platform} URL format` });
