@@ -174,7 +174,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
      FROM users u
      LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM user_favorites GROUP BY user_id) fav ON fav.user_id = u.id
      LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM store_claims GROUP BY user_id) cl ON cl.user_id = u.id
-     LEFT JOIN (SELECT author_id, COUNT(*) as cnt FROM creator_posts GROUP BY author_id) p ON p.author_id = u.id
+     LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM creator_posts GROUP BY user_id) p ON p.user_id = u.id
      LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM integrity_reviews GROUP BY user_id) r ON r.user_id = u.id
      ORDER BY u.created_at DESC`
   );
