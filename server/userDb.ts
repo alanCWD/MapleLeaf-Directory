@@ -270,6 +270,25 @@ export async function updateUserProfile(userId: string, data: {
   };
 }
 
+export async function getUserSocialProfile(userId: string): Promise<{
+  socialLinkPlatform: string | null;
+  socialLinkUrl: string | null;
+  socialLinkPublic: boolean;
+  socialLinkVerified: boolean;
+}> {
+  const r = await pool.query(
+    'SELECT social_link_platform, social_link_url, social_link_public, social_link_verified FROM users WHERE id = $1',
+    [userId]
+  );
+  const row = r.rows[0] || {};
+  return {
+    socialLinkPlatform: row.social_link_platform || null,
+    socialLinkUrl: row.social_link_url || null,
+    socialLinkPublic: row.social_link_public ?? false,
+    socialLinkVerified: row.social_link_verified ?? false,
+  };
+}
+
 export async function getUserByHandle(handle: string): Promise<{
   id: string;
   handle: string;

@@ -37,6 +37,7 @@ import {
   updateUserProfile,
   getUserByHandle,
   getUserPublicProfile,
+  getUserSocialProfile,
 } from './userDb.ts';
 import {
   initUpload,
@@ -736,7 +737,7 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
       updateData.socialLinkPublic = socialLinkPublic === true || socialLinkPublic === 'true';
     }
 
-    const existingProfile = await updateUserProfile(userId, {});
+    const existingProfile = await getUserSocialProfile(userId);
     const willHavePlatform = 'socialLinkPlatform' in updateData ? updateData.socialLinkPlatform : existingProfile.socialLinkPlatform;
     const willHaveUrl = 'socialLinkUrl' in updateData ? updateData.socialLinkUrl : existingProfile.socialLinkUrl;
     if (!willHavePlatform || !willHaveUrl) {
