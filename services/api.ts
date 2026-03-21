@@ -257,6 +257,8 @@ export interface WeightedReview {
   thumbnailUrl?: string | null;
   contentRating?: string | null;
   moderationStatus?: string | null;
+  reviewerHandle?: string | null;
+  reviewerAvatarUrl?: string | null;
 }
 
 export async function initMediaUpload(
@@ -650,7 +652,7 @@ export async function fetchUserProfile(handle: string): Promise<PublicUserProfil
   return apiFetch<PublicUserProfile>(`/user/profile/${handle}`);
 }
 
-export async function updateUserProfile(data: { handle?: string; avatarFile?: File }): Promise<{ handle: string | null; customProfileImageUrl: string | null }> {
+export async function updateUserProfile(data: { handle?: string; avatarFile?: File }): Promise<{ handle: string | null; avatarUrl: string | null }> {
   const form = new FormData();
   if (data.handle !== undefined) form.append('handle', data.handle);
   if (data.avatarFile) form.append('avatar', data.avatarFile);

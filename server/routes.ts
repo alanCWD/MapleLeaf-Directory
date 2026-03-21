@@ -608,7 +608,7 @@ router.get('/user/claims', isAuthenticated as RequestHandler, async (req: any, r
   }
 });
 
-router.get('/user/profile/me', isAuthenticated as RequestHandler, async (req: any, res) => {
+router.get('/user/profile/self', isAuthenticated as RequestHandler, async (req: any, res) => {
   try {
     const userId = getUserId(req)!;
     const user = await authStorage.getUser(userId);
@@ -619,6 +619,8 @@ router.get('/user/profile/me', isAuthenticated as RequestHandler, async (req: an
     res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
+
+const RESERVED_HANDLES = new Set(['me', 'self', 'admin', 'api', 'auth', 'profile', 'settings', 'store', 'posts', 'submit', 'owners', 'badges', 'anonymous']);
 
 router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.single('avatar'), async (req: any, res) => {
   try {
@@ -635,6 +637,10 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
       }
       if (cleaned.length > 30) {
         res.status(400).json({ error: 'Handle must be 30 characters or fewer' });
+        return;
+      }
+      if (RESERVED_HANDLES.has(cleaned)) {
+        res.status(400).json({ error: 'That handle is reserved and cannot be used' });
         return;
       }
       if (cleaned) {
