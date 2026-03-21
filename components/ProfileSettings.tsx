@@ -54,8 +54,12 @@ export const ProfileSettings: React.FC = () => {
     setError('');
     setSuccess('');
 
-    if (socialPlatform && !socialUrl.trim()) {
-      setError('Please enter your social link or remove the platform selection.');
+    if (!socialPlatform) {
+      setError('A social media link is required. Please select a platform and enter your link.');
+      return;
+    }
+    if (!socialUrl.trim()) {
+      setError('Please enter your social media link or username.');
       return;
     }
 
@@ -170,8 +174,9 @@ export const ProfileSettings: React.FC = () => {
 
         <div className="space-y-3">
           <label className="block text-sm font-black text-stone-700">
-            Social Media Link <span className="font-normal text-stone-400">(optional)</span>
+            Social Media Link <span className="font-medium text-red-400 text-xs">*</span>
           </label>
+          <p className="text-xs text-stone-400">Select a platform and enter your link to complete your profile.</p>
 
           <div className="grid grid-cols-5 gap-2">
             {Object.entries(PLATFORM_CONFIG).map(([key, cfg]) => (

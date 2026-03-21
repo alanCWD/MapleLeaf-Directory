@@ -343,7 +343,7 @@ export const AdminUsers: React.FC = () => {
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-500">
                                   <span>💬</span>
-                                  <span>{u.socialLinkUrl}</span>
+                                  <span>@{u.socialLinkUrl} on Discord</span>
                                   {!u.socialLinkPublic && <span className="text-stone-300 ml-0.5">(private)</span>}
                                 </span>
                               )}

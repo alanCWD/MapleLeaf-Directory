@@ -732,6 +732,14 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
       updateData.socialLinkPublic = socialLinkPublic === true || socialLinkPublic === 'true';
     }
 
+    const existingProfile = await updateUserProfile(userId, {});
+    const willHavePlatform = 'socialLinkPlatform' in updateData ? updateData.socialLinkPlatform : existingProfile.socialLinkPlatform;
+    const willHaveUrl = 'socialLinkUrl' in updateData ? updateData.socialLinkUrl : existingProfile.socialLinkUrl;
+    if (!willHavePlatform || !willHaveUrl) {
+      res.status(400).json({ error: 'A social media link is required to save your profile. Please select a platform and enter your link.' });
+      return;
+    }
+
     const result = await updateUserProfile(userId, updateData);
     res.json(result);
   } catch (error: any) {
