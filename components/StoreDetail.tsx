@@ -554,18 +554,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
               {storePosts.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-black text-stone-500 uppercase tracking-widest flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-violet-400 rounded-full"></span>
-                    Written Posts
-                  </h3>
-                  <Link
-                    to={`/posts?storeId=${store?.id}`}
-                    className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
-                  >
-                    View All
-                  </Link>
-                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {storePosts.map(post => {
                     const heroImage = post.media?.find(m => m.mediaType === 'image');

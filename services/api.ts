@@ -635,7 +635,6 @@ export async function moderateVideoReview(
 export interface PublicUserProfile {
   handle: string | null;
   avatarUrl: string | null;
-  firstName: string | null;
   posts: import('../types').CreatorPost[];
   reviews: Array<{
     id: number;

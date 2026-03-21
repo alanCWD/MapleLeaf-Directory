@@ -687,7 +687,6 @@ router.get('/user/profile/:handle', async (req: any, res) => {
     res.json({
       handle: userInfo.handle,
       avatarUrl: userInfo.avatarUrl,
-      firstName: userInfo.firstName,
       posts: content.posts,
       reviews: content.reviews,
     });

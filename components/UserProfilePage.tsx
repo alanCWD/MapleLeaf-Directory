@@ -43,7 +43,7 @@ export const UserProfilePage: React.FC = () => {
     );
   }
 
-  const initials = (profile.handle?.[0] || profile.firstName?.[0] || 'U').toUpperCase();
+  const initials = (profile.handle?.[0] || 'U').toUpperCase();
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
@@ -69,7 +69,7 @@ export const UserProfilePage: React.FC = () => {
             {profile.handle ? (
               <h1 className="text-2xl font-black text-stone-900">@{profile.handle}</h1>
             ) : (
-              <h1 className="text-2xl font-black text-stone-900">{profile.firstName || 'Community Member'}</h1>
+              <h1 className="text-2xl font-black text-stone-900">Community Member</h1>
             )}
             <p className="text-sm text-stone-400 font-medium mt-1">
               {profile.posts.length} post{profile.posts.length !== 1 ? 's' : ''} · {profile.reviews.length} review{profile.reviews.length !== 1 ? 's' : ''}
