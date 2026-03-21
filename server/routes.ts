@@ -627,18 +627,19 @@ const SOCIAL_PLATFORMS: Record<string, { pattern: RegExp | null; isUrl: boolean 
   facebook:  { pattern: /^https?:\/\/(www\.)?facebook\.com\/[a-zA-Z0-9.]{1,100}\/?$/, isUrl: true },
   x:         { pattern: /^https?:\/\/(www\.)?(x|twitter)\.com\/[a-zA-Z0-9_]{1,15}\/?$/, isUrl: true },
   reddit:    { pattern: /^https?:\/\/(www\.)?reddit\.com\/(user|u)\/[a-zA-Z0-9_-]{3,20}\/?$/, isUrl: true },
-  discord:   { pattern: /^.{2,32}$/, isUrl: false },
+  discord:   { pattern: /^[a-zA-Z0-9_.]{2,32}$/, isUrl: false },
 };
 
 async function checkUrlHead(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' });
-    clearTimeout(timeout);
     return response.ok || response.status === 405 || response.status === 403;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
