@@ -554,11 +554,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
               {storePosts.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
-                    <span className="w-2 h-8 bg-violet-500 rounded-full"></span>
-                    Posts About This Store
-                  </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-black text-stone-500 uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-violet-400 rounded-full"></span>
+                    Written Posts
+                  </h3>
                   <Link
                     to={`/posts?storeId=${store?.id}`}
                     className="text-xs font-bold text-emerald-600 hover:text-emerald-500 uppercase tracking-widest"
@@ -566,7 +566,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     View All
                   </Link>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2">
                   {storePosts.map(post => {
                     const heroImage = post.media?.find(m => m.mediaType === 'image');
                     return (
@@ -576,11 +576,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                         className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
                       >
                         {heroImage && (
-                          <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-stone-100">
+                          <div className="w-20 h-20 flex-shrink-0 overflow-hidden bg-stone-100">
                             <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
                           </div>
                         )}
-                        <div className="p-4 flex-grow min-w-0">
+                        <div className="p-3 flex-grow min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
                               post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
@@ -591,10 +591,18 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                           </div>
                           <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
                           {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
-                          <p className="text-[10px] text-stone-400 mt-1">
+                          <p className="text-[10px] mt-1">
                             {post.authorHandle ? (
-                              <span>@{post.authorHandle}</span>
-                            ) : (post.authorName || 'Anonymous')}
+                              <Link
+                                to={`/profile/${post.authorHandle}`}
+                                className="text-emerald-600 hover:text-emerald-500 font-bold transition-colors"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                @{post.authorHandle}
+                              </Link>
+                            ) : (
+                              <span className="text-stone-400">{post.authorName || 'Anonymous'}</span>
+                            )}
                           </p>
                         </div>
                       </Link>
