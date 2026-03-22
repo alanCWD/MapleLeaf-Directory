@@ -125,7 +125,11 @@ export const AuthPage: React.FC = () => {
         return;
       }
 
-      window.location.href = '/';
+      if (mode === 'register') {
+        window.location.href = '/#/settings/profile?setup=true';
+      } else {
+        window.location.href = '/';
+      }
     } catch {
       setError('Network error. Please try again.');
     } finally {

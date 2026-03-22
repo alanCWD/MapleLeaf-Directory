@@ -22,13 +22,22 @@ export const Navbar: React.FC = () => {
   }, [showUserMenu]);
 
   const avatarSrc = user?.avatarUrl || user?.profileImageUrl;
-  const avatar = avatarSrc ? (
+  const profileIncomplete = isAuthenticated && user && !user.socialLinkPlatform;
+
+  const avatarEl = avatarSrc ? (
     <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />
   ) : (
     <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-black text-sm">
       {(user?.handle?.[0] || user?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
     </div>
   );
+
+  const avatar = profileIncomplete ? (
+    <div className="relative">
+      {avatarEl}
+      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-400 border-2 border-white rounded-full" title="Complete your profile" />
+    </div>
+  ) : avatarEl;
 
   return (
     <nav className="sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-8 pt-4">
@@ -144,6 +153,14 @@ export const Navbar: React.FC = () => {
               </div>
             )}
           </div>
+          {profileIncomplete && (
+            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+              <a href="#/settings/profile" onClick={() => setShowUserMenu(false)} className="text-xs font-bold text-amber-700 hover:underline">
+                Add a social link to complete your profile
+              </a>
+            </div>
+          )}
           <div className="p-2">
             {(user.role === 'owner' || user.role === 'admin') && (
               <a href="#/owners" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">

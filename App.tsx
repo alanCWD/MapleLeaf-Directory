@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -55,6 +55,14 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const [favsSynced, setFavsSynced] = useState(false);
+  const [socialBannerDismissed, setSocialBannerDismissed] = useState(() =>
+    sessionStorage.getItem('ll_social_banner_dismissed') === '1'
+  );
+
+  const dismissSocialBanner = useCallback(() => {
+    sessionStorage.setItem('ll_social_banner_dismissed', '1');
+    setSocialBannerDismissed(true);
+  }, []);
 
   const loadStores = async () => {
     try {
@@ -208,6 +216,35 @@ const App: React.FC = () => {
               <>
                 <Hero onSearchResults={handleSearchResults} userLocation={userLocation} />
                 <div className="max-w-7xl mx-auto px-4 py-12" id="listings-container">
+                  {isAuthenticated && user && !user.socialLinkPlatform && !socialBannerDismissed && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl flex-shrink-0">🔗</span>
+                        <div className="min-w-0">
+                          <p className="text-amber-900 font-bold text-sm">Complete your profile — add a social link</p>
+                          <p className="text-amber-700 text-xs mt-0.5">A social media link is required on your profile. It takes 30 seconds.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <a
+                          href="#/settings/profile"
+                          className="bg-amber-500 hover:bg-amber-400 text-white text-xs font-black px-4 py-2 rounded-xl transition-all shadow-sm whitespace-nowrap"
+                        >
+                          Add Now
+                        </a>
+                        <button
+                          onClick={dismissSocialBanner}
+                          className="text-amber-500 hover:text-amber-700 p-1 rounded-lg transition-colors"
+                          aria-label="Dismiss"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {userProfile?.email && (
                     <div className="mb-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between animate-fade-in">
                       <div className="flex items-center gap-3">

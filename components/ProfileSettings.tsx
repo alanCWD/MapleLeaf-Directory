@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { updateUserProfile } from '../services/api';
 
@@ -12,6 +13,8 @@ const PLATFORM_CONFIG: Record<string, { label: string; placeholder: string; isUr
 
 export const ProfileSettings: React.FC = () => {
   const { user, isAuthenticated, isLoading, refetch } = useAuth();
+  const location = useLocation();
+  const isSetupMode = new URLSearchParams(location.search).get('setup') === 'true';
   const [handle, setHandle] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -116,6 +119,14 @@ export const ProfileSettings: React.FC = () => {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12">
+      {isSetupMode && !user?.socialLinkPlatform && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+          <p className="font-black text-amber-900 text-sm mb-1">Welcome! One last step 🎉</p>
+          <p className="text-amber-800 text-xs leading-relaxed">
+            To participate in the LegacyLeaf community, please add a social media link below. This helps verify you're a real person and lets other members know who you are.
+          </p>
+        </div>
+      )}
       <h1 className="text-3xl font-black text-stone-900 mb-2">Profile Settings</h1>
       <p className="text-stone-500 font-medium mb-8">Customize your public identity on LegacyLeaf.</p>
 
