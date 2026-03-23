@@ -549,56 +549,53 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     )}
                   </div>
                 </div>
-                <MediaGallery media={storeMedia} isLoading={isLoadingMedia} isAuthenticated={isAuthenticated} />
-              </div>
-
-              {storePosts.length > 0 && (
-              <div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {storePosts.map(post => {
-                    const heroImage = post.media?.find(m => m.mediaType === 'image');
-                    return (
-                      <Link
-                        key={post.id}
-                        to={`/posts/${post.id}`}
-                        className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
-                      >
-                        {heroImage && (
-                          <div className="w-20 h-20 flex-shrink-0 overflow-hidden bg-stone-100">
-                            <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
+                {storePosts.length > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2 mb-6">
+                    {storePosts.map(post => {
+                      const heroImage = post.media?.find(m => m.mediaType === 'image');
+                      return (
+                        <Link
+                          key={post.id}
+                          to={`/posts/${post.id}`}
+                          className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
+                        >
+                          {heroImage && (
+                            <div className="w-20 h-20 flex-shrink-0 overflow-hidden bg-stone-100">
+                              <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div className="p-3 flex-grow min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                                post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
+                              </span>
+                              <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
+                            {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
+                            <p className="text-[10px] mt-1">
+                              {post.authorHandle ? (
+                                <Link
+                                  to={`/profile/${post.authorHandle}`}
+                                  className="text-emerald-600 hover:text-emerald-500 font-bold transition-colors"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  @{post.authorHandle}
+                                </Link>
+                              ) : (
+                                <span className="text-stone-400">{post.authorName || 'Anonymous'}</span>
+                              )}
+                            </p>
                           </div>
-                        )}
-                        <div className="p-3 flex-grow min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
-                              post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
-                            </span>
-                            <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
-                          {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
-                          <p className="text-[10px] mt-1">
-                            {post.authorHandle ? (
-                              <Link
-                                to={`/profile/${post.authorHandle}`}
-                                className="text-emerald-600 hover:text-emerald-500 font-bold transition-colors"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                @{post.authorHandle}
-                              </Link>
-                            ) : (
-                              <span className="text-stone-400">{post.authorName || 'Anonymous'}</span>
-                            )}
-                          </p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+                <MediaGallery media={storeMedia} isLoading={isLoadingMedia} isAuthenticated={isAuthenticated} hideEmptyState={storePosts.length > 0} />
               </div>
-              )}
             </section>
           )}
 

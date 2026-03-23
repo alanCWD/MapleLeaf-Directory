@@ -5,9 +5,10 @@ interface MediaGalleryProps {
   media: StoreMedia[];
   isLoading?: boolean;
   isAuthenticated?: boolean;
+  hideEmptyState?: boolean;
 }
 
-export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = false, isAuthenticated = false }) => {
+export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = false, isAuthenticated = false, hideEmptyState = false }) => {
   const [selectedMedia, setSelectedMedia] = useState<StoreMedia | null>(null);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -73,6 +74,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({ media, isLoading = f
   }
 
   if (media.length === 0) {
+    if (hideEmptyState) return null;
     return (
       <div className="text-center py-12 bg-white rounded-3xl border border-stone-200 border-dashed">
         <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-4">
