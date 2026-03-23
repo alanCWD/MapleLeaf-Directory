@@ -550,44 +550,67 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   </div>
                 </div>
                 {storePosts.length > 0 && (
-                  <div className="grid gap-3 md:grid-cols-2 mb-6">
+                  <div className="grid gap-4 md:grid-cols-2 mb-6">
                     {storePosts.map(post => {
                       const heroImage = post.media?.find(m => m.mediaType === 'image');
+                      const heroVideo = post.media?.find(m => m.mediaType === 'video');
+                      const videoThumb = heroVideo?.thumbnailUrl;
                       return (
                         <Link
                           key={post.id}
                           to={`/posts/${post.id}`}
-                          className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex"
+                          className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
                         >
-                          {heroImage && (
-                            <div className="w-20 h-20 flex-shrink-0 overflow-hidden bg-stone-100">
-                              <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover" />
+                          {heroImage ? (
+                            <div className="aspect-[16/10] overflow-hidden bg-stone-100">
+                              <img src={heroImage.cdnUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            </div>
+                          ) : videoThumb ? (
+                            <div className="aspect-[16/10] overflow-hidden bg-stone-900 relative">
+                              <img src={videoThumb} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-colors">
+                                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                                  <span className="text-stone-900 text-lg ml-1">▶</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="aspect-[16/10] bg-gradient-to-br from-emerald-50 to-stone-50 flex items-center justify-center">
+                              <span className="text-5xl opacity-30">📝</span>
                             </div>
                           )}
-                          <div className="p-3 flex-grow min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                          <div className="p-4 flex-grow flex flex-col">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
                                 post.contentTier === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                               }`}>
                                 {post.contentTier === 'raw' ? '🔥 Raw' : '✨ Clean'}
                               </span>
-                              <span className="text-[10px] text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
                             </div>
-                            <h4 className="font-bold text-stone-900 text-sm truncate group-hover:text-emerald-600 transition-colors">{post.title}</h4>
-                            {post.subtitle && <p className="text-xs text-stone-500 truncate mt-0.5">{post.subtitle}</p>}
-                            <p className="text-[10px] mt-1">
+                            <h4 className="font-black text-stone-900 text-base leading-tight mb-1 group-hover:text-emerald-600 transition-colors">{post.title}</h4>
+                            {post.subtitle && <p className="text-stone-500 text-sm font-medium mb-1">{post.subtitle}</p>}
+                            {post.bodyText && <p className="text-stone-400 text-sm line-clamp-2 mb-2">{post.bodyText}</p>}
+                            <div className="flex items-center gap-2 mt-auto pt-3 border-t border-stone-100">
+                              {post.authorImageUrl ? (
+                                <img src={post.authorImageUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                                  {(post.authorHandle?.[0] || post.authorName?.[0] || 'A').toUpperCase()}
+                                </div>
+                              )}
                               {post.authorHandle ? (
                                 <Link
                                   to={`/profile/${post.authorHandle}`}
-                                  className="text-emerald-600 hover:text-emerald-500 font-bold transition-colors"
+                                  className="text-xs font-bold text-emerald-600 hover:text-emerald-500 truncate transition-colors"
                                   onClick={e => e.stopPropagation()}
                                 >
                                   @{post.authorHandle}
                                 </Link>
                               ) : (
-                                <span className="text-stone-400">{post.authorName || 'Anonymous'}</span>
+                                <span className="text-xs text-stone-400 truncate">{post.authorName || 'Anonymous'}</span>
                               )}
-                            </p>
+                              <span className="text-[10px] text-stone-400 ml-auto flex-shrink-0">{new Date(post.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                            </div>
                           </div>
                         </Link>
                       );
