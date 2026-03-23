@@ -374,6 +374,20 @@ export async function ensureUserProfileColumns(): Promise<void> {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_url TEXT`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_public BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_link_verified BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '[]'`);
+  await pool.query(`
+    UPDATE users
+    SET social_links = jsonb_build_array(
+      jsonb_build_object(
+        'platform', social_link_platform,
+        'url',      social_link_url,
+        'public',   COALESCE(social_link_public, false),
+        'verified', COALESCE(social_link_verified, false)
+      )
+    )
+    WHERE (social_links IS NULL OR social_links = '[]'::jsonb)
+      AND social_link_platform IS NOT NULL
+  `);
   console.log('[DB] user profile columns ensured');
 }
 

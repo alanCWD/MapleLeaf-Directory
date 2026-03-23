@@ -145,6 +145,13 @@ export async function setUserRole(userId: string, role: string): Promise<void> {
   await pool.query('UPDATE users SET role = $1, updated_at = now() WHERE id = $2', [role, userId]);
 }
 
+export interface SocialLink {
+  platform: string;
+  url: string;
+  public: boolean;
+  verified: boolean;
+}
+
 export interface AdminUser {
   id: string;
   email: string | null;
@@ -161,6 +168,7 @@ export interface AdminUser {
   avatarUrl: string | null;
   postsCount: number;
   reviewsCount: number;
+  socialLinks: SocialLink[];
   socialLinkPlatform: string | null;
   socialLinkUrl: string | null;
   socialLinkPublic: boolean;
@@ -205,11 +213,8 @@ export async function deleteUser(userId: string): Promise<void> {
 export async function updateUserProfile(userId: string, data: {
   handle?: string | null;
   customProfileImageUrl?: string | null;
-  socialLinkPlatform?: string | null;
-  socialLinkUrl?: string | null;
-  socialLinkPublic?: boolean;
-  socialLinkVerified?: boolean;
-}): Promise<{ handle: string | null; avatarUrl: string | null; socialLinkPlatform: string | null; socialLinkUrl: string | null; socialLinkPublic: boolean; socialLinkVerified: boolean }> {
+  socialLinks?: SocialLink[];
+}): Promise<{ handle: string | null; avatarUrl: string | null; socialLinks: SocialLink[] }> {
   const fields: string[] = [];
   const values: any[] = [];
   let idx = 1;
@@ -222,70 +227,55 @@ export async function updateUserProfile(userId: string, data: {
     fields.push(`custom_profile_image_url = $${idx++}`);
     values.push(data.customProfileImageUrl || null);
   }
-  if ('socialLinkPlatform' in data) {
+  if ('socialLinks' in data && data.socialLinks !== undefined) {
+    const links = data.socialLinks;
+    fields.push(`social_links = $${idx++}`);
+    values.push(JSON.stringify(links));
     fields.push(`social_link_platform = $${idx++}`);
-    values.push(data.socialLinkPlatform || null);
-  }
-  if ('socialLinkUrl' in data) {
+    values.push(links[0]?.platform || null);
     fields.push(`social_link_url = $${idx++}`);
-    values.push(data.socialLinkUrl || null);
-  }
-  if ('socialLinkPublic' in data) {
+    values.push(links[0]?.url || null);
     fields.push(`social_link_public = $${idx++}`);
-    values.push(data.socialLinkPublic ?? false);
-  }
-  if ('socialLinkVerified' in data) {
+    values.push(links[0]?.public ?? false);
     fields.push(`social_link_verified = $${idx++}`);
-    values.push(data.socialLinkVerified ?? false);
+    values.push(links[0]?.verified ?? false);
   }
   if (fields.length === 0) {
     const r = await pool.query(
-      'SELECT handle, custom_profile_image_url, profile_image_url, social_link_platform, social_link_url, social_link_public, social_link_verified FROM users WHERE id = $1',
+      'SELECT handle, custom_profile_image_url, profile_image_url, social_links FROM users WHERE id = $1',
       [userId]
     );
     const row = r.rows[0] || {};
     return {
       handle: row.handle || null,
       avatarUrl: row.custom_profile_image_url || row.profile_image_url || null,
-      socialLinkPlatform: row.social_link_platform || null,
-      socialLinkUrl: row.social_link_url || null,
-      socialLinkPublic: row.social_link_public ?? false,
-      socialLinkVerified: row.social_link_verified ?? false,
+      socialLinks: Array.isArray(row.social_links) ? row.social_links : [],
     };
   }
   fields.push('updated_at = now()');
   values.push(userId);
   const result = await pool.query(
-    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING handle, custom_profile_image_url, profile_image_url, social_link_platform, social_link_url, social_link_public, social_link_verified`,
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING handle, custom_profile_image_url, profile_image_url, social_links`,
     values
   );
   const row = result.rows[0] || {};
   return {
     handle: row.handle || null,
     avatarUrl: row.custom_profile_image_url || row.profile_image_url || null,
-    socialLinkPlatform: row.social_link_platform || null,
-    socialLinkUrl: row.social_link_url || null,
-    socialLinkPublic: row.social_link_public ?? false,
-    socialLinkVerified: row.social_link_verified ?? false,
+    socialLinks: Array.isArray(row.social_links) ? row.social_links : [],
   };
 }
 
 export async function getUserSocialProfile(userId: string): Promise<{
-  socialLinkPlatform: string | null;
-  socialLinkUrl: string | null;
-  socialLinkPublic: boolean;
-  socialLinkVerified: boolean;
+  socialLinks: SocialLink[];
 }> {
   const r = await pool.query(
-    'SELECT social_link_platform, social_link_url, social_link_public, social_link_verified FROM users WHERE id = $1',
+    'SELECT social_links FROM users WHERE id = $1',
     [userId]
   );
   const row = r.rows[0] || {};
   return {
-    socialLinkPlatform: row.social_link_platform || null,
-    socialLinkUrl: row.social_link_url || null,
-    socialLinkPublic: row.social_link_public ?? false,
-    socialLinkVerified: row.social_link_verified ?? false,
+    socialLinks: Array.isArray(row.social_links) ? row.social_links : [],
   };
 }
 
@@ -294,13 +284,10 @@ export async function getUserByHandle(handle: string): Promise<{
   handle: string;
   avatarUrl: string | null;
   firstName: string | null;
-  socialLinkPlatform: string | null;
-  socialLinkUrl: string | null;
-  socialLinkPublic: boolean;
-  socialLinkVerified: boolean;
+  socialLinks: SocialLink[];
 } | null> {
   const result = await pool.query(
-    'SELECT id, handle, custom_profile_image_url, profile_image_url, first_name, social_link_platform, social_link_url, social_link_public, social_link_verified FROM users WHERE LOWER(handle) = LOWER($1)',
+    'SELECT id, handle, custom_profile_image_url, profile_image_url, first_name, social_links FROM users WHERE LOWER(handle) = LOWER($1)',
     [handle]
   );
   if (result.rows.length === 0) return null;
@@ -310,10 +297,7 @@ export async function getUserByHandle(handle: string): Promise<{
     handle: row.handle,
     avatarUrl: row.custom_profile_image_url || row.profile_image_url || null,
     firstName: row.first_name || null,
-    socialLinkPlatform: row.social_link_platform || null,
-    socialLinkUrl: row.social_link_url || null,
-    socialLinkPublic: row.social_link_public ?? false,
-    socialLinkVerified: row.social_link_verified ?? false,
+    socialLinks: Array.isArray(row.social_links) ? row.social_links : [],
   };
 }
 
@@ -365,6 +349,7 @@ export async function getUserPublicProfile(userId: string): Promise<{
 }
 
 function formatUser(row: any): AdminUser {
+  const socialLinks: SocialLink[] = Array.isArray(row.social_links) ? row.social_links : [];
   return {
     id: row.id,
     email: row.email,
@@ -381,10 +366,11 @@ function formatUser(row: any): AdminUser {
     avatarUrl: row.avatar_url || null,
     postsCount: parseInt(row.posts_count) || 0,
     reviewsCount: parseInt(row.reviews_count) || 0,
-    socialLinkPlatform: row.social_link_platform || null,
-    socialLinkUrl: row.social_link_url || null,
-    socialLinkPublic: row.social_link_public ?? false,
-    socialLinkVerified: row.social_link_verified ?? false,
+    socialLinks,
+    socialLinkPlatform: socialLinks[0]?.platform || row.social_link_platform || null,
+    socialLinkUrl: socialLinks[0]?.url || row.social_link_url || null,
+    socialLinkPublic: socialLinks[0]?.public ?? row.social_link_public ?? false,
+    socialLinkVerified: socialLinks[0]?.verified ?? row.social_link_verified ?? false,
   };
 }
 

@@ -1,5 +1,12 @@
 import { pool } from "../../db.ts";
 
+export interface SocialLink {
+  platform: string;
+  url: string;
+  public: boolean;
+  verified: boolean;
+}
+
 export interface User {
   id: string;
   email: string | null;
@@ -12,6 +19,7 @@ export interface User {
   isCreator: boolean;
   createdAt: Date | null;
   updatedAt: Date | null;
+  socialLinks: SocialLink[];
   socialLinkPlatform: string | null;
   socialLinkUrl: string | null;
   socialLinkPublic: boolean;
@@ -40,6 +48,7 @@ class AuthStorage implements IAuthStorage {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     if (result.rows.length === 0) return undefined;
     const row = result.rows[0];
+    const socialLinks: SocialLink[] = Array.isArray(row.social_links) ? row.social_links : [];
     return {
       id: row.id,
       email: row.email,
@@ -52,10 +61,11 @@ class AuthStorage implements IAuthStorage {
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      socialLinkPlatform: row.social_link_platform || null,
-      socialLinkUrl: row.social_link_url || null,
-      socialLinkPublic: row.social_link_public ?? false,
-      socialLinkVerified: row.social_link_verified ?? false,
+      socialLinks,
+      socialLinkPlatform: socialLinks[0]?.platform || row.social_link_platform || null,
+      socialLinkUrl: socialLinks[0]?.url || row.social_link_url || null,
+      socialLinkPublic: socialLinks[0]?.public ?? row.social_link_public ?? false,
+      socialLinkVerified: socialLinks[0]?.verified ?? row.social_link_verified ?? false,
     };
   }
 
@@ -79,6 +89,7 @@ class AuthStorage implements IAuthStorage {
       ]
     );
     const row = result.rows[0];
+    const socialLinks2: SocialLink[] = Array.isArray(row.social_links) ? row.social_links : [];
     return {
       id: row.id,
       email: row.email,
@@ -91,10 +102,11 @@ class AuthStorage implements IAuthStorage {
       isCreator: row.is_creator ?? false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      socialLinkPlatform: row.social_link_platform || null,
-      socialLinkUrl: row.social_link_url || null,
-      socialLinkPublic: row.social_link_public ?? false,
-      socialLinkVerified: row.social_link_verified ?? false,
+      socialLinks: socialLinks2,
+      socialLinkPlatform: socialLinks2[0]?.platform || row.social_link_platform || null,
+      socialLinkUrl: socialLinks2[0]?.url || row.social_link_url || null,
+      socialLinkPublic: socialLinks2[0]?.public ?? row.social_link_public ?? false,
+      socialLinkVerified: socialLinks2[0]?.verified ?? row.social_link_verified ?? false,
     };
   }
 }

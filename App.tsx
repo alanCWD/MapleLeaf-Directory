@@ -216,7 +216,7 @@ const App: React.FC = () => {
               <>
                 <Hero onSearchResults={handleSearchResults} userLocation={userLocation} />
                 <div className="max-w-7xl mx-auto px-4 py-12" id="listings-container">
-                  {isAuthenticated && user && !user.socialLinkPlatform && !socialBannerDismissed && (
+                  {isAuthenticated && user && !user.socialLinks?.length && !socialBannerDismissed && (
                     <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-2xl flex-shrink-0">🔗</span>

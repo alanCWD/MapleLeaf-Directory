@@ -178,6 +178,13 @@ export async function reviewClaimAPI(claimId: number, action: 'approve' | 'rejec
   });
 }
 
+export interface SocialLink {
+  platform: string;
+  url: string;
+  public: boolean;
+  verified: boolean;
+}
+
 export interface AdminUser {
   id: string;
   email: string | null;
@@ -199,6 +206,7 @@ export interface AdminUser {
   socialLinkUrl: string | null;
   socialLinkPublic: boolean;
   socialLinkVerified: boolean;
+  socialLinks: SocialLink[];
 }
 
 export async function getAdminUsersAPI(): Promise<AdminUser[]> {
@@ -654,6 +662,7 @@ export interface PublicUserProfile {
     reviewText: string | null;
     createdAt: string;
   }>;
+  socialLinks: SocialLink[];
   socialLinkPlatform?: string | null;
   socialLinkUrl?: string | null;
   socialLinkVerified?: boolean;
@@ -666,22 +675,15 @@ export async function fetchUserProfile(handle: string): Promise<PublicUserProfil
 export async function updateUserProfile(data: {
   handle?: string;
   avatarFile?: File;
-  socialLinkPlatform?: string;
-  socialLinkUrl?: string;
-  socialLinkPublic?: boolean;
+  socialLinks?: SocialLink[];
 }): Promise<{
   handle: string | null;
   avatarUrl: string | null;
-  socialLinkPlatform: string | null;
-  socialLinkUrl: string | null;
-  socialLinkPublic: boolean;
-  socialLinkVerified: boolean;
+  socialLinks: SocialLink[];
 }> {
   const form = new FormData();
   if (data.handle !== undefined) form.append('handle', data.handle);
   if (data.avatarFile) form.append('avatar', data.avatarFile);
-  if (data.socialLinkPlatform !== undefined) form.append('socialLinkPlatform', data.socialLinkPlatform);
-  if (data.socialLinkUrl !== undefined) form.append('socialLinkUrl', data.socialLinkUrl);
-  if (data.socialLinkPublic !== undefined) form.append('socialLinkPublic', String(data.socialLinkPublic));
+  if (data.socialLinks !== undefined) form.append('socialLinks', JSON.stringify(data.socialLinks));
   return apiFetch(`/user/profile`, { method: 'PATCH', body: form });
 }

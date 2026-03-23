@@ -22,7 +22,7 @@ export const Navbar: React.FC = () => {
   }, [showUserMenu]);
 
   const avatarSrc = user?.avatarUrl || user?.profileImageUrl;
-  const profileIncomplete = isAuthenticated && user && !user.socialLinkPlatform;
+  const profileIncomplete = isAuthenticated && user && !user.socialLinks?.length;
 
   const avatarEl = avatarSrc ? (
     <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200" />

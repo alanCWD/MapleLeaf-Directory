@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { UserBadge } from '../services/api';
+import type { UserBadge, SocialLink } from '../services/api';
 
 export interface AuthUser {
   id: string;
@@ -14,6 +14,7 @@ export interface AuthUser {
   createdAt: string | null;
   updatedAt: string | null;
   badges: UserBadge[];
+  socialLinks: SocialLink[];
   socialLinkPlatform: string | null;
   socialLinkUrl: string | null;
   socialLinkPublic: boolean;
@@ -43,6 +44,12 @@ export function useAuth() {
 
   useEffect(() => {
     fetchUser();
+  }, [fetchUser]);
+
+  useEffect(() => {
+    const handler = () => fetchUser();
+    window.addEventListener('auth:user-updated', handler);
+    return () => window.removeEventListener('auth:user-updated', handler);
   }, [fetchUser]);
 
   return {

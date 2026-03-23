@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchUserProfile } from '../services/api';
 import type { PublicUserProfile } from '../services/api';
+import { SocialPlatformIcon } from './SocialPlatformIcon';
 
 export const UserProfilePage: React.FC = () => {
   const { handle } = useParams<{ handle: string }>();
@@ -45,15 +46,8 @@ export const UserProfilePage: React.FC = () => {
 
   const initials = (profile.handle?.[0] || 'U').toUpperCase();
 
-  const PLATFORM_ICONS: Record<string, string> = {
-    instagram: '📸',
-    facebook: '📘',
-    x: '🐦',
-    reddit: '🟠',
-    discord: '💬',
-  };
-
-  function extractHandle(platform: string, url: string): string {
+  function extractDisplayName(platform: string, url: string): string {
+    if (platform === 'discord') return url;
     try {
       const u = new URL(url);
       const segments = u.pathname.split('/').filter(Boolean);
@@ -95,27 +89,30 @@ export const UserProfilePage: React.FC = () => {
             <p className="text-sm text-stone-400 font-medium mt-1">
               {profile.posts.length} post{profile.posts.length !== 1 ? 's' : ''} · {profile.reviews.length} review{profile.reviews.length !== 1 ? 's' : ''}
             </p>
-            {profile.socialLinkPlatform && profile.socialLinkUrl && (
-              <div className="mt-2">
-                {profile.socialLinkPlatform !== 'discord' ? (
-                  <a
-                    href={profile.socialLinkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 hover:text-emerald-600 transition-colors bg-white border border-stone-200 rounded-full px-2.5 py-1 shadow-sm"
-                  >
-                    <span>{PLATFORM_ICONS[profile.socialLinkPlatform] || '🔗'}</span>
-                    <span>{extractHandle(profile.socialLinkPlatform, profile.socialLinkUrl)}</span>
-                    {profile.socialLinkVerified && (
-                      <svg className="w-3 h-3 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    )}
-                  </a>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 bg-white border border-stone-200 rounded-full px-2.5 py-1 shadow-sm">
-                    <span>{PLATFORM_ICONS.discord}</span>
-                    <span>@{profile.socialLinkUrl} on Discord</span>
-                  </span>
-                )}
+            {profile.socialLinks && profile.socialLinks.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {profile.socialLinks.map((link) => (
+                  link.platform !== 'discord' ? (
+                    <a
+                      key={link.platform}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 hover:text-emerald-600 transition-colors bg-white border border-stone-200 rounded-full px-2.5 py-1 shadow-sm"
+                    >
+                      <SocialPlatformIcon platform={link.platform} className="w-3.5 h-3.5" />
+                      <span>{extractDisplayName(link.platform, link.url)}</span>
+                      {link.verified && (
+                        <svg className="w-3 h-3 text-emerald-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                      )}
+                    </a>
+                  ) : (
+                    <span key={link.platform} className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 bg-white border border-stone-200 rounded-full px-2.5 py-1 shadow-sm">
+                      <SocialPlatformIcon platform="discord" className="w-3.5 h-3.5" />
+                      <span>{link.url} on Discord</span>
+                    </span>
+                  )
+                ))}
               </div>
             )}
           </div>

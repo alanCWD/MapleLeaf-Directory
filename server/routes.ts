@@ -647,15 +647,12 @@ async function checkUrlHead(url: string): Promise<boolean> {
 router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.single('avatar'), async (req: any, res) => {
   try {
     const userId = getUserId(req)!;
-    const { handle, socialLinkPlatform, socialLinkUrl, socialLinkPublic } = req.body;
+    const { handle, socialLinks: socialLinksRaw } = req.body;
 
     const updateData: {
       handle?: string | null;
       customProfileImageUrl?: string | null;
-      socialLinkPlatform?: string | null;
-      socialLinkUrl?: string | null;
-      socialLinkPublic?: boolean;
-      socialLinkVerified?: boolean;
+      socialLinks?: Array<{ platform: string; url: string; public: boolean; verified: boolean }>;
     } = {};
 
     if (handle !== undefined) {
@@ -698,51 +695,66 @@ router.patch('/user/profile', isAuthenticated as RequestHandler, imageUpload.sin
       updateData.customProfileImageUrl = url;
     }
 
-    if (socialLinkPlatform !== undefined || socialLinkUrl !== undefined) {
-      const platform = (socialLinkPlatform || '').trim().toLowerCase();
-      const linkUrl = (socialLinkUrl || '').trim();
-
-      if (platform && !SOCIAL_PLATFORMS[platform]) {
-        res.status(400).json({ error: 'Invalid social platform. Must be one of: instagram, facebook, x, reddit, discord' });
+    if (socialLinksRaw !== undefined) {
+      let parsed: any[];
+      try {
+        parsed = JSON.parse(socialLinksRaw);
+        if (!Array.isArray(parsed)) throw new Error('not array');
+      } catch {
+        res.status(400).json({ error: 'Invalid socialLinks format' });
         return;
       }
-
-      if (!platform && linkUrl) {
-        res.status(400).json({ error: 'A platform must be selected when providing a social link URL' });
+      if (parsed.length === 0) {
+        res.status(400).json({ error: 'At least one social media link is required to save your profile.' });
         return;
-      } else if (platform && linkUrl) {
-        const config = SOCIAL_PLATFORMS[platform];
-        if (config.pattern && !config.pattern.test(linkUrl)) {
-          res.status(400).json({ error: `Invalid ${platform} URL format` });
+      }
+      if (parsed.length > 5) {
+        res.status(400).json({ error: 'Maximum 5 social links allowed.' });
+        return;
+      }
+      const seenPlatforms = new Set<string>();
+      const validatedLinks: Array<{ platform: string; url: string; public: boolean; verified: boolean }> = [];
+      for (const link of parsed) {
+        const platform = (typeof link.platform === 'string' ? link.platform : '').trim().toLowerCase();
+        const linkUrl = (typeof link.url === 'string' ? link.url : '').trim();
+        if (!SOCIAL_PLATFORMS[platform]) {
+          res.status(400).json({ error: `Invalid platform: ${platform}` });
           return;
         }
-        updateData.socialLinkPlatform = platform;
-        updateData.socialLinkUrl = linkUrl;
+        if (seenPlatforms.has(platform)) {
+          res.status(400).json({ error: `Duplicate platform: ${platform}` });
+          return;
+        }
+        seenPlatforms.add(platform);
+        if (!linkUrl) {
+          res.status(400).json({ error: `URL/username is required for ${platform}` });
+          return;
+        }
+        const config = SOCIAL_PLATFORMS[platform];
+        if (config.pattern && !config.pattern.test(linkUrl)) {
+          res.status(400).json({ error: `Invalid ${platform} URL or username format` });
+          return;
+        }
         let verified = false;
         if (config.isUrl) {
           verified = await checkUrlHead(linkUrl);
         }
-        updateData.socialLinkVerified = verified;
-      } else if (!platform && !linkUrl) {
-        updateData.socialLinkPlatform = null;
-        updateData.socialLinkUrl = null;
-        updateData.socialLinkVerified = false;
-      } else if (platform && !linkUrl) {
-        res.status(400).json({ error: 'Social link URL is required when a platform is selected' });
+        validatedLinks.push({
+          platform,
+          url: linkUrl,
+          public: link.public === true || link.public === 'true',
+          verified,
+        });
+      }
+      updateData.socialLinks = validatedLinks;
+    }
+
+    if (socialLinksRaw === undefined) {
+      const existingProfile = await getUserSocialProfile(userId);
+      if (existingProfile.socialLinks.length === 0) {
+        res.status(400).json({ error: 'A social media link is required to save your profile.' });
         return;
       }
-    }
-
-    if (socialLinkPublic !== undefined) {
-      updateData.socialLinkPublic = socialLinkPublic === true || socialLinkPublic === 'true';
-    }
-
-    const existingProfile = await getUserSocialProfile(userId);
-    const willHavePlatform = 'socialLinkPlatform' in updateData ? updateData.socialLinkPlatform : existingProfile.socialLinkPlatform;
-    const willHaveUrl = 'socialLinkUrl' in updateData ? updateData.socialLinkUrl : existingProfile.socialLinkUrl;
-    if (!willHavePlatform || !willHaveUrl) {
-      res.status(400).json({ error: 'A social media link is required to save your profile. Please select a platform and enter your link.' });
-      return;
     }
 
     const result = await updateUserProfile(userId, updateData);
@@ -766,17 +778,14 @@ router.get('/user/profile/:handle', async (req: any, res) => {
       return;
     }
     const content = await getUserPublicProfile(userInfo.id);
+    const publicLinks = (userInfo.socialLinks || []).filter((l: any) => l.public);
     const payload: any = {
       handle: userInfo.handle,
       avatarUrl: userInfo.avatarUrl,
       posts: content.posts,
       reviews: content.reviews,
+      socialLinks: publicLinks,
     };
-    if (userInfo.socialLinkPublic && userInfo.socialLinkPlatform && userInfo.socialLinkUrl) {
-      payload.socialLinkPlatform = userInfo.socialLinkPlatform;
-      payload.socialLinkUrl = userInfo.socialLinkUrl;
-      payload.socialLinkVerified = userInfo.socialLinkVerified;
-    }
     res.json(payload);
   } catch (error) {
     console.error('Error fetching public profile:', error);
