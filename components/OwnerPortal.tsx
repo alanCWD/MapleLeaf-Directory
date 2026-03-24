@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
@@ -251,6 +251,11 @@ const OwnedStoresSection: React.FC = () => {
   const [newOffering, setNewOffering] = useState('');
   const [newHourDay, setNewHourDay] = useState('Monday');
   const [newHourTime, setNewHourTime] = useState('');
+  const [headerUploading, setHeaderUploading] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [editingPhotos, setEditingPhotos] = useState<string[]>([]);
+  const headerFileRef = useRef<HTMLInputElement>(null);
+  const photoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getOwnedStoresAPI().then(setStores).catch(() => {});
@@ -266,9 +271,50 @@ const OwnedStoresSection: React.FC = () => {
       featuredOfferings: [...(store.featuredOfferings || [])],
       hours: [...(store.hours || [])],
     });
+    setEditingPhotos(store.storePhotos || []);
     setNewOffering('');
     setNewHourDay('Monday');
     setNewHourTime('');
+  };
+
+  const handleHeaderImageUpload = async (storeId: string, file: File) => {
+    setHeaderUploading(true);
+    try {
+      const { url, store } = await ownerUploadStoreHeaderImage(storeId, file);
+      setEditData((prev: any) => ({ ...prev, headerImageUrl: url }));
+      setStores(prev => prev.map(s => s.id === storeId ? store : s));
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload header image');
+    } finally {
+      setHeaderUploading(false);
+    }
+  };
+
+  const handleAddPhoto = async (storeId: string, file: File) => {
+    if (editingPhotos.length >= 10) {
+      alert('Maximum of 10 interior photos allowed');
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const { storePhotos, store } = await ownerUploadStorePhoto(storeId, file);
+      setEditingPhotos(storePhotos);
+      setStores(prev => prev.map(s => s.id === storeId ? store : s));
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload photo');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async (storeId: string, index: number) => {
+    try {
+      const { storePhotos, store } = await ownerDeleteStorePhoto(storeId, index);
+      setEditingPhotos(storePhotos);
+      setStores(prev => prev.map(s => s.id === storeId ? store : s));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete photo');
+    }
   };
 
   const addOffering = () => {
@@ -356,13 +402,37 @@ const OwnedStoresSection: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-stone-500 mb-2">Main Header Image</label>
-                  <div className="mb-2">
+                  <input
+                    ref={headerFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleHeaderImageUpload(store.id, file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <div
+                    className="relative mb-2 group cursor-pointer rounded-xl overflow-hidden"
+                    onClick={() => !headerUploading && headerFileRef.current?.click()}
+                  >
                     <img
                       src={editData.headerImageUrl ? editData.headerImageUrl : getStoreHeaderImage(store.id, store.headerImageUrl)}
                       alt="Header preview"
-                      className="w-full h-32 object-cover rounded-xl border border-stone-200"
+                      className="w-full h-32 object-cover border border-stone-200"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/400x200/065f46/ffffff?text=Image+Error`; }}
                     />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1">
+                      {headerUploading ? (
+                        <span className="text-white text-xs font-bold">Uploading…</span>
+                      ) : (
+                        <>
+                          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                          <span className="text-white text-xs font-bold">Upload from computer</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2 mb-2">
                     <input
@@ -370,7 +440,7 @@ const OwnedStoresSection: React.FC = () => {
                       value={editData.headerImageUrl ?? ''}
                       onChange={e => setEditData((prev: any) => ({ ...prev, headerImageUrl: e.target.value }))}
                       className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
-                      placeholder="Custom image URL (or pick from defaults below)"
+                      placeholder="Or paste an image URL"
                     />
                     {editData.headerImageUrl && (
                       <button
@@ -396,6 +466,58 @@ const OwnedStoresSection: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-stone-500">Interior Photos ({editingPhotos.length}/10)</label>
+                  </div>
+                  <input
+                    ref={photoFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleAddPhoto(store.id, file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {editingPhotos.map((photoUrl, idx) => (
+                      <div key={idx} className="relative group rounded-lg overflow-hidden border border-stone-200">
+                        <img src={photoUrl} alt={`Interior ${idx + 1}`} className="w-full h-20 object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePhoto(store.id, idx)}
+                          className="absolute top-1 right-1 bg-black/60 hover:bg-red-600 text-white rounded-full w-5 h-5 text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition leading-none"
+                          aria-label="Delete photo"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {editingPhotos.length < 10 && (
+                      <button
+                        type="button"
+                        onClick={() => !photoUploading && photoFileRef.current?.click()}
+                        disabled={photoUploading}
+                        className="h-20 rounded-lg border-2 border-dashed border-stone-300 hover:border-emerald-400 flex flex-col items-center justify-center gap-1 text-stone-400 hover:text-emerald-600 transition disabled:opacity-50"
+                      >
+                        {photoUploading ? (
+                          <span className="text-xs font-bold">Uploading…</span>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            <span className="text-xs font-bold">Add Photo</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {editingPhotos.length === 0 && (
+                    <p className="text-xs text-stone-400 italic">No interior photos yet. Show customers what your store looks like inside.</p>
+                  )}
                 </div>
 
                 <div>

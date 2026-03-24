@@ -840,6 +840,129 @@ router.patch('/owner/stores/:id', isAuthenticated as RequestHandler, requireOwne
   }
 });
 
+router.post('/owner/stores/:id/header-image', isAuthenticated as RequestHandler, requireOwnerOrAdmin, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer).resize(1600, 600, { fit: 'cover' }).jpeg({ quality: 88 }).toBuffer();
+    const filename = `store-header-${storeId}-${Date.now()}.jpg`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'store-headers');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'store-headers');
+    }
+    const store = await updateStore(storeId, { headerImageUrl: url });
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json({ url, store });
+  } catch (error: any) {
+    console.error('[OwnerHeaderImage] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload header image' });
+  }
+});
+
+router.post('/owner/stores/:id/photos', isAuthenticated as RequestHandler, requireOwnerOrAdmin, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const currentPhotos: string[] = existing.storePhotos || [];
+    if (currentPhotos.length >= 10) {
+      res.status(400).json({ error: 'Maximum of 10 interior photos allowed' });
+      return;
+    }
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer).resize(1200, 900, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer();
+    const filename = `store-photo-${storeId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'store-photos');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'store-photos');
+    }
+    const newPhotos = [...currentPhotos, url];
+    const store = await updateStore(storeId, { storePhotos: newPhotos });
+    res.json({ url, storePhotos: newPhotos, store });
+  } catch (error: any) {
+    console.error('[OwnerStorePhotos] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload store photo' });
+  }
+});
+
+router.delete('/owner/stores/:id/photos/:index', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const photoIndex = parseInt(req.params.index, 10);
+    if (!Number.isInteger(photoIndex) || isNaN(photoIndex)) {
+      res.status(400).json({ error: 'Invalid photo index' });
+      return;
+    }
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const currentPhotos: string[] = existing.storePhotos || [];
+    if (photoIndex < 0 || photoIndex >= currentPhotos.length) {
+      res.status(400).json({ error: 'Invalid photo index' });
+      return;
+    }
+    const newPhotos = currentPhotos.filter((_, i) => i !== photoIndex);
+    const store = await updateStore(storeId, { storePhotos: newPhotos });
+    res.json({ storePhotos: newPhotos, store });
+  } catch (error: any) {
+    console.error('[OwnerStorePhotos] Delete error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to delete store photo' });
+  }
+});
+
 router.get('/admin/review-queue', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
   try {
     const stores = await getReviewQueue();

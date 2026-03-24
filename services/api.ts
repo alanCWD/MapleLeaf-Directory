@@ -530,6 +530,40 @@ export async function adminDeleteStorePhoto(storeId: string, photoIndex: number)
   return apiFetch(`/admin/stores/${storeId}/photos/${photoIndex}`, { method: 'DELETE' });
 }
 
+export async function ownerUploadStoreHeaderImage(storeId: string, file: File): Promise<{ url: string; store: Store }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`/api/owner/stores/${storeId}/header-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to upload header image');
+  }
+  return res.json();
+}
+
+export async function ownerUploadStorePhoto(storeId: string, file: File): Promise<{ url: string; storePhotos: string[]; store: Store }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`/api/owner/stores/${storeId}/photos`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to upload store photo');
+  }
+  return res.json();
+}
+
+export async function ownerDeleteStorePhoto(storeId: string, photoIndex: number): Promise<{ storePhotos: string[]; store: Store }> {
+  return apiFetch(`/owner/stores/${storeId}/photos/${photoIndex}`, { method: 'DELETE' });
+}
+
 export async function createCreatorPost(data: {
   title: string;
   subtitle?: string;
