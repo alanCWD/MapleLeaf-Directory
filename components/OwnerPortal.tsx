@@ -727,6 +727,10 @@ export const OwnerPortal: React.FC = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
 
+  const scrollToClaim = () => {
+    document.getElementById('claim-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="min-h-screen bg-stone-50">
       <section className="bg-gradient-to-br from-emerald-900 via-[#0a2e1f] to-purple-900 text-white py-24 relative overflow-hidden">
@@ -740,18 +744,18 @@ export const OwnerPortal: React.FC = () => {
               Exclusively for Sovereign Indigenous shops and local gems. We are the anti-corporate directory, connecting connoisseurs with the real roots of Canadian cannabis.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              {!isLoading && !isAuthenticated ? (
-                <a href="/api/login" className="bg-emerald-500 hover:bg-emerald-400 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-emerald-900/40 text-center">
-                  Sign In to Claim Your Shop
-                </a>
-              ) : (
-                <a href="#claim-section" className="bg-emerald-500 hover:bg-emerald-400 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-emerald-900/40 text-center">
-                  Claim Your Shop
-                </a>
-              )}
-              <Link to="/" className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold transition border border-white/20 backdrop-blur-md text-center">
+              <button
+                onClick={scrollToClaim}
+                className="bg-emerald-500 hover:bg-emerald-400 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-emerald-900/40 text-center"
+              >
+                Claim Your Store
+              </button>
+              <button
+                onClick={scrollToClaim}
+                className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold transition border border-white/20 backdrop-blur-md text-center"
+              >
                 Browse Directory
-              </Link>
+              </button>
             </div>
           </div>
           <div className="bg-white/5 p-8 rounded-[40px] border border-white/10 shadow-2xl backdrop-blur-xl">
@@ -790,12 +794,34 @@ export const OwnerPortal: React.FC = () => {
         </div>
       </section>
 
-      {isAuthenticated && (
-        <section id="claim-section" className="py-16 max-w-4xl mx-auto px-4 space-y-8">
-          {isOwnerOrAdmin && <OwnedStoresSection />}
-          <ClaimStoreSection />
-        </section>
-      )}
+      <section id="claim-section" className="py-16 max-w-4xl mx-auto px-4 space-y-8">
+        {isAuthenticated ? (
+          <>
+            {isOwnerOrAdmin && <OwnedStoresSection />}
+            <ClaimStoreSection />
+          </>
+        ) : (
+          !isLoading && (
+            <div className="bg-white rounded-[32px] border border-stone-200 p-10 shadow-sm text-center">
+              <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-black text-stone-900 mb-2">Sign in to Claim Your Store</h3>
+              <p className="text-stone-500 font-medium mb-8 max-w-sm mx-auto">
+                Create a free account to search for your store, submit an ownership claim, and manage your listing.
+              </p>
+              <a
+                href="/api/login"
+                className="inline-block bg-emerald-500 hover:bg-emerald-400 text-white px-10 py-4 rounded-2xl font-black transition shadow-lg shadow-emerald-200"
+              >
+                Sign In / Register
+              </a>
+            </div>
+          )
+        )}
+      </section>
 
       <section className="py-24 max-w-7xl mx-auto px-4">
         <div className="text-center mb-16">
@@ -826,15 +852,12 @@ export const OwnerPortal: React.FC = () => {
           <p className="text-lg text-stone-600 mb-8 font-medium">
             Highlight your traditional roots and community impact today. Our platform is designed to respect and elevate sovereign commerce without the interference of corporate standardizing.
           </p>
-          {!isAuthenticated ? (
-            <a href="/api/login" className="inline-block bg-stone-900 text-white px-12 py-5 rounded-2xl font-black hover:bg-emerald-600 transition shadow-2xl shadow-stone-900/10">
-              Sign In to Start Your Claim
-            </a>
-          ) : (
-            <a href="#claim-section" className="inline-block bg-stone-900 text-white px-12 py-5 rounded-2xl font-black hover:bg-emerald-600 transition shadow-2xl shadow-stone-900/10">
-              Start Your Claim
-            </a>
-          )}
+          <button
+            onClick={scrollToClaim}
+            className="inline-block bg-stone-900 text-white px-12 py-5 rounded-2xl font-black hover:bg-emerald-600 transition shadow-2xl shadow-stone-900/10"
+          >
+            Claim Your Store
+          </button>
         </div>
       </section>
     </div>
