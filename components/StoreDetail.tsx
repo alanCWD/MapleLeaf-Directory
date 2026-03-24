@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Store, Review, StoreMedia, CreatorPost } from '../types';
 import { getStoreInsights } from '../services/geminiService';
-import { saveStoreInsights, fetchStoreMedia, fetchStoreReviews, fetchIntegrityScore, submitReview, fetchPublishedPosts } from '../services/api';
+import { saveStoreInsights, fetchStoreMedia, fetchStoreReviews, fetchIntegrityScore, submitReview, fetchPublishedPosts, fetchStore } from '../services/api';
 import type { WeightedReview, IntegrityScoreCard } from '../services/api';
 import { VerificationBadge } from './VerificationBadge';
 import { EvidencePanel } from './EvidencePanel';
@@ -138,6 +138,16 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
       }
     }
   }, [id, stores]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchStore(id)
+      .then(fresh => {
+        setStore(fresh);
+        if (onUpdateStore) onUpdateStore(fresh);
+      })
+      .catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     if (store && !hasCachedInsights(store) && !insights?.atmosphere) {
