@@ -1026,7 +1026,11 @@ router.post('/admin/stores/:id/photos', isAuthenticated as RequestHandler, requi
 router.delete('/admin/stores/:id/photos/:index', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
   try {
     const storeId = paramId(req.params);
-    const photoIndex = parseInt(req.params.index);
+    const photoIndex = parseInt(req.params.index, 10);
+    if (!Number.isInteger(photoIndex) || isNaN(photoIndex)) {
+      res.status(400).json({ error: 'Invalid photo index' });
+      return;
+    }
     const adminUserId = getUserId(req)!;
     const existing = await getStoreById(storeId);
     if (!existing) {
