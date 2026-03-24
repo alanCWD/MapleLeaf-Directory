@@ -70,6 +70,7 @@ export interface Store {
   placesCategory?: string;
 
   headerImageUrl?: string;
+  storePhotos?: string[];
   lastVerifiedAt?: string;
   updatedAt?: string;
 

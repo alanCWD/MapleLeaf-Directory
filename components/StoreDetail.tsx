@@ -120,6 +120,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [storePosts, setStorePosts] = useState<CreatorPost[]>([]);
   const [activeTab, setActiveTab] = useState<'reviews' | 'posts'>('reviews');
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; index: number } | null>(null);
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -486,6 +487,30 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                     <p className="text-stone-700 leading-relaxed">{insights.community}</p>
                   </div>
                 )}
+              </div>
+            </section>
+          )}
+
+          {store.storePhotos && store.storePhotos.length > 0 && (
+            <section>
+              <h2 className="text-2xl font-extrabold text-stone-900 mb-6 flex items-center gap-2">
+                <span className="w-2 h-8 bg-emerald-600 rounded-full"></span>
+                Inside the Store
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {store.storePhotos.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setLightboxPhoto({ url, index: i })}
+                    className="group aspect-square rounded-2xl overflow-hidden border border-stone-200 hover:shadow-lg transition-shadow"
+                  >
+                    <img
+                      src={url}
+                      alt={`${store.name} interior photo ${i + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </button>
+                ))}
               </div>
             </section>
           )}
@@ -1075,6 +1100,46 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
               }}
               onCancel={() => setShowVideoUploader(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {lightboxPhoto && store.storePhotos && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div className="relative max-w-4xl w-full" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setLightboxPhoto(null)}
+              className="absolute -top-12 right-0 text-white/70 hover:text-white transition p-2"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            {store.storePhotos.length > 1 && (
+              <>
+                <button
+                  onClick={() => setLightboxPhoto({ url: store.storePhotos![(lightboxPhoto.index - 1 + store.storePhotos!.length) % store.storePhotos!.length], index: (lightboxPhoto.index - 1 + store.storePhotos!.length) % store.storePhotos!.length })}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 text-white/70 hover:text-white transition p-2"
+                >
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button
+                  onClick={() => setLightboxPhoto({ url: store.storePhotos![(lightboxPhoto.index + 1) % store.storePhotos!.length], index: (lightboxPhoto.index + 1) % store.storePhotos!.length })}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 text-white/70 hover:text-white transition p-2"
+                >
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </>
+            )}
+            <img
+              src={lightboxPhoto.url}
+              alt={`${store.name} interior photo`}
+              className="w-full rounded-2xl object-contain max-h-[80vh]"
+            />
+            <p className="text-white/50 text-xs text-center mt-3">{lightboxPhoto.index + 1} / {store.storePhotos.length}</p>
           </div>
         </div>
       )}

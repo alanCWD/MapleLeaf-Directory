@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, Province, VerificationStatus } from '../types';
-import { fetchAdminStores, adminEditStore, fetchAuditLogs } from '../services/api';
+import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto } from '../services/api';
 import type { AuditLogEntry } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
@@ -82,6 +82,9 @@ export const AdminStores: React.FC = () => {
   const [newAdminHourTime, setNewAdminHourTime] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [isUploadingHeader, setIsUploadingHeader] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [editingStorePhotos, setEditingStorePhotos] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<'stores' | 'audit'>('stores');
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -183,6 +186,7 @@ export const AdminStores: React.FC = () => {
     setNewAdminHourDay('Monday');
     setNewAdminHourTime('');
     setSaveMessage('');
+    setEditingStorePhotos(store.storePhotos || []);
   };
 
   const handleSave = async () => {
@@ -216,6 +220,51 @@ export const AdminStores: React.FC = () => {
       setSaveMessage(`Error: ${err.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleHeaderImageUpload = async (file: File) => {
+    if (!editingStore) return;
+    setIsUploadingHeader(true);
+    setSaveMessage('');
+    try {
+      const result = await adminUploadStoreHeaderImage(editingStore.id, file);
+      setEditForm(f => ({ ...f, headerImageUrl: result.url }));
+      setStores(prev => prev.map(s => s.id === result.store.id ? result.store : s));
+      setSaveMessage('Header image uploaded successfully');
+      setTimeout(() => setSaveMessage(''), 2000);
+    } catch (err: any) {
+      setSaveMessage(`Error: ${err.message}`);
+    } finally {
+      setIsUploadingHeader(false);
+    }
+  };
+
+  const handleAddStorePhoto = async (file: File) => {
+    if (!editingStore) return;
+    setIsUploadingPhoto(true);
+    setSaveMessage('');
+    try {
+      const result = await adminUploadStorePhoto(editingStore.id, file);
+      setEditingStorePhotos(result.storePhotos);
+      setStores(prev => prev.map(s => s.id === result.store.id ? result.store : s));
+      setSaveMessage('Interior photo added successfully');
+      setTimeout(() => setSaveMessage(''), 2000);
+    } catch (err: any) {
+      setSaveMessage(`Error: ${err.message}`);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleDeleteStorePhoto = async (index: number) => {
+    if (!editingStore) return;
+    try {
+      const result = await adminDeleteStorePhoto(editingStore.id, index);
+      setEditingStorePhotos(result.storePhotos);
+      setStores(prev => prev.map(s => s.id === result.store.id ? result.store : s));
+    } catch (err: any) {
+      setSaveMessage(`Error: ${err.message}`);
     }
   };
 
@@ -790,13 +839,29 @@ export const AdminStores: React.FC = () => {
               <div>
                 <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Header Image</label>
                 {editingStore && (
-                  <div className="mb-2">
+                  <div className="mb-2 relative group">
                     <img
                       src={editForm.headerImageUrl || getStoreHeaderImage(editingStore.id, editingStore.headerImageUrl)}
                       alt="Header preview"
                       className="w-full h-32 object-cover rounded-xl border border-stone-200"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/400x200/065f46/ffffff?text=Image+Error`; }}
                     />
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-all rounded-xl cursor-pointer">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold bg-black/60 px-3 py-1.5 rounded-lg">
+                        {isUploadingHeader ? 'Uploading...' : 'Upload New Image'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                        className="hidden"
+                        disabled={isUploadingHeader}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleHeaderImageUpload(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
                   </div>
                 )}
                 <div className="flex gap-2 mb-2">
@@ -805,7 +870,7 @@ export const AdminStores: React.FC = () => {
                     value={editForm.headerImageUrl}
                     onChange={e => setEditForm(f => ({ ...f, headerImageUrl: e.target.value }))}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="Custom image URL (or pick from defaults below)"
+                    placeholder="Or paste a custom image URL"
                   />
                   {editForm.headerImageUrl && (
                     <button
@@ -831,6 +896,49 @@ export const AdminStores: React.FC = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">Interior Photos</label>
+                  <span className="text-xs text-stone-400">{editingStorePhotos.length}/10</span>
+                </div>
+                {editingStorePhotos.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {editingStorePhotos.map((url, i) => (
+                      <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-stone-200">
+                        <img src={url} alt={`Interior ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStorePhoto(i)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                          title="Remove photo"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {editingStorePhotos.length < 10 ? (
+                  <label className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-emerald-400 hover:text-emerald-600 transition cursor-pointer ${isUploadingPhoto ? 'opacity-50 cursor-wait' : ''}`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                    {isUploadingPhoto ? 'Uploading...' : `Add Interior Photo (${editingStorePhotos.length}/10)`}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                      className="hidden"
+                      disabled={isUploadingPhoto}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAddStorePhoto(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <p className="text-xs text-stone-400 text-center py-2">Maximum of 10 interior photos reached.</p>
+                )}
               </div>
 
               {saveMessage && (

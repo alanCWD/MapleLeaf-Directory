@@ -40,6 +40,7 @@ function snakeToCamel(row: Record<string, any>): Store {
     placesCategory: row.places_category || undefined,
     lastVerifiedAt: row.last_verified_at ? row.last_verified_at.toISOString() : undefined,
     headerImageUrl: row.header_image_url || undefined,
+    storePhotos: row.store_photos || [],
     storeInsights: row.store_insights || null,
     updatedAt: row.updated_at ? row.updated_at.toISOString() : undefined,
   };
@@ -215,6 +216,7 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
     placesApiMatch: 'places_api_match',
     placesCategory: 'places_category',
     headerImageUrl: 'header_image_url',
+    storePhotos: 'store_photos',
     lastVerifiedAt: 'last_verified_at',
     storeInsights: 'store_insights',
   };
@@ -222,7 +224,7 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
   for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
     if (jsKey in updates) {
       const val = (updates as any)[jsKey];
-      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources' || dbKey === 'store_insights') {
+      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources' || dbKey === 'store_insights' || dbKey === 'store_photos') {
         setClauses.push(`${dbKey} = $${idx++}`);
         params.push(JSON.stringify(val));
       } else if (dbKey === 'featured_offerings') {
@@ -364,6 +366,13 @@ export async function ensureHeaderImageColumn(): Promise<void> {
     ALTER TABLE stores ADD COLUMN IF NOT EXISTS header_image_url TEXT
   `);
   console.log('[DB] header_image_url column ensured');
+}
+
+export async function ensureStorePhotosColumn(): Promise<void> {
+  await pool.query(`
+    ALTER TABLE stores ADD COLUMN IF NOT EXISTS store_photos JSONB DEFAULT '[]'
+  `);
+  console.log('[DB] store_photos column ensured');
 }
 
 export async function ensureUserProfileColumns(): Promise<void> {

@@ -952,6 +952,101 @@ router.patch('/admin/stores/:id', isAuthenticated as RequestHandler, requireAdmi
   }
 });
 
+router.post('/admin/stores/:id/header-image', isAuthenticated as RequestHandler, requireAdmin, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const adminUserId = getUserId(req)!;
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer).resize(1600, 600, { fit: 'cover' }).jpeg({ quality: 88 }).toBuffer();
+    const filename = `store-header-${storeId}-${Date.now()}.jpg`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'store-headers');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'store-headers');
+    }
+    const store = await adminUpdateStore(storeId, { headerImageUrl: url }, adminUserId);
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json({ url, store });
+  } catch (error: any) {
+    console.error('[AdminHeaderImage] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload header image' });
+  }
+});
+
+router.post('/admin/stores/:id/photos', isAuthenticated as RequestHandler, requireAdmin, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const adminUserId = getUserId(req)!;
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const currentPhotos: string[] = existing.storePhotos || [];
+    if (currentPhotos.length >= 10) {
+      res.status(400).json({ error: 'Maximum of 10 interior photos allowed' });
+      return;
+    }
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer).resize(1200, 900, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer();
+    const filename = `store-photo-${storeId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'store-photos');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'store-photos');
+    }
+    const newPhotos = [...currentPhotos, url];
+    const store = await adminUpdateStore(storeId, { storePhotos: newPhotos }, adminUserId);
+    res.json({ url, storePhotos: newPhotos, store });
+  } catch (error: any) {
+    console.error('[AdminStorePhotos] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload store photo' });
+  }
+});
+
+router.delete('/admin/stores/:id/photos/:index', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const photoIndex = parseInt(req.params.index);
+    const adminUserId = getUserId(req)!;
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const currentPhotos: string[] = existing.storePhotos || [];
+    if (photoIndex < 0 || photoIndex >= currentPhotos.length) {
+      res.status(400).json({ error: 'Invalid photo index' });
+      return;
+    }
+    const newPhotos = currentPhotos.filter((_, i) => i !== photoIndex);
+    const store = await adminUpdateStore(storeId, { storePhotos: newPhotos }, adminUserId);
+    res.json({ storePhotos: newPhotos, store });
+  } catch (error: any) {
+    console.error('[AdminStorePhotos] Delete error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to delete store photo' });
+  }
+});
+
 router.get('/admin/audit-logs', isAuthenticated as RequestHandler, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { storeId, adminUserId, action, targetType, startDate, endDate, page, limit } = req.query;
