@@ -21,12 +21,16 @@ export async function fetchStores(filters?: {
   type?: string;
   verificationStatus?: string;
   hideUnverified?: boolean;
+  search?: string;
+  limit?: number;
 }): Promise<Store[]> {
   const params = new URLSearchParams();
   if (filters?.province) params.set('province', filters.province);
   if (filters?.type) params.set('type', filters.type);
   if (filters?.verificationStatus) params.set('verificationStatus', filters.verificationStatus);
   if (filters?.hideUnverified) params.set('hideUnverified', 'true');
+  if (filters?.search) params.set('search', filters.search);
+  if (filters?.limit) params.set('limit', String(filters.limit));
   const qs = params.toString();
   return apiFetch<Store[]>(`/stores${qs ? `?${qs}` : ''}`);
 }

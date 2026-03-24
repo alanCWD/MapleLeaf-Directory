@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
@@ -36,26 +36,74 @@ const SERVICES = [
 ];
 
 const ClaimStoreSection: React.FC = () => {
-  const [storeId, setStoreId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Store[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [claims, setClaims] = useState<any[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getUserClaimsAPI().then(setClaims).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value;
+    setSearchQuery(q);
+    setSelectedStore(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await fetchStores({ search: q, limit: 20 });
+        setSearchResults(results.slice(0, 8));
+        setShowDropdown(true);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectStore = (store: Store) => {
+    setSelectedStore(store);
+    setSearchQuery(store.name);
+    setShowDropdown(false);
+    setSearchResults([]);
+  };
+
   const handleClaim = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!storeId.trim()) { setError('Please enter a store ID'); return; }
+    if (!selectedStore) { setError('Please search for and select your store'); return; }
     setIsSubmitting(true);
     setError('');
     try {
-      await createClaimAPI(storeId.trim(), message.trim() || undefined);
+      await createClaimAPI(selectedStore.id, message.trim() || undefined);
       setSuccess(true);
-      setStoreId('');
+      setSelectedStore(null);
+      setSearchQuery('');
       setMessage('');
       const updated = await getUserClaimsAPI();
       setClaims(updated);
@@ -68,9 +116,9 @@ const ClaimStoreSection: React.FC = () => {
 
   return (
     <div className="bg-white rounded-[32px] border border-stone-200 p-8 shadow-sm">
-      <h3 className="text-xl font-black text-stone-900 mb-4">Claim Your Store</h3>
+      <h3 className="text-xl font-black text-stone-900 mb-2">Claim Your Store</h3>
       <p className="text-stone-500 text-sm mb-6 font-medium">
-        Find your store in our directory, copy its ID from the URL, and submit your claim. Our admin team will review and approve ownership.
+        Search for your store below and submit a claim. Our admin team will verify and approve ownership.
       </p>
 
       {success && (
@@ -86,15 +134,71 @@ const ClaimStoreSection: React.FC = () => {
 
       <form onSubmit={handleClaim} className="space-y-4">
         <div>
-          <label className="block text-xs font-black uppercase tracking-widest text-stone-500 mb-2">Store ID</label>
-          <input
-            type="text"
-            value={storeId}
-            onChange={e => setStoreId(e.target.value)}
-            placeholder="Paste the store ID from the listing URL"
-            className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-4 focus:border-emerald-400 outline-none text-stone-900 placeholder-stone-300 font-medium"
-          />
+          <label className="block text-xs font-black uppercase tracking-widest text-stone-500 mb-2">Search for Your Store</label>
+          <div ref={searchRef} className="relative">
+            <div className="relative">
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                placeholder="Type your store name…"
+                className="w-full bg-stone-50 border border-stone-200 rounded-2xl pl-11 pr-4 py-4 focus:border-emerald-400 outline-none text-stone-900 placeholder-stone-300 font-medium"
+                autoComplete="off"
+              />
+              {isSearching && (
+                <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+            </div>
+
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-stone-200 rounded-2xl shadow-xl overflow-hidden">
+                {searchResults.map(store => (
+                  <button
+                    key={store.id}
+                    type="button"
+                    onClick={() => handleSelectStore(store)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 transition text-left border-b border-stone-100 last:border-b-0"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-stone-900 text-sm truncate">{store.name}</p>
+                      <p className="text-xs text-stone-400 truncate">{store.address}, {store.province}</p>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${store.isClaimed ? 'bg-blue-100 text-blue-700' : 'bg-stone-100 text-stone-500'}`}>
+                      {store.isClaimed ? 'Claimed' : store.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showDropdown && searchResults.length === 0 && !isSearching && searchQuery.trim() && (
+              <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-stone-200 rounded-2xl shadow-xl px-4 py-4 text-sm text-stone-500 text-center">
+                No stores found for "{searchQuery}". <Link to="/community-submit" className="text-emerald-600 font-bold hover:underline">Submit a new listing?</Link>
+              </div>
+            )}
+          </div>
+
+          {selectedStore && (
+            <div className="mt-3 flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+              <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-emerald-900 text-sm truncate">{selectedStore.name}</p>
+                <p className="text-xs text-emerald-700 truncate">{selectedStore.address}, {selectedStore.province}</p>
+              </div>
+              <button type="button" onClick={() => { setSelectedStore(null); setSearchQuery(''); }} className="text-emerald-500 hover:text-emerald-700 text-lg leading-none flex-shrink-0">×</button>
+            </div>
+          )}
         </div>
+
         <div>
           <label className="block text-xs font-black uppercase tracking-widest text-stone-500 mb-2">Why should we approve your claim?</label>
           <textarea
@@ -107,10 +211,10 @@ const ClaimStoreSection: React.FC = () => {
         </div>
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black hover:bg-emerald-400 transition shadow-lg shadow-emerald-200 disabled:opacity-50"
+          disabled={isSubmitting || !selectedStore}
+          className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black hover:bg-emerald-400 transition shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+          {isSubmitting ? 'Submitting…' : 'Submit Ownership Claim'}
         </button>
       </form>
 
@@ -119,9 +223,9 @@ const ClaimStoreSection: React.FC = () => {
           <h4 className="text-sm font-black uppercase tracking-widest text-stone-500 mb-3">Your Claims</h4>
           <div className="space-y-2">
             {claims.map((claim: any) => (
-              <div key={claim.id} className="flex items-center justify-between bg-stone-50 rounded-xl px-4 py-3 border border-stone-100">
-                <span className="text-sm font-medium text-stone-700 truncate">{claim.storeId}</span>
-                <span className={`text-xs font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
+              <div key={claim.id} className="flex items-center justify-between bg-stone-50 rounded-xl px-4 py-3 border border-stone-100 gap-3">
+                <span className="text-sm font-bold text-stone-700 truncate">{claim.storeName || claim.storeId}</span>
+                <span className={`text-xs font-black uppercase tracking-widest px-2 py-1 rounded-lg flex-shrink-0 ${
                   claim.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
                   claim.status === 'rejected' ? 'bg-red-100 text-red-700' :
                   'bg-yellow-100 text-yellow-700'

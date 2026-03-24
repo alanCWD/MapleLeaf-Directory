@@ -74,12 +74,16 @@ export async function createStoreClaim(userId: string, storeId: string, message?
   return formatClaim(result.rows[0]);
 }
 
-export async function getStoreClaimsByUser(userId: string): Promise<StoreClaim[]> {
+export async function getStoreClaimsByUser(userId: string): Promise<(StoreClaim & { storeName?: string })[]> {
   const result = await pool.query(
-    'SELECT * FROM store_claims WHERE user_id = $1 ORDER BY created_at DESC',
+    `SELECT sc.*, s.name as store_name
+     FROM store_claims sc
+     LEFT JOIN stores s ON sc.store_id = s.id
+     WHERE sc.user_id = $1
+     ORDER BY sc.created_at DESC`,
     [userId]
   );
-  return result.rows.map(formatClaim);
+  return result.rows.map(row => ({ ...formatClaim(row), storeName: row.store_name || undefined }));
 }
 
 export async function getPendingClaims(): Promise<(StoreClaim & { storeName?: string; userName?: string })[]> {

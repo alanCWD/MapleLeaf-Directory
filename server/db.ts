@@ -61,6 +61,8 @@ export async function getAllStores(filters: {
   type?: string;
   verificationStatus?: string;
   hideUnverified?: boolean;
+  search?: string;
+  limit?: number;
 }): Promise<Store[]> {
   const conditions: string[] = [];
   const params: any[] = [];
@@ -81,14 +83,20 @@ export async function getAllStores(filters: {
   if (filters.hideUnverified) {
     conditions.push(`(verification_status != 'ai_suggested')`);
   }
+  if (filters.search) {
+    conditions.push(`(name ILIKE $${idx} OR address ILIKE $${idx} OR province ILIKE $${idx})`);
+    params.push(`%${filters.search}%`);
+    idx++;
+  }
 
   conditions.push(`verification_status != 'rejected'`);
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limitClause = filters.limit ? ` LIMIT ${parseInt(String(filters.limit), 10)}` : '';
   const query = `SELECT * FROM stores ${where} ORDER BY 
     CASE WHEN verification_status = 'verified' THEN 0
          WHEN verification_status = 'ai_suggested' THEN 1
          ELSE 2 END,
-    confidence_score DESC, name ASC`;
+    confidence_score DESC, name ASC${limitClause}`;
   const result = await pool.query(query, params);
   const rows = result.rows.map(snakeToCamel);
 

@@ -243,12 +243,14 @@ router.post('/search', async (req: Request, res: Response) => {
 
 router.get('/stores', async (req: Request, res: Response) => {
   try {
-    const { province, type, verificationStatus, hideUnverified } = req.query;
+    const { province, type, verificationStatus, hideUnverified, search, limit } = req.query;
     const stores = await getAllStores({
       province: province as string | undefined,
       type: type as string | undefined,
       verificationStatus: verificationStatus as string | undefined,
       hideUnverified: hideUnverified === 'true',
+      search: search as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
     });
     res.json(stores);
   } catch (error) {
