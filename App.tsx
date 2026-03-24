@@ -55,14 +55,18 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user, isAuthenticated } = useAuth();
   const [favsSynced, setFavsSynced] = useState(false);
-  const [socialBannerDismissed, setSocialBannerDismissed] = useState(() =>
-    sessionStorage.getItem('ll_social_banner_dismissed') === '1'
-  );
+  const [socialBannerDismissed, setSocialBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    const key = user?.id ? `ll_social_banner_dismissed_${user.id}` : null;
+    setSocialBannerDismissed(key ? sessionStorage.getItem(key) === '1' : false);
+  }, [user?.id]);
 
   const dismissSocialBanner = useCallback(() => {
-    sessionStorage.setItem('ll_social_banner_dismissed', '1');
+    const key = user?.id ? `ll_social_banner_dismissed_${user.id}` : null;
+    if (key) sessionStorage.setItem(key, '1');
     setSocialBannerDismissed(true);
-  }, []);
+  }, [user?.id]);
 
   const loadStores = async () => {
     try {
@@ -214,10 +218,9 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={
               <>
-                <Hero onSearchResults={handleSearchResults} userLocation={userLocation} />
-                <div className="max-w-7xl mx-auto px-4 py-12" id="listings-container">
-                  {isAuthenticated && user && !user.socialLinks?.length && !socialBannerDismissed && (
-                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
+                {isAuthenticated && user && !user.socialLinkPlatform && !socialBannerDismissed && (
+                  <div className="max-w-7xl mx-auto px-4 pt-4">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-2xl flex-shrink-0">🔗</span>
                         <div className="min-w-0">
@@ -243,8 +246,10 @@ const App: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  )}
-
+                  </div>
+                )}
+                <Hero onSearchResults={handleSearchResults} userLocation={userLocation} />
+                <div className="max-w-7xl mx-auto px-4 py-12" id="listings-container">
                   {userProfile?.email && (
                     <div className="mb-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between animate-fade-in">
                       <div className="flex items-center gap-3">
