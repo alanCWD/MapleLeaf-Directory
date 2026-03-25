@@ -966,7 +966,13 @@ router.delete('/owner/stores/:id/photos/:index', isAuthenticated as RequestHandl
 });
 
 router.get('/tenant', async (req: any, res) => {
-  res.json(req.tenantStore || null);
+  if (!req.tenantStore) {
+    res.json(null);
+    return;
+  }
+  const firstDomain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
+  const directoryOrigin = firstDomain ? `https://${firstDomain}` : 'http://localhost:5000';
+  res.json({ store: req.tenantStore, directoryOrigin });
 });
 
 router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {

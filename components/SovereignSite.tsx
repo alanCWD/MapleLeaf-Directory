@@ -8,6 +8,7 @@ import { getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 interface SovereignSiteProps {
   store: Store;
+  directoryOrigin: string;
 }
 
 function formatHour(time: string): string {
@@ -20,7 +21,7 @@ function getDayAbbrev(day: string): string {
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export const SovereignSite: React.FC<SovereignSiteProps> = ({ store }) => {
+export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOrigin }) => {
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [integrityScore, setIntegrityScore] = useState<IntegrityScoreCard | null>(null);
   const [isLoadingIntegrity, setIsLoadingIntegrity] = useState(true);
@@ -40,7 +41,8 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store }) => {
   });
 
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${store.name}, ${store.address}, ${store.province}, Canada`)}`;
-  const directoryListingUrl = `https://${(process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || window.location.host}/#/store/${store.id}`;
+  const directoryListingUrl = `${directoryOrigin}/#/store/${store.id}`;
+  const directoryPostUrl = (postId: number) => `${directoryOrigin}/#/posts/${postId}`;
 
   useEffect(() => {
     document.title = `${store.name} — ${store.address.split(',')[0]?.trim() || ''}, ${store.province}`;
@@ -414,9 +416,12 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store }) => {
                   ) : (
                     <div className="grid sm:grid-cols-2 gap-4">
                       {posts.map(post => (
-                        <div
+                        <a
                           key={post.id}
-                          className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:border-stone-300 transition"
+                          href={directoryPostUrl(post.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:border-stone-300 hover:shadow-md transition"
                         >
                           {post.media && post.media[0]?.cdnUrl && (
                             <div className="relative aspect-video rounded-xl overflow-hidden mb-4">
@@ -448,7 +453,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store }) => {
                           {post.subtitle && (
                             <p className="text-sm text-stone-500 mt-1 line-clamp-2">{post.subtitle}</p>
                           )}
-                        </div>
+                        </a>
                       ))}
                     </div>
                   )}

@@ -508,12 +508,18 @@ const DirectoryApp: React.FC = () => {
 
 const App: React.FC = () => {
   const [tenantStore, setTenantStore] = useState<Store | null>(null);
+  const [directoryOrigin, setDirectoryOrigin] = useState('');
   const [tenantLoading, setTenantLoading] = useState(true);
 
   useEffect(() => {
     fetchTenantStore()
-      .then(store => setTenantStore(store))
-      .catch(() => setTenantStore(null))
+      .then(result => {
+        if (result) {
+          setTenantStore(result.store);
+          setDirectoryOrigin(result.directoryOrigin);
+        }
+      })
+      .catch(() => {})
       .finally(() => setTenantLoading(false));
   }, []);
 
@@ -529,7 +535,7 @@ const App: React.FC = () => {
   }
 
   if (tenantStore) {
-    return <SovereignSite store={tenantStore} />;
+    return <SovereignSite store={tenantStore} directoryOrigin={directoryOrigin} />;
   }
 
   return <DirectoryApp />;

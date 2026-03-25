@@ -39,8 +39,8 @@ export async function fetchStore(id: string): Promise<Store> {
   return apiFetch<Store>(`/stores/${id}`);
 }
 
-export async function fetchTenantStore(): Promise<Store | null> {
-  return apiFetch<Store | null>('/tenant');
+export async function fetchTenantStore(): Promise<{ store: Store; directoryOrigin: string } | null> {
+  return apiFetch<{ store: Store; directoryOrigin: string } | null>('/tenant');
 }
 
 export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: { brandColor?: string; logoUrl?: string }): Promise<Store> {
