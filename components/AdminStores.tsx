@@ -836,6 +836,30 @@ export const AdminStores: React.FC = () => {
                 />
               </div>
 
+              {(editingStore?.customDomain || editingStore?.domainVerified) && (
+                <div className="bg-stone-50 rounded-xl border border-stone-200 p-4">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Custom Domain</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-mono text-stone-800">{editingStore.customDomain || '—'}</span>
+                    {editingStore.domainVerified ? (
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Verified ✓</span>
+                    ) : (
+                      <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not Verified</span>
+                    )}
+                  </div>
+                  {editingStore.themeConfig?.brandColor && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs text-stone-500">Brand color:</span>
+                      <span
+                        className="inline-block w-4 h-4 rounded-full border border-stone-300"
+                        style={{ backgroundColor: editingStore.themeConfig.brandColor }}
+                      />
+                      <span className="text-xs font-mono text-stone-600">{editingStore.themeConfig.brandColor}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">Header Image</label>
                 {editingStore && (

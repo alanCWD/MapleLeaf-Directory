@@ -74,6 +74,13 @@ export interface Store {
   lastVerifiedAt?: string;
   updatedAt?: string;
 
+  customDomain?: string;
+  domainVerified?: boolean;
+  themeConfig?: {
+    brandColor?: string;
+    logoUrl?: string;
+  } | null;
+
   storeInsights?: {
     atmosphere?: string;
     community?: string;

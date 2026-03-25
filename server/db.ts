@@ -43,6 +43,9 @@ function snakeToCamel(row: Record<string, any>): Store {
     storePhotos: row.store_photos || [],
     storeInsights: row.store_insights || null,
     updatedAt: row.updated_at ? row.updated_at.toISOString() : undefined,
+    customDomain: row.custom_domain || undefined,
+    domainVerified: row.domain_verified ?? false,
+    themeConfig: row.theme_config || null,
   };
 }
 
@@ -227,12 +230,15 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
     storePhotos: 'store_photos',
     lastVerifiedAt: 'last_verified_at',
     storeInsights: 'store_insights',
+    customDomain: 'custom_domain',
+    domainVerified: 'domain_verified',
+    themeConfig: 'theme_config',
   };
 
   for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
     if (jsKey in updates) {
       const val = (updates as any)[jsKey];
-      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources' || dbKey === 'store_insights' || dbKey === 'store_photos') {
+      if (dbKey === 'hours' || dbKey === 'reviews' || dbKey === 'evidence_sources' || dbKey === 'store_insights' || dbKey === 'store_photos' || dbKey === 'theme_config') {
         setClauses.push(`${dbKey} = $${idx++}`);
         params.push(JSON.stringify(val));
       } else if (dbKey === 'featured_offerings') {
@@ -381,6 +387,23 @@ export async function ensureStorePhotosColumn(): Promise<void> {
     ALTER TABLE stores ADD COLUMN IF NOT EXISTS store_photos JSONB DEFAULT '[]'
   `);
   console.log('[DB] store_photos column ensured');
+}
+
+export async function ensureCustomDomainColumns(): Promise<void> {
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS custom_domain TEXT`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS domain_verified BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS theme_config JSONB`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_stores_custom_domain ON stores(custom_domain) WHERE custom_domain IS NOT NULL`);
+  console.log('[DB] custom_domain columns ensured');
+}
+
+export async function getStoreByCustomDomain(domain: string): Promise<Store | null> {
+  const result = await pool.query(
+    `SELECT * FROM stores WHERE custom_domain = $1 AND domain_verified = true LIMIT 1`,
+    [domain]
+  );
+  if (result.rows.length === 0) return null;
+  return snakeToCamel(result.rows[0]);
 }
 
 export async function ensureUserProfileColumns(): Promise<void> {

@@ -39,6 +39,23 @@ export async function fetchStore(id: string): Promise<Store> {
   return apiFetch<Store>(`/stores/${id}`);
 }
 
+export async function fetchTenantStore(): Promise<Store | null> {
+  return apiFetch<Store | null>('/tenant');
+}
+
+export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: { brandColor?: string; logoUrl?: string }): Promise<Store> {
+  return apiFetch<Store>(`/owner/stores/${storeId}/domain`, {
+    method: 'PATCH',
+    body: JSON.stringify({ customDomain, themeConfig }),
+  });
+}
+
+export async function ownerVerifyStoreDomain(storeId: string): Promise<{ verified: boolean; cnameTarget: string | null; domain: string }> {
+  return apiFetch<{ verified: boolean; cnameTarget: string | null; domain: string }>(`/owner/stores/${storeId}/domain/verify`, {
+    method: 'POST',
+  });
+}
+
 export async function createStore(store: Partial<Store>): Promise<Store> {
   return apiFetch<Store>('/stores', {
     method: 'POST',

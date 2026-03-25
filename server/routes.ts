@@ -15,7 +15,9 @@ import {
   getAdminAllStores,
   adminUpdateStore,
   findStoreByNameOrAddress,
+  getStoreByCustomDomain,
 } from './db.ts';
+import dns from 'dns';
 import { verifyStore } from './verification.ts';
 import { serverSearchStores } from './search.ts';
 import { isAuthenticated } from './replit_integrations/auth/index.ts';
@@ -960,6 +962,88 @@ router.delete('/owner/stores/:id/photos/:index', isAuthenticated as RequestHandl
   } catch (error: any) {
     console.error('[OwnerStorePhotos] Delete error:', error.message);
     res.status(500).json({ error: error.message || 'Failed to delete store photo' });
+  }
+});
+
+router.get('/tenant', async (req: any, res) => {
+  res.json(req.tenantStore || null);
+});
+
+router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const { customDomain, themeConfig } = req.body;
+    const updates: any = {};
+    if (customDomain !== undefined) {
+      updates.customDomain = customDomain ? customDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') : null;
+      updates.domainVerified = false;
+    }
+    if (themeConfig !== undefined) {
+      updates.themeConfig = themeConfig;
+    }
+    const store = await updateStore(storeId, updates);
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json(store);
+  } catch (error: any) {
+    console.error('[OwnerDomain] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to update domain settings' });
+  }
+});
+
+router.post('/owner/stores/:id/domain/verify', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    if (!existing.customDomain) {
+      res.status(400).json({ error: 'No custom domain configured for this store' });
+      return;
+    }
+    const appHost = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
+    let verified = false;
+    let cnameTarget: string | null = null;
+    try {
+      const addresses = await dns.promises.resolveCname(existing.customDomain);
+      cnameTarget = addresses[0] || null;
+      verified = addresses.some(addr =>
+        addr.toLowerCase().includes('replit.app') ||
+        addr.toLowerCase().includes('replit.dev') ||
+        (appHost && addr.toLowerCase().includes(appHost.toLowerCase()))
+      );
+    } catch {
+      verified = false;
+    }
+    if (verified) {
+      await updateStore(storeId, { domainVerified: true });
+    }
+    res.json({ verified, cnameTarget, domain: existing.customDomain });
+  } catch (error: any) {
+    console.error('[OwnerDomain] Verify error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to verify domain' });
   }
 });
 

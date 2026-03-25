@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, ensureCustomDomainColumns, getStoreByCustomDomain } from './db.ts';
 import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 
 const app = express();
@@ -29,6 +29,33 @@ async function startServer() {
   await ensureHeaderImageColumn();
   await ensureStorePhotosColumn();
   await ensureUserProfileColumns();
+  await ensureCustomDomainColumns();
+
+  const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
+  const tenantCache = new Map<string, { store: any; expiresAt: number }>();
+  const TENANT_CACHE_TTL_MS = 60_000;
+
+  app.use(async (req: any, _res, next) => {
+    try {
+      const host = (req.headers.host || '').split(':')[0].toLowerCase().trim();
+      if (!host || host === 'localhost' || host === MAIN_DOMAIN || host.endsWith('.replit.app') || host.endsWith('.replit.dev')) {
+        req.tenantStore = null;
+        return next();
+      }
+      const cached = tenantCache.get(host);
+      if (cached) {
+        req.tenantStore = cached.expiresAt > Date.now() ? cached.store : null;
+        if (!cached.store || cached.expiresAt <= Date.now()) tenantCache.delete(host);
+        if (req.tenantStore) return next();
+      }
+      const store = await getStoreByCustomDomain(host);
+      tenantCache.set(host, { store, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
+      req.tenantStore = store;
+    } catch {
+      req.tenantStore = null;
+    }
+    next();
+  });
 
   app.use('/api', router);
 
