@@ -1059,7 +1059,8 @@ router.post('/owner/stores/:id/domain/verify', isAuthenticated as RequestHandler
     if (verified) {
       await updateStore(storeId, { domainVerified: true });
     }
-    res.json({ verified, cnameTarget, domain: existing.customDomain, reason: verificationReason });
+    const expectedTarget = replitDomains[0] || null;
+    res.json({ verified, cnameTarget, expectedTarget, domain: existing.customDomain, reason: verificationReason });
   } catch (error: any) {
     console.error('[OwnerDomain] Verify error:', error.message);
     res.status(500).json({ error: error.message || 'Failed to verify domain' });

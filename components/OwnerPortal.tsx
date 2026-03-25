@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
@@ -639,8 +639,281 @@ const OwnedStoresSection: React.FC = () => {
 
             <StoreMediaSection store={store} />
             <PresenceQR storeId={store.id} storeName={store.name} />
+            <OwnedSiteSection
+              store={store}
+              onUpdate={updated => setStores(prev => prev.map(s => s.id === updated.id ? updated : s))}
+            />
           </div>
         ))}
+      </div>
+    </div>
+  );
+};
+
+type DnsResult = {
+  verified: boolean;
+  cnameTarget: string | null;
+  expectedTarget: string | null;
+  domain: string;
+  reason: string;
+};
+
+const DEFAULT_BRAND = '#065f46';
+const FALLBACK_CNAME_TARGET = 'legacyleaf-directory.replit.app';
+
+const DnsInstructions: React.FC<{ target: string; header: string; subtext: string; color: 'amber' | 'red' }> = ({ target, header, subtext, color }) => {
+  const colorMap = {
+    amber: { bg: 'bg-amber-50', border: 'border-amber-200', head: 'text-amber-800', sub: 'text-amber-700', inner: 'border-amber-200' },
+    red: { bg: 'bg-red-50', border: 'border-red-200', head: 'text-red-800', sub: 'text-red-700', inner: 'border-red-200' },
+  }[color];
+  return (
+    <div className={`${colorMap.bg} ${colorMap.border} border rounded-2xl p-4`}>
+      <p className={`${colorMap.head} font-bold text-sm mb-1`}>{header}</p>
+      <p className={`${colorMap.sub} text-xs mb-3`}>{subtext}</p>
+      <div className={`bg-white ${colorMap.inner} border rounded-xl p-3`}>
+        <p className="text-xs font-black uppercase tracking-widest text-stone-500 mb-2">DNS Setup Instructions</p>
+        <p className="text-xs text-stone-600 mb-2">Go to your domain registrar → DNS settings → add this CNAME record:</p>
+        <div className="overflow-x-auto">
+          <table className="text-xs font-mono w-full min-w-[220px]">
+            <thead>
+              <tr className="text-stone-400">
+                <th className="text-left pr-4 font-bold">Type</th>
+                <th className="text-left pr-4 font-bold">Name</th>
+                <th className="text-left font-bold">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="text-stone-800">
+                <td className="pr-4">CNAME</td>
+                <td className="pr-4">@</td>
+                <td className="break-all">{target}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => void }> = ({ store, onUpdate }) => {
+  const [domain, setDomain] = useState(store.customDomain ?? '');
+  const [brandColor, setBrandColor] = useState(store.themeConfig?.brandColor ?? DEFAULT_BRAND);
+  const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [dnsResult, setDnsResult] = useState<DnsResult | null>(null);
+  const [dnsError, setDnsError] = useState('');
+  const autoCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (autoCheckRef.current) clearTimeout(autoCheckRef.current); }, []);
+
+  const savedDomain = store.customDomain ?? '';
+  const savedBrand = store.themeConfig?.brandColor ?? DEFAULT_BRAND;
+  const isDirty = domain !== savedDomain || brandColor !== savedBrand;
+
+  const hasDomain = !!savedDomain;
+  const isVerified = dnsResult ? dnsResult.verified : store.domainVerified;
+  const displayExpected = dnsResult?.expectedTarget || FALLBACK_CNAME_TARGET;
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    setDnsResult(null);
+    try {
+      const updated = await ownerSaveStoreDomain(store.id, domain.trim(), { brandColor });
+      onUpdate(updated);
+      if (domain.trim()) {
+        autoCheckRef.current = setTimeout(async () => {
+          try {
+            const result = await ownerVerifyStoreDomain(store.id);
+            setDnsResult(result);
+          } catch { }
+        }, 5000);
+      }
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save domain settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCheckDns = async () => {
+    setChecking(true);
+    setDnsError('');
+    try {
+      const result = await ownerVerifyStoreDomain(store.id);
+      setDnsResult(result);
+    } catch (err: any) {
+      setDnsError(err.message || 'DNS check failed');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="border border-stone-200 rounded-2xl p-6 mt-4">
+      <div className="flex items-center gap-2 mb-1">
+        <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+        </svg>
+        <h4 className="font-bold text-stone-900">Your Website</h4>
+        {hasDomain && !isDirty && (
+          isVerified ? (
+            <span className="ml-auto text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
+              Live
+            </span>
+          ) : (
+            <span className="ml-auto text-xs font-black uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+              DNS Pending
+            </span>
+          )
+        )}
+      </div>
+      <p className="text-xs text-stone-400 mb-4 ml-7">Connect your own domain and customize your store's branded website.</p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold text-stone-500 mb-1">Custom Domain</label>
+          <input
+            type="text"
+            value={domain}
+            onChange={e => { setDomain(e.target.value); setDnsResult(null); }}
+            placeholder="e.g. thegreentree.ca"
+            disabled={saving}
+            className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none disabled:opacity-60"
+          />
+          <p className="text-xs text-stone-400 mt-1">Enter without https:// — e.g. shop.example.ca</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-stone-500 mb-1">Brand Colour</label>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input
+                type="color"
+                value={brandColor}
+                onChange={e => setBrandColor(e.target.value)}
+                disabled={saving}
+                className="w-10 h-10 rounded-xl border border-stone-200 cursor-pointer bg-stone-50 p-0.5 disabled:opacity-60"
+                title="Pick a colour"
+              />
+            </div>
+            <input
+              type="text"
+              value={brandColor}
+              onChange={e => {
+                const v = e.target.value;
+                if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setBrandColor(v);
+              }}
+              maxLength={7}
+              disabled={saving}
+              className="w-28 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm font-mono focus:border-emerald-400 outline-none disabled:opacity-60"
+              placeholder="#065f46"
+            />
+            <div
+              className="w-8 h-8 rounded-full border border-stone-200 flex-shrink-0"
+              style={{ backgroundColor: brandColor }}
+              title="Colour preview"
+            />
+          </div>
+        </div>
+
+        {saveError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm font-medium">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !isDirty}
+            className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saving && (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+          {hasDomain && (
+            <button
+              type="button"
+              onClick={handleCheckDns}
+              disabled={checking || saving}
+              className="bg-stone-100 text-stone-700 px-5 py-2 rounded-xl text-sm font-bold hover:bg-stone-200 transition disabled:opacity-40 flex items-center gap-2"
+            >
+              {checking && (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {checking ? 'Checking…' : 'Check DNS'}
+            </button>
+          )}
+        </div>
+
+        {saving && domain.trim() && (
+          <p className="text-xs text-stone-400 italic">Saved — will auto-check DNS in 5 seconds…</p>
+        )}
+
+        {dnsError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm font-medium">
+            {dnsError}
+          </div>
+        )}
+
+        {dnsResult && (
+          dnsResult.verified ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+              <p className="text-emerald-700 font-bold text-sm mb-1">✅ Verified & Live</p>
+              <p className="text-emerald-600 text-xs mb-3">Your custom domain is pointing here correctly.</p>
+              <a
+                href={`https://${store.customDomain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 hover:text-emerald-500 transition"
+              >
+                Preview Your Site →
+              </a>
+            </div>
+          ) : (
+            <DnsInstructions
+              target={displayExpected}
+              header="⚠ DNS Not Yet Resolving"
+              subtext={`Your domain is not yet pointing here. ${dnsResult.cnameTarget ? `Currently resolves to: ${dnsResult.cnameTarget}.` : 'No CNAME record found.'}`}
+              color="amber"
+            />
+          )
+        )}
+
+        {!dnsResult && hasDomain && isVerified && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+            <p className="text-emerald-700 font-bold text-sm mb-1">✅ Verified & Live</p>
+            <a
+              href={`https://${savedDomain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 hover:text-emerald-500 transition"
+            >
+              Preview Your Site →
+            </a>
+          </div>
+        )}
+
+        {!dnsResult && hasDomain && !isVerified && (
+          <DnsInstructions
+            target={FALLBACK_CNAME_TARGET}
+            header="⚠ DNS Setup Pending"
+            subtext="Add a CNAME record at your domain registrar to activate your branded website:"
+            color="amber"
+          />
+        )}
       </div>
     </div>
   );
