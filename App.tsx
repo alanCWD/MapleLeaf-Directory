@@ -23,8 +23,9 @@ import { PostDetailPage } from './components/PostDetailPage';
 import { CreatePost } from './components/CreatePost';
 import { ProfileSettings } from './components/ProfileSettings';
 import { UserProfilePage } from './components/UserProfilePage';
+import { SovereignSite } from './components/SovereignSite';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
-import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI } from './services/api';
+import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore } from './services/api';
 import { useAuth } from './hooks/useAuth';
 
 const FAVORITES_KEY = 'legacyleaf_favs_v2';
@@ -38,7 +39,7 @@ const ScrollToTop = () => {
   return null;
 };
 
-const App: React.FC = () => {
+const DirectoryApp: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedProvince, setSelectedProvince] = useState<Province | null>(null);
@@ -503,6 +504,35 @@ const App: React.FC = () => {
       </div>
     </HashRouter>
   );
+};
+
+const App: React.FC = () => {
+  const [tenantStore, setTenantStore] = useState<Store | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTenantStore()
+      .then(store => setTenantStore(store))
+      .catch(() => setTenantStore(null))
+      .finally(() => setTenantLoading(false));
+  }, []);
+
+  if (tenantLoading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-stone-400 text-sm font-bold">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (tenantStore) {
+    return <SovereignSite store={tenantStore} />;
+  }
+
+  return <DirectoryApp />;
 };
 
 export default App;
