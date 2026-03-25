@@ -34,6 +34,21 @@ async function startServer() {
   const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
   const tenantCache = new Map<string, { store: any; expiresAt: number }>();
   const TENANT_CACHE_TTL_MS = 60_000;
+  const TENANT_CACHE_MAX_SIZE = 500;
+
+  const pruneTenantCache = () => {
+    const now = Date.now();
+    for (const [key, val] of tenantCache) {
+      if (val.expiresAt <= now) tenantCache.delete(key);
+    }
+    if (tenantCache.size > TENANT_CACHE_MAX_SIZE) {
+      const oldest = Array.from(tenantCache.entries())
+        .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+        .slice(0, tenantCache.size - TENANT_CACHE_MAX_SIZE);
+      for (const [key] of oldest) tenantCache.delete(key);
+    }
+  };
+  setInterval(pruneTenantCache, 5 * 60 * 1000).unref();
 
   app.use(async (req: any, _res, next) => {
     try {
@@ -50,6 +65,7 @@ async function startServer() {
         }
         tenantCache.delete(host);
       }
+      if (tenantCache.size >= TENANT_CACHE_MAX_SIZE) pruneTenantCache();
       const store = await getStoreByCustomDomain(host);
       tenantCache.set(host, { store, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
       req.tenantStore = store;
