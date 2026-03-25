@@ -751,6 +751,8 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
     }
   };
 
+  const isFormBusy = saving || checking;
+
   return (
     <div className="border border-stone-200 rounded-2xl p-6 mt-4">
       <div className="flex items-center gap-2 mb-1">
@@ -780,7 +782,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
             value={domain}
             onChange={e => { setDomain(e.target.value); setDnsResult(null); }}
             placeholder="e.g. thegreentree.ca"
-            disabled={saving}
+            disabled={isFormBusy}
             className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none disabled:opacity-60"
           />
           <p className="text-xs text-stone-400 mt-1">Enter without https:// — e.g. shop.example.ca</p>
@@ -789,16 +791,14 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
         <div>
           <label className="block text-xs font-bold text-stone-500 mb-1">Brand Colour</label>
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                type="color"
-                value={brandColor}
-                onChange={e => setBrandColor(e.target.value)}
-                disabled={saving}
-                className="w-10 h-10 rounded-xl border border-stone-200 cursor-pointer bg-stone-50 p-0.5 disabled:opacity-60"
-                title="Pick a colour"
-              />
-            </div>
+            <input
+              type="color"
+              value={brandColor}
+              onChange={e => setBrandColor(e.target.value)}
+              disabled={isFormBusy}
+              className="w-10 h-10 rounded-xl border border-stone-200 cursor-pointer bg-stone-50 p-0.5 disabled:opacity-60"
+              title="Pick a colour"
+            />
             <input
               type="text"
               value={brandColor}
@@ -807,7 +807,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
                 if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setBrandColor(v);
               }}
               maxLength={7}
-              disabled={saving}
+              disabled={isFormBusy}
               className="w-28 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm font-mono focus:border-emerald-400 outline-none disabled:opacity-60"
               placeholder="#065f46"
             />
@@ -829,7 +829,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !isDirty}
+            disabled={isFormBusy || !isDirty}
             className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-emerald-400 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving && (
@@ -840,26 +840,28 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
             )}
             {saving ? 'Saving…' : 'Save Settings'}
           </button>
-          {hasDomain && (
-            <button
-              type="button"
-              onClick={handleCheckDns}
-              disabled={checking || saving}
-              className="bg-stone-100 text-stone-700 px-5 py-2 rounded-xl text-sm font-bold hover:bg-stone-200 transition disabled:opacity-40 flex items-center gap-2"
-            >
-              {checking && (
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
-              {checking ? 'Checking…' : 'Check DNS'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleCheckDns}
+            disabled={isFormBusy || !hasDomain}
+            title={!hasDomain ? 'Save a domain first' : undefined}
+            className="bg-stone-100 text-stone-700 px-5 py-2 rounded-xl text-sm font-bold hover:bg-stone-200 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {checking && (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            {checking ? 'Checking…' : 'Check DNS'}
+          </button>
         </div>
 
         {saving && domain.trim() && (
-          <p className="text-xs text-stone-400 italic">Saved — will auto-check DNS in 5 seconds…</p>
+          <p className="text-xs text-stone-400 italic">Saving — will auto-check DNS in 5 seconds after save…</p>
+        )}
+        {checking && (
+          <p className="text-xs text-stone-400 italic">Checking DNS…</p>
         )}
 
         {dnsError && (
@@ -868,7 +870,8 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           </div>
         )}
 
-        {dnsResult && (
+        {/* --- DNS status area: exactly one of three states --- */}
+        {dnsResult ? (
           dnsResult.verified ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
               <p className="text-emerald-700 font-bold text-sm mb-1">✅ Verified & Live</p>
@@ -890,9 +893,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
               color="amber"
             />
           )
-        )}
-
-        {!dnsResult && hasDomain && isVerified && (
+        ) : hasDomain && isVerified ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
             <p className="text-emerald-700 font-bold text-sm mb-1">✅ Verified & Live</p>
             <a
@@ -904,15 +905,18 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
               Preview Your Site →
             </a>
           </div>
-        )}
-
-        {!dnsResult && hasDomain && !isVerified && (
+        ) : hasDomain && !isVerified ? (
           <DnsInstructions
             target={FALLBACK_CNAME_TARGET}
             header="⚠ DNS Setup Pending"
             subtext="Add a CNAME record at your domain registrar to activate your branded website:"
             color="amber"
           />
+        ) : (
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+            <p className="text-stone-500 font-bold text-sm mb-1">❌ No domain entered</p>
+            <p className="text-stone-400 text-xs">Enter a custom domain above and save to get started. DNS instructions will appear once a domain is saved.</p>
+          </div>
         )}
       </div>
     </div>
