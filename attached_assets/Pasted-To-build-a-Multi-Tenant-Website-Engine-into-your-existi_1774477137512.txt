@@ -1,0 +1,73 @@
+To build a **Multi-Tenant Website Engine** into your existing LegacyLeaf app, you are essentially moving from a "Directory" (where everything is on one domain) to a "Platform" (where your app acts as the invisible engine behind hundreds of unique domains).
+
+Here is the step-by-step technical and operational outline to implement this.
+
+---
+
+### Phase 1: Database Architecture Updates
+Your database needs to know which custom domain belongs to which store.
+
+1.  **Update the Store Schema:** Add a `custom_domain` column to your `Stores` table.
+    * *Field:* `custom_domain` (e.g., `thegreentree.ca`)
+    * *Field:* `theme_config` (JSON object to store brand colors, logo URL, and font choices).
+2.  **Primary Key Lookup:** Ensure you have an index on `custom_domain` for ultra-fast lookups, as every single page load on the custom site will query this.
+
+---
+
+### Phase 2: The Routing Engine (Middleware)
+This is the "Brain" of multi-tenancy. You need to intercept the request before it hits your page and decide what to show. If you are using **Next.js** (recommended for this), you use a `middleware.ts` file.
+
+**The Logic:**
+1.  **Capture the Host:** Get the hostname from the request (e.g., `user-store.com`).
+2.  **Ignore the "Main" App:** If the host is `legacy-leaf-directory.replit.app`, proceed to the directory as normal.
+3.  **Identify the Tenant:** If it's a custom domain, look up that domain in your database.
+4.  **Rewrite the URL:** Internally "rewrite" the request to a special folder (e.g., `/store-fronts/[storeId]`) **without** changing the URL in the browser.
+
+*The user sees `thegreentree.ca/about`, but your server is actually rendering `legacyleaf.app/sites/store-123/about`.*
+
+---
+
+### Phase 3: Automated SSL and Domain Mapping
+You cannot manually set up SSL certificates for every store. You need a **Programmable Infrastructure** layer.
+
+* **Option A: Vercel (Easiest):** If you host on Vercel, you use their "External Domains" API. When a store saves their domain in your dashboard, your app makes an API call to Vercel to "Allow" that domain and generate an SSL via Let’s Encrypt.
+* **Option B: Cloudflare for Platforms:** This is the industry standard for SaaS. You point the store's CNAME to your Cloudflare "fallback" address, and Cloudflare handles the SSL handshake and security at the edge.
+
+**The Instruction to the Store Owner:**
+> "Go to your domain provider (GoDaddy/Namecheap) and create a **CNAME record** pointing `@` to `proxy.legacyleaf.app`."
+
+---
+
+### Phase 4: The "Sovereign" UI Template
+You don’t want the standalone website to look like a directory. You need to create a **Site Template** that pulls from your existing data:
+
+1.  **The "Live Feed" Component:** Build a component that pulls the **Culture Posts** (from Page 1 of your PDF) and displays them as a "Latest News" blog.
+2.  **The "Trust" Sidebar:** Create a widget that displays the **Badge System** (Page 11).
+    * *Example:* A "Verified Region Leaders" section showing the top 3 **Regional Builders** who have reviewed this specific store.
+3.  **Dynamic SEO:** Use the Store’s name and location (Okanagan, Kootenays, etc.) to generate the Meta Tags dynamically. This ensures the standalone site ranks for "[Store Name] [City]" immediately.
+
+---
+
+### Phase 5: The Monetization & Onboarding Flow
+To make this a $29–$150/month service, the setup must be "Self-Serve."
+
+1.  **The Dashboard:** Inside the LegacyLeaf app, the store owner sees a "Go Live" button.
+2.  **Domain Input:** They enter their domain.
+3.  **Verification:** Your app checks the DNS records. Once verified, the middleware "activates."
+4.  **Sync Control:** Give them toggles:
+    * [X] Show my LegacyLeaf star rating.
+    * [X] Sync "Culture Posts" to my homepage.
+    * [X] Show "Founding BC Contributor" reviews first.
+
+---
+
+### Why this beats WordPress for your Niche:
+* **Speed:** Because it’s a direct "Rewrite" of your app, the sites will load in <1 second (crucial for mobile users looking for stores).
+* **Data Integrity:** If a **Scout** or **Architect** posts a "Culture Post" (Page 3 of PDF) about the store, it updates the directory *and* the store’s standalone website simultaneously.
+* **Zero Maintenance:** The store owner never has to update a plugin or worry about a "Gray Market" hosting provider banning them. You are their "Safe Haven" infrastructure.
+
+### Summary of Tech Stack
+* **Framework:** Next.js (on Replit or Vercel).
+* **Infrastructure:** Cloudflare for Platforms (for Custom Domains/SSL).
+* **Database:** Supabase or PostgreSQL (to store `custom_domain` links).
+* **Styling:** Tailwind CSS (using CSS variables for store-specific branding).
