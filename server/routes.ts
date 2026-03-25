@@ -1023,24 +1023,37 @@ router.post('/owner/stores/:id/domain/verify', isAuthenticated as RequestHandler
       res.status(400).json({ error: 'No custom domain configured for this store' });
       return;
     }
-    const appHost = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
+    const replitDomains = (process.env.REPLIT_DOMAINS || '')
+      .split(',')
+      .map(d => d.trim().toLowerCase())
+      .filter(Boolean);
+    const normalizeHost = (h: string) => h.toLowerCase().replace(/\.$/, '').trim();
     let verified = false;
     let cnameTarget: string | null = null;
+    let verificationReason: string = 'CNAME_NOT_FOUND';
     try {
       const addresses = await dns.promises.resolveCname(existing.customDomain);
       cnameTarget = addresses[0] || null;
-      verified = addresses.some(addr =>
-        addr.toLowerCase().includes('replit.app') ||
-        addr.toLowerCase().includes('replit.dev') ||
-        (appHost && addr.toLowerCase().includes(appHost.toLowerCase()))
-      );
-    } catch {
-      verified = false;
+      const normalizedAddresses = addresses.map(normalizeHost);
+      if (replitDomains.length > 0) {
+        verified = normalizedAddresses.some(addr =>
+          replitDomains.some(appDomain => addr === appDomain)
+        );
+        verificationReason = verified
+          ? 'CNAME_MATCHES_APP'
+          : `CNAME_WRONG_TARGET: points to "${cnameTarget}", expected one of: ${replitDomains.join(', ')}`;
+      } else {
+        verificationReason = 'APP_DOMAIN_NOT_CONFIGURED';
+      }
+    } catch (dnsErr: any) {
+      verificationReason = dnsErr.code === 'ENODATA' || dnsErr.code === 'ENOTFOUND'
+        ? 'CNAME_NOT_FOUND'
+        : `DNS_ERROR: ${dnsErr.code || dnsErr.message}`;
     }
     if (verified) {
       await updateStore(storeId, { domainVerified: true });
     }
-    res.json({ verified, cnameTarget, domain: existing.customDomain });
+    res.json({ verified, cnameTarget, domain: existing.customDomain, reason: verificationReason });
   } catch (error: any) {
     console.error('[OwnerDomain] Verify error:', error.message);
     res.status(500).json({ error: error.message || 'Failed to verify domain' });

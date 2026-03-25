@@ -50,8 +50,8 @@ export async function ownerSaveStoreDomain(storeId: string, customDomain: string
   });
 }
 
-export async function ownerVerifyStoreDomain(storeId: string): Promise<{ verified: boolean; cnameTarget: string | null; domain: string }> {
-  return apiFetch<{ verified: boolean; cnameTarget: string | null; domain: string }>(`/owner/stores/${storeId}/domain/verify`, {
+export async function ownerVerifyStoreDomain(storeId: string): Promise<{ verified: boolean; cnameTarget: string | null; domain: string; reason: string }> {
+  return apiFetch<{ verified: boolean; cnameTarget: string | null; domain: string; reason: string }>(`/owner/stores/${storeId}/domain/verify`, {
     method: 'POST',
   });
 }

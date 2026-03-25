@@ -44,9 +44,11 @@ async function startServer() {
       }
       const cached = tenantCache.get(host);
       if (cached) {
-        req.tenantStore = cached.expiresAt > Date.now() ? cached.store : null;
-        if (!cached.store || cached.expiresAt <= Date.now()) tenantCache.delete(host);
-        if (req.tenantStore) return next();
+        if (cached.expiresAt > Date.now()) {
+          req.tenantStore = cached.store;
+          return next();
+        }
+        tenantCache.delete(host);
       }
       const store = await getStoreByCustomDomain(host);
       tenantCache.set(host, { store, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
