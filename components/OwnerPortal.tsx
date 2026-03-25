@@ -724,6 +724,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
       const updated = await ownerSaveStoreDomain(store.id, domain.trim(), { brandColor });
       onUpdate(updated);
       if (domain.trim()) {
+        if (autoCheckRef.current) clearTimeout(autoCheckRef.current);
         autoCheckRef.current = setTimeout(async () => {
           try {
             const result = await ownerVerifyStoreDomain(store.id);
@@ -877,7 +878,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
               <p className="text-emerald-700 font-bold text-sm mb-1">✅ Verified & Live</p>
               <p className="text-emerald-600 text-xs mb-3">Your custom domain is pointing here correctly.</p>
               <a
-                href={`https://${store.customDomain}`}
+                href={`https://${dnsResult.domain || savedDomain}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 hover:text-emerald-500 transition"
