@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia, ThemeConfig, FontPairing } from '../types';
@@ -256,6 +256,7 @@ const OwnedStoresSection: React.FC = () => {
   const [editingPhotos, setEditingPhotos] = useState<string[]>([]);
   const headerFileRef = useRef<HTMLInputElement>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
+  const showUpgradeSuccess = new URLSearchParams(window.location.search).get('upgraded') === '1';
 
   useEffect(() => {
     getOwnedStoresAPI().then(setStores).catch(() => {});
@@ -642,6 +643,7 @@ const OwnedStoresSection: React.FC = () => {
             <OwnedSiteSection
               store={store}
               onUpdate={updated => setStores(prev => prev.map(s => s.id === updated.id ? updated : s))}
+              showUpgradeSuccess={showUpgradeSuccess}
             />
           </div>
         ))}
@@ -744,7 +746,37 @@ const FONT_PAIRINGS: { value: string; label: string; description: string }[] = [
   { value: 'elegant', label: 'Elegant', description: 'Playfair Display + Lato' },
 ];
 
-const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => void }> = ({ store, onUpdate }) => {
+const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => void; showUpgradeSuccess?: boolean }> = ({ store, onUpdate, showUpgradeSuccess }) => {
+  const isActivePlan = store.sovereignPlanStatus === 'active' || store.sovereignPlanStatus === 'trialing';
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const { url } = await ownerCreateCheckout(store.id);
+      if (url) window.location.href = url;
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Failed to start checkout');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setPortalLoading(true);
+    try {
+      const { url } = await ownerGetBillingPortal(store.id);
+      if (url) window.open(url, '_blank');
+    } catch (err: any) {
+      console.error('Billing portal error:', err.message);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   const [domain, setDomain] = useState(store.customDomain ?? '');
   const [brandColor, setBrandColor] = useState(store.themeConfig?.brandColor ?? DEFAULT_BRAND);
   const [accentColor, setAccentColor] = useState(store.themeConfig?.accentColor ?? '');
@@ -864,6 +896,75 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
 
   const isFormBusy = saving || checking;
 
+  if (!isActivePlan) {
+    return (
+      <div className="border border-stone-200 rounded-2xl p-6 mt-4">
+        <div className="flex items-center gap-2 mb-1">
+          <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+          </svg>
+          <h4 className="font-bold text-stone-900">Your Website</h4>
+          <span className="ml-auto text-xs font-black uppercase tracking-widest text-stone-400 bg-stone-100 border border-stone-200 px-2 py-1 rounded-lg">Not Active</span>
+        </div>
+        <p className="text-xs text-stone-400 mb-4 ml-7">Launch your own branded sovereign microsite on a custom domain.</p>
+
+        {showUpgradeSuccess && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-bold text-emerald-800 text-sm">Welcome to Sovereign Site!</p>
+              <p className="text-emerald-700 text-xs mt-0.5">Your subscription is being activated. Refresh this page in a moment to start building your site.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-gradient-to-br from-emerald-50 to-stone-50 border border-emerald-200 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-emerald-600 text-xl">🌿</span>
+            <p className="font-black text-stone-900 text-base">Sovereign Site</p>
+            <span className="ml-auto text-xs font-black text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">$29 / month</span>
+          </div>
+          <ul className="space-y-2 mb-5">
+            {[
+              'Your own branded domain — look fully sovereign, no directory watermark',
+              'Full colour, font, and content control — built around your identity',
+              'Hero tagline, sub-headline, and section visibility toggles',
+              'Integrated gallery, posts, hours, and contact — all in one site',
+              'Live preview and DNS verification tools included',
+            ].map((benefit, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-stone-700">
+                <svg className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                </svg>
+                {benefit}
+              </li>
+            ))}
+          </ul>
+          {checkoutError && <p className="text-red-600 text-xs mb-3 font-medium">{checkoutError}</p>}
+          <button
+            onClick={handleCheckout}
+            disabled={checkoutLoading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black rounded-xl py-3 px-4 transition text-sm flex items-center justify-center gap-2"
+          >
+            {checkoutLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Redirecting to checkout…
+              </>
+            ) : (
+              'Unlock Sovereign Site →'
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border border-stone-200 rounded-2xl p-6 mt-4">
       <div className="flex items-center gap-2 mb-1">
@@ -871,6 +972,9 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
         </svg>
         <h4 className="font-bold text-stone-900">Your Website</h4>
+        <span className="ml-1 text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+          {store.sovereignPlanStatus === 'trialing' ? 'Trialing' : 'Active'}
+        </span>
         {hasDomain && !isDirty && (
           isVerified ? (
             <span className="ml-auto text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
@@ -883,7 +987,16 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           )
         )}
       </div>
-      <p className="text-xs text-stone-400 mb-4 ml-7">Connect your own domain and customize your store's branded website.</p>
+      <div className="flex items-center justify-between mb-4 ml-7">
+        <p className="text-xs text-stone-400">Connect your own domain and customize your store's branded website.</p>
+        <button
+          onClick={handleManageBilling}
+          disabled={portalLoading}
+          className="ml-3 text-xs font-bold text-stone-500 hover:text-emerald-600 transition flex-shrink-0 disabled:opacity-60"
+        >
+          {portalLoading ? 'Loading…' : 'Manage Billing →'}
+        </button>
+      </div>
 
       <input
         ref={logoFileRef}

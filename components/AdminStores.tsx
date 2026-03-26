@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, Province, VerificationStatus, ThemeConfig, FontPairing } from '../types';
-import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto, adminSaveStoreTheme } from '../services/api';
+import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto, adminSaveStoreTheme, adminSetSovereignPlan } from '../services/api';
 import type { AuditLogEntry } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
@@ -104,6 +104,10 @@ export const AdminStores: React.FC = () => {
   const [siteShowContact, setSiteShowContact] = useState(true);
   const [siteSaving, setSiteSaving] = useState(false);
   const [siteSaveMsg, setSiteSaveMsg] = useState('');
+  const [sovereignStatus, setSovereignStatus] = useState<'active' | 'trialing' | 'inactive'>('inactive');
+  const [sovereignExpiry, setSovereignExpiry] = useState('');
+  const [sovereignSaving, setSovereignSaving] = useState(false);
+  const [sovereignMsg, setSovereignMsg] = useState('');
 
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
@@ -210,6 +214,9 @@ export const AdminStores: React.FC = () => {
     setSiteShowPosts(store.themeConfig?.sections?.showPosts !== false);
     setSiteShowContact(store.themeConfig?.sections?.showContact !== false);
     setSiteSaveMsg('');
+    setSovereignStatus(store.sovereignPlanStatus ?? 'inactive');
+    setSovereignExpiry(store.sovereignPlanExpiresAt ? store.sovereignPlanExpiresAt.substring(0, 10) : '');
+    setSovereignMsg('');
   };
 
   const handleSiteSave = async () => {
@@ -231,6 +238,24 @@ export const AdminStores: React.FC = () => {
       setSiteSaveMsg('Error: ' + (e.message ?? 'Failed'));
     } finally {
       setSiteSaving(false);
+    }
+  };
+
+  const handleSovereignSave = async () => {
+    if (!editSiteStore) return;
+    setSovereignSaving(true);
+    setSovereignMsg('');
+    try {
+      const expiry = sovereignExpiry ? new Date(sovereignExpiry).toISOString() : null;
+      const updated = await adminSetSovereignPlan(editSiteStore.id, sovereignStatus, expiry);
+      setStores(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setEditSiteStore(updated);
+      setSovereignMsg('Sovereign plan updated!');
+      setTimeout(() => setSovereignMsg(''), 2500);
+    } catch (e: any) {
+      setSovereignMsg('Error: ' + (e.message ?? 'Failed'));
+    } finally {
+      setSovereignSaving(false);
     }
   };
 
@@ -1172,6 +1197,51 @@ export const AdminStores: React.FC = () => {
                   {siteSaveMsg}
                 </div>
               )}
+
+              <div className="border-t border-stone-100 pt-5">
+                <p className="text-xs font-black uppercase tracking-widest text-stone-400 mb-3">Sovereign Plan (Admin)</p>
+                <div className="flex items-center gap-2 mb-3">
+                  {(['active', 'trialing', 'inactive'] as const).map(status => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setSovereignStatus(status)}
+                      className={`flex-1 py-2 rounded-xl border text-xs font-bold transition capitalize ${
+                        sovereignStatus === status
+                          ? status === 'active' ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                            : status === 'trialing' ? 'border-amber-400 bg-amber-50 text-amber-800'
+                            : 'border-stone-300 bg-stone-100 text-stone-600'
+                          : 'border-stone-200 bg-stone-50 text-stone-400 hover:border-stone-300'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-bold text-stone-500 mb-1">Expiry Date <span className="font-normal text-stone-400">(optional)</span></label>
+                  <input
+                    type="date"
+                    value={sovereignExpiry}
+                    onChange={e => setSovereignExpiry(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+                  />
+                </div>
+                {sovereignMsg && (
+                  <div className={`px-4 py-3 rounded-xl text-sm font-bold mb-2 ${
+                    sovereignMsg.startsWith('Error') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                  }`}>
+                    {sovereignMsg}
+                  </div>
+                )}
+                <button
+                  onClick={handleSovereignSave}
+                  disabled={sovereignSaving}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold bg-stone-800 text-white hover:bg-stone-700 disabled:opacity-50 transition"
+                >
+                  {sovereignSaving ? 'Saving...' : 'Update Sovereign Plan'}
+                </button>
+              </div>
             </div>
 
             <div className="sticky bottom-0 bg-white border-t border-stone-100 rounded-b-3xl px-6 py-4 flex justify-end gap-3">

@@ -94,6 +94,9 @@ export interface Store {
   customDomain?: string;
   domainVerified?: boolean;
   themeConfig?: ThemeConfig | null;
+  sovereignPlanStatus?: 'active' | 'trialing' | 'inactive';
+  sovereignPlanExpiresAt?: string | null;
+  stripeCustomerId?: string | null;
 
   storeInsights?: {
     atmosphere?: string;

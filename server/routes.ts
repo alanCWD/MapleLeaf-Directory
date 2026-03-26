@@ -1142,6 +1142,123 @@ router.post('/owner/stores/:id/domain/verify', isAuthenticated as RequestHandler
   }
 });
 
+router.post('/owner/stores/:id/billing/checkout', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const store = await getStoreById(storeId);
+    if (!store) { res.status(404).json({ error: 'Store not found' }); return; }
+
+    const { getUncachableStripeClient } = await import('./stripeClient.ts');
+    const stripe = await getUncachableStripeClient();
+
+    let customerId = store.stripeCustomerId || undefined;
+    if (!customerId) {
+      const user = await authStorage.getUser(userId);
+      const customer = await stripe.customers.create({
+        email: user?.email || undefined,
+        name: store.name,
+        metadata: { storeId, userId },
+      });
+      customerId = customer.id;
+      await updateStore(storeId, { stripeCustomerId: customerId } as any);
+    }
+
+    const products = await stripe.products.search({ query: "name:'Sovereign Site' AND active:'true'" });
+    let priceId: string | undefined;
+    if (products.data.length > 0) {
+      const prices = await stripe.prices.list({ product: products.data[0].id, active: true, limit: 5 });
+      const monthly = prices.data.find(p => (p.recurring as any)?.interval === 'month');
+      priceId = monthly?.id || prices.data[0]?.id;
+    }
+    if (!priceId) {
+      res.status(400).json({ error: 'Sovereign Site plan not found. Run seed-sovereign-plan script first.' });
+      return;
+    }
+
+    const baseUrl = `https://${(process.env.REPLIT_DOMAINS || '').split(',')[0]}`;
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${baseUrl}/#/owners?upgraded=1`,
+      cancel_url: `${baseUrl}/#/owners`,
+      metadata: { storeId },
+    });
+
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('[Billing] Checkout error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to create checkout session' });
+  }
+});
+
+router.get('/owner/stores/:id/billing/portal', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const store = await getStoreById(storeId);
+    if (!store) { res.status(404).json({ error: 'Store not found' }); return; }
+    if (!store.stripeCustomerId) {
+      res.status(400).json({ error: 'No billing account found for this store' });
+      return;
+    }
+
+    const { getUncachableStripeClient } = await import('./stripeClient.ts');
+    const stripe = await getUncachableStripeClient();
+    const baseUrl = `https://${(process.env.REPLIT_DOMAINS || '').split(',')[0]}`;
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: store.stripeCustomerId,
+      return_url: `${baseUrl}/#/owners`,
+    });
+
+    res.json({ url: portalSession.url });
+  } catch (error: any) {
+    console.error('[Billing] Portal error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to create billing portal session' });
+  }
+});
+
+router.patch('/admin/stores/:id/sovereign-plan', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const { sovereignPlanStatus, sovereignPlanExpiresAt } = req.body;
+    const validStatuses = ['active', 'trialing', 'inactive'];
+    if (sovereignPlanStatus && !validStatuses.includes(sovereignPlanStatus)) {
+      res.status(400).json({ error: 'Invalid sovereignPlanStatus' });
+      return;
+    }
+    const updates: any = {};
+    if (sovereignPlanStatus !== undefined) updates.sovereignPlanStatus = sovereignPlanStatus;
+    if (sovereignPlanExpiresAt !== undefined) updates.sovereignPlanExpiresAt = sovereignPlanExpiresAt;
+    const store = await updateStore(storeId, updates);
+    if (!store) { res.status(404).json({ error: 'Store not found' }); return; }
+    const adminId = getUserId(req)!;
+    await createAuditLog(adminId, 'update_sovereign_plan', 'store', storeId, { sovereignPlanStatus, sovereignPlanExpiresAt });
+    res.json(store);
+  } catch (error: any) {
+    console.error('[Admin] Sovereign plan update error:', error.message);
+    res.status(500).json({ error: 'Failed to update sovereign plan' });
+  }
+});
+
 router.get('/admin/review-queue', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
   try {
     const stores = await getReviewQueue();

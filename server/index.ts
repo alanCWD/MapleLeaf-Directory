@@ -5,8 +5,11 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, ensureCustomDomainColumns, getStoreByCustomDomain } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, ensureCustomDomainColumns, ensureSovereignPlanColumns, getStoreByCustomDomain } from './db.ts';
 import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
+import { WebhookHandlers } from './webhookHandlers.ts';
+import { runMigrations } from 'stripe-replit-sync';
+import { getStripeSync } from './stripeClient.ts';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -18,7 +21,53 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
 
 app.use(cors());
+
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req: any, res: any) => {
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature' });
+    }
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('[Stripe] Webhook error:', error.message);
+      res.status(400).json({ error: 'Webhook processing error' });
+    }
+  }
+);
+
 app.use(express.json({ limit: '10mb' }));
+
+async function initStripe() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.warn('[Stripe] DATABASE_URL not set, skipping Stripe init');
+    return;
+  }
+  try {
+    console.log('[Stripe] Running migrations...');
+    await runMigrations({ databaseUrl, schema: 'stripe' });
+    console.log('[Stripe] Migrations done');
+
+    const stripeSync = await getStripeSync();
+
+    const webhookBaseUrl = `https://${(process.env.REPLIT_DOMAINS || '').split(',')[0]}`;
+    console.log('[Stripe] Setting up managed webhook...');
+    await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
+    console.log('[Stripe] Webhook configured');
+
+    stripeSync.syncBackfill()
+      .then(() => console.log('[Stripe] Backfill sync complete'))
+      .catch((err: any) => console.error('[Stripe] Backfill error:', err.message));
+  } catch (err: any) {
+    console.error('[Stripe] Init error (non-fatal):', err.message);
+  }
+}
 
 async function startServer() {
   await setupAuth(app);
@@ -30,6 +79,7 @@ async function startServer() {
   await ensureStorePhotosColumn();
   await ensureUserProfileColumns();
   await ensureCustomDomainColumns();
+  await ensureSovereignPlanColumns();
 
   const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
   const tenantCache = new Map<string, { store: any; expiresAt: number }>();
@@ -143,6 +193,7 @@ async function startServer() {
     } catch (err) {
       console.error('[Seed] Error during store seeding:', err);
     }
+    initStripe().catch((err: any) => console.error('[Stripe] Background init error:', err.message));
   });
 }
 

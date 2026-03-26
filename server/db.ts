@@ -46,6 +46,9 @@ function snakeToCamel(row: Record<string, any>): Store {
     customDomain: row.custom_domain || undefined,
     domainVerified: row.domain_verified ?? false,
     themeConfig: row.theme_config || null,
+    sovereignPlanStatus: row.sovereign_plan_status ?? 'inactive',
+    sovereignPlanExpiresAt: row.sovereign_plan_expires_at ? row.sovereign_plan_expires_at.toISOString() : null,
+    stripeCustomerId: row.stripe_customer_id || null,
   };
 }
 
@@ -233,6 +236,9 @@ export async function updateStore(id: string, updates: Partial<Store>): Promise<
     customDomain: 'custom_domain',
     domainVerified: 'domain_verified',
     themeConfig: 'theme_config',
+    sovereignPlanStatus: 'sovereign_plan_status',
+    sovereignPlanExpiresAt: 'sovereign_plan_expires_at',
+    stripeCustomerId: 'stripe_customer_id',
   };
 
   for (const [jsKey, dbKey] of Object.entries(fieldMap)) {
@@ -387,6 +393,13 @@ export async function ensureStorePhotosColumn(): Promise<void> {
     ALTER TABLE stores ADD COLUMN IF NOT EXISTS store_photos JSONB DEFAULT '[]'
   `);
   console.log('[DB] store_photos column ensured');
+}
+
+export async function ensureSovereignPlanColumns(): Promise<void> {
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS sovereign_plan_status VARCHAR(20) DEFAULT 'inactive'`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS sovereign_plan_expires_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+  console.log('[DB] sovereign_plan columns ensured');
 }
 
 export async function ensureCustomDomainColumns(): Promise<void> {

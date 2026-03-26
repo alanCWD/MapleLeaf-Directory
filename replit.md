@@ -44,3 +44,36 @@ Users can set a public `@handle` (2–30 chars, letters/numbers/underscores, res
 **UserProfilePage.tsx**: shows social link badge in header only when public (clickable link for URL platforms, plain text for Discord)
 **AdminUsers.tsx**: always shows social link for admin users (with private indicator if not public)
 **API**: `PATCH /api/user/profile` (FormData); `GET /api/user/profile/:handle` (conditionally exposes social link)
+
+## Sovereign Site + Stripe Billing
+Store owners can unlock a "Sovereign Site" — a branded microsite on a custom domain — via a $29 CAD/month subscription.
+
+**Schema additions to `stores` table:**
+- `sovereign_plan_status VARCHAR(20) DEFAULT 'inactive'` — one of `active`, `trialing`, `inactive`
+- `sovereign_plan_expires_at TIMESTAMP` — optional expiry (for admin overrides)
+- `stripe_customer_id TEXT` — Stripe customer ID linked to the store
+
+**Stripe integration:**
+- `server/stripeClient.ts` — Replit-managed credentials (no hardcoded keys); exports `getUncachableStripeClient()`, `getStripeSync()`, `getStripePublishableKey()`
+- `server/webhookHandlers.ts` — minimal webhook handler calling `stripe-replit-sync`'s `processWebhook()`
+- Webhook route `/api/stripe/webhook` registered BEFORE `express.json()` in `server/index.ts`
+- `initStripe()` runs on startup: `runMigrations()` → `getStripeSync()` → `findOrCreateManagedWebhook()` → `syncBackfill()` (non-fatal on error)
+- Sovereign Site product seeded via `scripts/seed-sovereign-plan.ts` (run once in dev)
+
+**Backend routes:**
+- `POST /api/owner/stores/:id/billing/checkout` — creates Stripe Checkout session; creates Stripe customer if none; finds Sovereign Site price dynamically
+- `GET /api/owner/stores/:id/billing/portal` — creates Stripe Billing Portal session for active subscribers
+- `PATCH /api/admin/stores/:id/sovereign-plan` — admin manual override of `sovereignPlanStatus` + optional expiry
+
+**Frontend (OwnerPortal):**
+- `OwnedSiteSection` is gated: inactive plan → shows upgrade CTA card (benefits list + $29/month price + "Unlock Sovereign Site" button → Stripe Checkout); active/trialing → shows full site editor with "Manage Billing →" link
+- Success banner shown when returning from checkout with `?upgraded=1` in URL
+- Plan status badge shown in section header
+
+**Frontend (AdminStores):**
+- "Edit Site" modal includes a "Sovereign Plan (Admin)" section: active/trialing/inactive toggle buttons + optional expiry date picker + "Update Sovereign Plan" button
+
+**Key services/api.ts exports:**
+- `ownerCreateCheckout(storeId)` — POST to checkout endpoint
+- `ownerGetBillingPortal(storeId)` — GET billing portal URL
+- `adminSetSovereignPlan(storeId, status, expiresAt?)` — admin plan override

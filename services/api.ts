@@ -810,3 +810,24 @@ export async function updateUserProfile(data: {
   if (data.socialLinks !== undefined) form.append('socialLinks', JSON.stringify(data.socialLinks));
   return apiFetch(`/user/profile`, { method: 'PATCH', body: form });
 }
+
+export async function ownerCreateCheckout(storeId: string): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>(`/owner/stores/${storeId}/billing/checkout`, {
+    method: 'POST',
+  });
+}
+
+export async function ownerGetBillingPortal(storeId: string): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>(`/owner/stores/${storeId}/billing/portal`);
+}
+
+export async function adminSetSovereignPlan(
+  storeId: string,
+  sovereignPlanStatus: 'active' | 'trialing' | 'inactive',
+  sovereignPlanExpiresAt?: string | null
+): Promise<Store> {
+  return apiFetch<Store>(`/admin/stores/${storeId}/sovereign-plan`, {
+    method: 'PATCH',
+    body: JSON.stringify({ sovereignPlanStatus, sovereignPlanExpiresAt }),
+  });
+}
