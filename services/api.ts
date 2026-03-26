@@ -1,4 +1,4 @@
-import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, MediaType, CreatorPost } from '../types';
+import type { Store, StoreFlag, FlagReason, StoreMedia, UploadCredentials, MediaType, CreatorPost, ThemeConfig } from '../types';
 
 const API_BASE = '/api';
 
@@ -70,30 +70,14 @@ export async function ownerUploadStoreLogo(storeId: string, file: File): Promise
   return res.json();
 }
 
-export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: {
-  brandColor?: string;
-  accentColor?: string;
-  logoUrl?: string;
-  tagline?: string;
-  subHeadline?: string;
-  fontPairing?: string;
-  sections?: { showHours?: boolean; showGallery?: boolean; showPosts?: boolean; showContact?: boolean };
-}): Promise<Store> {
+export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: ThemeConfig): Promise<Store> {
   return apiFetch<Store>(`/owner/stores/${storeId}/domain`, {
     method: 'PATCH',
     body: JSON.stringify({ customDomain, themeConfig }),
   });
 }
 
-export async function adminSaveStoreTheme(storeId: string, themeConfig: {
-  tagline?: string;
-  subHeadline?: string;
-  fontPairing?: string;
-  sections?: { showHours?: boolean; showGallery?: boolean; showPosts?: boolean; showContact?: boolean };
-  brandColor?: string;
-  accentColor?: string;
-  logoUrl?: string;
-}): Promise<Store> {
+export async function adminSaveStoreTheme(storeId: string, themeConfig: ThemeConfig): Promise<Store> {
   return apiFetch<Store>(`/admin/stores/${storeId}/theme`, {
     method: 'PATCH',
     body: JSON.stringify({ themeConfig }),

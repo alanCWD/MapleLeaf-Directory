@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
-import type { Store, StoreMedia } from '../types';
+import type { Store, StoreMedia, ThemeConfig, FontPairing } from '../types';
 import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
 
 const SERVICES = [
@@ -751,7 +751,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
   const [currentLogoUrl, setCurrentLogoUrl] = useState(store.themeConfig?.logoUrl ?? '');
   const [tagline, setTagline] = useState(store.themeConfig?.tagline ?? '');
   const [subHeadline, setSubHeadline] = useState(store.themeConfig?.subHeadline ?? '');
-  const [fontPairing, setFontPairing] = useState(store.themeConfig?.fontPairing ?? 'system');
+  const [fontPairing, setFontPairing] = useState<FontPairing>(store.themeConfig?.fontPairing ?? 'system');
   const [showHours, setShowHours] = useState(store.themeConfig?.sections?.showHours !== false);
   const [showGallery, setShowGallery] = useState(store.themeConfig?.sections?.showGallery !== false);
   const [showPosts, setShowPosts] = useState(store.themeConfig?.sections?.showPosts !== false);
@@ -822,13 +822,15 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
     setSaveError('');
     setDnsResult(null);
     try {
-      const themeConfig: Record<string, any> = { brandColor };
-      if (accentColor) themeConfig.accentColor = accentColor;
-      if (currentLogoUrl) themeConfig.logoUrl = currentLogoUrl;
-      if (tagline.trim()) themeConfig.tagline = tagline.trim();
-      if (subHeadline.trim()) themeConfig.subHeadline = subHeadline.trim();
-      themeConfig.fontPairing = fontPairing;
-      themeConfig.sections = { showHours, showGallery, showPosts, showContact };
+      const themeConfig: ThemeConfig = {
+        brandColor,
+        accentColor: accentColor || undefined,
+        logoUrl: currentLogoUrl || undefined,
+        tagline: tagline.trim() || '',
+        subHeadline: subHeadline.trim() || '',
+        fontPairing,
+        sections: { showHours, showGallery, showPosts, showContact },
+      };
       const updated = await ownerSaveStoreDomain(store.id, domain.trim(), themeConfig);
       onUpdate(updated);
       if (domain.trim()) {
@@ -1078,7 +1080,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
                     <button
                       key={fp.value}
                       type="button"
-                      onClick={() => setFontPairing(fp.value as any)}
+                      onClick={() => setFontPairing(fp.value as FontPairing)}
                       disabled={isFormBusy}
                       className={`text-left px-3 py-2.5 rounded-xl border text-sm transition ${
                         fontPairing === fp.value

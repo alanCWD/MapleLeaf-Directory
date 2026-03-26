@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Store, Province, VerificationStatus } from '../types';
+import { Store, Province, VerificationStatus, ThemeConfig, FontPairing } from '../types';
 import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto, adminSaveStoreTheme } from '../services/api';
 import type { AuditLogEntry } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -97,7 +97,7 @@ export const AdminStores: React.FC = () => {
   const [editSiteStore, setEditSiteStore] = useState<Store | null>(null);
   const [siteTagline, setSiteTagline] = useState('');
   const [siteSubHeadline, setSiteSubHeadline] = useState('');
-  const [siteFontPairing, setSiteFontPairing] = useState('system');
+  const [siteFontPairing, setSiteFontPairing] = useState<FontPairing>('system');
   const [siteShowHours, setSiteShowHours] = useState(true);
   const [siteShowGallery, setSiteShowGallery] = useState(true);
   const [siteShowPosts, setSiteShowPosts] = useState(true);
@@ -217,12 +217,13 @@ export const AdminStores: React.FC = () => {
     setSiteSaving(true);
     setSiteSaveMsg('');
     try {
-      const updated = await adminSaveStoreTheme(editSiteStore.id, {
-        tagline: siteTagline.trim() || undefined,
-        subHeadline: siteSubHeadline.trim() || undefined,
+      const themeUpdate: ThemeConfig = {
+        tagline: siteTagline.trim(),
+        subHeadline: siteSubHeadline.trim(),
         fontPairing: siteFontPairing,
         sections: { showHours: siteShowHours, showGallery: siteShowGallery, showPosts: siteShowPosts, showContact: siteShowContact },
-      });
+      };
+      const updated = await adminSaveStoreTheme(editSiteStore.id, themeUpdate);
       setStores(prev => prev.map(s => s.id === updated.id ? updated : s));
       setSiteSaveMsg('Saved!');
       setTimeout(() => setSiteSaveMsg(''), 2500);

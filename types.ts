@@ -39,6 +39,23 @@ export interface OperatingHours {
   time: string;
 }
 
+export type FontPairing = 'system' | 'modern' | 'classic' | 'playful' | 'elegant';
+
+export interface ThemeConfig {
+  brandColor?: string;
+  accentColor?: string;
+  logoUrl?: string;
+  tagline?: string;
+  subHeadline?: string;
+  fontPairing?: FontPairing;
+  sections?: {
+    showHours?: boolean;
+    showGallery?: boolean;
+    showPosts?: boolean;
+    showContact?: boolean;
+  };
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -76,20 +93,7 @@ export interface Store {
 
   customDomain?: string;
   domainVerified?: boolean;
-  themeConfig?: {
-    brandColor?: string;
-    accentColor?: string;
-    logoUrl?: string;
-    tagline?: string;
-    subHeadline?: string;
-    fontPairing?: 'system' | 'modern' | 'classic' | 'playful' | 'elegant';
-    sections?: {
-      showHours?: boolean;
-      showGallery?: boolean;
-      showPosts?: boolean;
-      showContact?: boolean;
-    };
-  } | null;
+  themeConfig?: ThemeConfig | null;
 
   storeInsights?: {
     atmosphere?: string;
