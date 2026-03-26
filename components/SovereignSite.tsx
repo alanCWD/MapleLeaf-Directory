@@ -22,6 +22,21 @@ function getDayAbbrev(day: string): string {
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+const FONT_GOOGLE_URLS: Record<string, string> = {
+  modern: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap',
+  classic: 'https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Open+Sans:wght@400;600&display=swap',
+  playful: 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap',
+  elegant: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@400;700&display=swap',
+};
+
+const FONT_CSS_VARS: Record<string, { heading: string; body: string }> = {
+  system: { heading: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', body: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  modern: { heading: '"Inter", sans-serif', body: '"Inter", sans-serif' },
+  classic: { heading: '"Merriweather", Georgia, serif', body: '"Open Sans", sans-serif' },
+  playful: { heading: '"Nunito", sans-serif', body: '"Nunito", sans-serif' },
+  elegant: { heading: '"Playfair Display", Georgia, serif', body: '"Lato", sans-serif' },
+};
+
 export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOrigin, isPreview = false }) => {
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [integrityScore, setIntegrityScore] = useState<IntegrityScoreCard | null>(null);
@@ -31,6 +46,14 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
 
   const brandColor = store.themeConfig?.brandColor || '#065f46';
   const accentColor = store.themeConfig?.accentColor || '';
+  const fontPairing = store.themeConfig?.fontPairing || 'system';
+  const tagline = store.themeConfig?.tagline || '';
+  const subHeadline = store.themeConfig?.subHeadline || '';
+  const sections = store.themeConfig?.sections || {};
+  const showHours = sections.showHours !== false;
+  const showGallery = sections.showGallery !== false;
+  const showPosts = sections.showPosts !== false;
+  const showContact = sections.showContact !== false;
   const headerImageUrl = getStoreHeaderImage(store.id, store.headerImageUrl);
 
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -80,7 +103,22 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
     setOg('og:type', 'business.business');
     setOg('og:image', headerImageUrl);
     setOg('og:url', window.location.href);
-  }, [store, headerImageUrl]);
+
+    const fontUrl = FONT_GOOGLE_URLS[fontPairing];
+    const linkId = 'sovereign-font-link';
+    let fontLink = document.getElementById(linkId) as HTMLLinkElement | null;
+    if (fontUrl) {
+      if (!fontLink) {
+        fontLink = document.createElement('link');
+        fontLink.id = linkId;
+        fontLink.rel = 'stylesheet';
+        document.head.appendChild(fontLink);
+      }
+      fontLink.href = fontUrl;
+    } else if (fontLink) {
+      fontLink.href = '';
+    }
+  }, [store, headerImageUrl, fontPairing]);
 
   useEffect(() => {
     fetchPublishedPosts({ storeId: store.id, limit: 6 })
@@ -116,10 +154,18 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
 
   const photos = store.storePhotos || [];
 
+  const fontVars = FONT_CSS_VARS[fontPairing] || FONT_CSS_VARS.system;
+
   return (
     <div
       className="min-h-screen bg-stone-50 flex flex-col overflow-x-hidden"
-      style={{ '--brand': brandColor, ...(accentColor ? { '--accent': accentColor } : {}) } as React.CSSProperties}
+      style={{
+        '--brand': brandColor,
+        '--font-heading': fontVars.heading,
+        '--font-body': fontVars.body,
+        fontFamily: 'var(--font-body)',
+        ...(accentColor ? { '--accent': accentColor } : {}),
+      } as React.CSSProperties}
     >
       {isPreview && (
         <div className="sticky top-0 z-50 bg-amber-400 text-amber-950 text-sm font-bold py-2.5 px-4 flex items-center justify-between gap-4 shadow-md">
@@ -257,9 +303,15 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
               </span>
             )}
           </div>
-          <h1 className="text-4xl md:text-6xl font-black text-white mb-3 tracking-tight leading-tight">
+          <h1 className="text-4xl md:text-6xl font-black text-white mb-3 tracking-tight leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
             {store.name}
           </h1>
+          {tagline && (
+            <p className="text-white/90 text-xl font-semibold mb-2 leading-snug">{tagline}</p>
+          )}
+          {subHeadline && (
+            <p className="text-stone-200 text-base mb-3 max-w-xl leading-relaxed">{subHeadline}</p>
+          )}
           <p className="text-stone-300 text-lg flex items-center gap-2">
             <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -387,11 +439,11 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
                 </section>
               )}
 
-              {photos.length > 0 && (
+              {showGallery && photos.length > 0 && (
                 <section>
                   <h2
                     className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
-                    style={{ color: 'var(--brand)' }}
+                    style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
                   >
                     <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
                     Inside the Store
@@ -416,11 +468,11 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
                 </section>
               )}
 
-              {(isLoadingPosts || posts.length > 0) && (
+              {showPosts && (isLoadingPosts || posts.length > 0) && (
                 <section>
                   <h2
                     className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
-                    style={{ color: 'var(--brand)' }}
+                    style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
                   >
                     <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
                     Latest from the Hub
@@ -484,7 +536,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
             </div>
 
             <div className="space-y-6">
-              {sortedHours.length > 0 && (
+              {showHours && sortedHours.length > 0 && (
                 <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
                   <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
                     <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,27 +562,29 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
                 </div>
               )}
 
-              <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
-                <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
-                  <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Location
-                </h3>
-                <address className="not-italic text-stone-700 text-sm font-medium leading-relaxed mb-4">
-                  {store.address}<br />{store.province}, Canada
-                </address>
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
-                  style={{ backgroundColor: 'var(--brand)' }}
-                >
-                  Get Directions
-                </a>
-              </div>
+              {showContact && (
+                <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
+                  <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
+                    <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Location
+                  </h3>
+                  <address className="not-italic text-stone-700 text-sm font-medium leading-relaxed mb-4">
+                    {store.address}<br />{store.province}, Canada
+                  </address>
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-center py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+                    style={{ backgroundColor: 'var(--brand)' }}
+                  >
+                    Get Directions
+                  </a>
+                </div>
+              )}
 
               <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
             </div>

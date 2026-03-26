@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, Province, VerificationStatus } from '../types';
-import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto } from '../services/api';
+import { fetchAdminStores, adminEditStore, fetchAuditLogs, adminUploadStoreHeaderImage, adminUploadStorePhoto, adminDeleteStorePhoto, adminSaveStoreTheme } from '../services/api';
 import type { AuditLogEntry } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';
@@ -93,6 +93,17 @@ export const AdminStores: React.FC = () => {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditStoreFilter, setAuditStoreFilter] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState('');
+
+  const [editSiteStore, setEditSiteStore] = useState<Store | null>(null);
+  const [siteTagline, setSiteTagline] = useState('');
+  const [siteSubHeadline, setSiteSubHeadline] = useState('');
+  const [siteFontPairing, setSiteFontPairing] = useState('system');
+  const [siteShowHours, setSiteShowHours] = useState(true);
+  const [siteShowGallery, setSiteShowGallery] = useState(true);
+  const [siteShowPosts, setSiteShowPosts] = useState(true);
+  const [siteShowContact, setSiteShowContact] = useState(true);
+  const [siteSaving, setSiteSaving] = useState(false);
+  const [siteSaveMsg, setSiteSaveMsg] = useState('');
 
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
@@ -187,6 +198,39 @@ export const AdminStores: React.FC = () => {
     setNewAdminHourTime('');
     setSaveMessage('');
     setEditingStorePhotos(store.storePhotos || []);
+  };
+
+  const openEditSite = (store: Store) => {
+    setEditSiteStore(store);
+    setSiteTagline(store.themeConfig?.tagline ?? '');
+    setSiteSubHeadline(store.themeConfig?.subHeadline ?? '');
+    setSiteFontPairing(store.themeConfig?.fontPairing ?? 'system');
+    setSiteShowHours(store.themeConfig?.sections?.showHours !== false);
+    setSiteShowGallery(store.themeConfig?.sections?.showGallery !== false);
+    setSiteShowPosts(store.themeConfig?.sections?.showPosts !== false);
+    setSiteShowContact(store.themeConfig?.sections?.showContact !== false);
+    setSiteSaveMsg('');
+  };
+
+  const handleSiteSave = async () => {
+    if (!editSiteStore) return;
+    setSiteSaving(true);
+    setSiteSaveMsg('');
+    try {
+      const updated = await adminSaveStoreTheme(editSiteStore.id, {
+        tagline: siteTagline.trim() || undefined,
+        subHeadline: siteSubHeadline.trim() || undefined,
+        fontPairing: siteFontPairing,
+        sections: { showHours: siteShowHours, showGallery: siteShowGallery, showPosts: siteShowPosts, showContact: siteShowContact },
+      });
+      setStores(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setSiteSaveMsg('Saved!');
+      setTimeout(() => setSiteSaveMsg(''), 2500);
+    } catch (e: any) {
+      setSiteSaveMsg('Error: ' + (e.message ?? 'Failed'));
+    } finally {
+      setSiteSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -495,6 +539,14 @@ export const AdminStores: React.FC = () => {
                               >
                                 Preview
                               </a>
+                              <button
+                                type="button"
+                                onClick={() => openEditSite(store)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-stone-100 text-stone-700 hover:bg-emerald-100 hover:text-emerald-700 transition"
+                                title="Edit site content & theme"
+                              >
+                                Edit Site
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1012,6 +1064,128 @@ export const AdminStores: React.FC = () => {
                 className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-50 transition shadow-lg shadow-emerald-200"
               >
                 {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editSiteStore && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-stone-100 rounded-t-3xl px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-stone-900">Edit Site Content</h2>
+                <p className="text-sm text-stone-500">{editSiteStore.name}</p>
+              </div>
+              <button onClick={() => setEditSiteStore(null)} className="text-stone-400 hover:text-stone-700 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-1">Tagline</label>
+                <input
+                  type="text"
+                  value={siteTagline}
+                  onChange={e => setSiteTagline(e.target.value)}
+                  maxLength={80}
+                  placeholder="e.g. Your neighbourhood legacy shop"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+                />
+                <p className="text-xs text-stone-400 mt-1">{siteTagline.length}/80</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-1">Sub-headline</label>
+                <textarea
+                  value={siteSubHeadline}
+                  onChange={e => setSiteSubHeadline(e.target.value)}
+                  maxLength={200}
+                  rows={2}
+                  placeholder="e.g. Family-run since 2018..."
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none resize-none"
+                />
+                <p className="text-xs text-stone-400 mt-1">{siteSubHeadline.length}/200</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-2">Font Pairing</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    { value: 'system', label: 'System' },
+                    { value: 'modern', label: 'Modern' },
+                    { value: 'classic', label: 'Classic' },
+                    { value: 'playful', label: 'Playful' },
+                    { value: 'elegant', label: 'Elegant' },
+                  ].map(fp => (
+                    <button
+                      key={fp.value}
+                      type="button"
+                      onClick={() => setSiteFontPairing(fp.value)}
+                      className={`py-2 rounded-xl border text-xs font-bold transition ${
+                        siteFontPairing === fp.value
+                          ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                          : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300'
+                      }`}
+                    >
+                      {fp.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-500 mb-2">Section Visibility</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'hours', label: 'Hours', state: siteShowHours, toggle: () => setSiteShowHours(v => !v) },
+                    { key: 'gallery', label: 'Gallery', state: siteShowGallery, toggle: () => setSiteShowGallery(v => !v) },
+                    { key: 'posts', label: 'Posts Feed', state: siteShowPosts, toggle: () => setSiteShowPosts(v => !v) },
+                    { key: 'contact', label: 'Contact', state: siteShowContact, toggle: () => setSiteShowContact(v => !v) },
+                  ].map(({ key, label, state, toggle }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={toggle}
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition ${
+                        state ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-stone-50 text-stone-400'
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span className={`w-8 h-4 rounded-full flex items-center transition-colors ${state ? 'bg-emerald-500' : 'bg-stone-300'}`}>
+                        <span className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm mx-0.5 transition-transform ${state ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {siteSaveMsg && (
+                <div className={`px-4 py-3 rounded-xl text-sm font-bold ${
+                  siteSaveMsg.startsWith('Error') ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                }`}>
+                  {siteSaveMsg}
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t border-stone-100 rounded-b-3xl px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => setEditSiteStore(null)}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-stone-600 hover:bg-stone-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSiteSave}
+                disabled={siteSaving}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-50 transition shadow-lg shadow-emerald-200"
+              >
+                {siteSaving ? 'Saving...' : 'Save Site Content'}
               </button>
             </div>
           </div>

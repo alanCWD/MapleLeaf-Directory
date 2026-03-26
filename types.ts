@@ -80,6 +80,15 @@ export interface Store {
     brandColor?: string;
     accentColor?: string;
     logoUrl?: string;
+    tagline?: string;
+    subHeadline?: string;
+    fontPairing?: 'system' | 'modern' | 'classic' | 'playful' | 'elegant';
+    sections?: {
+      showHours?: boolean;
+      showGallery?: boolean;
+      showPosts?: boolean;
+      showContact?: boolean;
+    };
   } | null;
 
   storeInsights?: {

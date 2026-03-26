@@ -1251,6 +1251,29 @@ router.patch('/admin/stores/:id', isAuthenticated as RequestHandler, requireAdmi
   }
 });
 
+router.patch('/admin/stores/:id/theme', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const adminUserId = getUserId(req)!;
+    const { themeConfig } = req.body;
+    if (!themeConfig || typeof themeConfig !== 'object') {
+      res.status(400).json({ error: 'themeConfig object required' });
+      return;
+    }
+    const existing = await getStoreById(storeId);
+    if (!existing) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const merged = { ...(existing.themeConfig || {}), ...themeConfig };
+    const store = await adminUpdateStore(storeId, { themeConfig: merged }, adminUserId);
+    res.json(store);
+  } catch (error) {
+    console.error('Error updating store theme:', error);
+    res.status(500).json({ error: 'Failed to update store theme' });
+  }
+});
+
 router.post('/admin/stores/:id/header-image', isAuthenticated as RequestHandler, requireAdmin, imageUpload.single('image'), async (req: any, res) => {
   try {
     const storeId = paramId(req.params);
