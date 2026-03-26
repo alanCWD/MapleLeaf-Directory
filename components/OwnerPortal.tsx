@@ -928,11 +928,12 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           </div>
           <ul className="space-y-2 mb-5">
             {[
-              'Your own domain — serve your site at yourshop.ca, not a directory URL',
-              'Full colour, font & brand control — built around your identity, not ours',
-              'Custom hero tagline, sub-headline, and section visibility toggles',
-              'Gallery, posts, hours, contact, and menu — all owned by you',
-              'Live preview before you publish + DNS verification tools included',
+              'Your own domain — serve your site at yourshop.ca, no LegacyLeaf branding',
+              'Full colour, font & layout control — your identity, not a template',
+              'Host your culture posts, events, and updates directly on your site',
+              'Verified creators and community voices embedded in your store\'s story',
+              'Local SEO authority — every page signals your geographic sovereignty',
+              'SSL hosting, DNS verification tools, and live preview included',
             ].map((benefit, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-stone-700">
                 <svg className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1240,6 +1240,11 @@ router.get('/owner/stores/:id/billing/portal', isAuthenticated as RequestHandler
       res.status(400).json({ error: 'No billing account found for this store' });
       return;
     }
+    const planStatus = store.sovereignPlanStatus || 'inactive';
+    if (role !== 'admin' && planStatus !== 'active' && planStatus !== 'trialing') {
+      res.status(403).json({ error: 'Active Sovereign Site plan required to access billing portal' });
+      return;
+    }
 
     const { getUncachableStripeClient } = await import('./stripeClient.ts');
     const stripe = await getUncachableStripeClient();
