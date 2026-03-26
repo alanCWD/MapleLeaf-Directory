@@ -1020,6 +1020,30 @@ router.get('/tenant', async (req: any, res) => {
   res.json({ store: req.tenantStore, directoryOrigin });
 });
 
+router.get('/owner/stores/:id/preview', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    const store = await getStoreById(storeId);
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json(store);
+  } catch (error) {
+    console.error('Error fetching store preview:', error);
+    res.status(500).json({ error: 'Failed to fetch store preview' });
+  }
+});
+
 router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
   try {
     const storeId = paramId(req.params);

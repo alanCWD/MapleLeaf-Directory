@@ -25,7 +25,7 @@ import { ProfileSettings } from './components/ProfileSettings';
 import { UserProfilePage } from './components/UserProfilePage';
 import { SovereignSite } from './components/SovereignSite';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
-import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore, fetchStore } from './services/api';
+import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore, fetchStore, fetchStorePreview } from './services/api';
 import { useAuth } from './hooks/useAuth';
 
 const FAVORITES_KEY = 'legacyleaf_favs_v2';
@@ -59,9 +59,20 @@ const StorePreviewPage: React.FC = () => {
 
   useEffect(() => {
     if (!id) { setError('No store ID'); setLoading(false); return; }
-    fetchStore(id)
+    fetchStorePreview(id)
       .then(setStore)
-      .catch(() => setError('Store not found'))
+      .catch((err: any) => {
+        const status = err?.status;
+        if (status === 403) {
+          setError('Access denied — you must be the owner or an admin to preview this store.');
+        } else if (status === 404) {
+          setError('Store not found.');
+        } else if (status === 401) {
+          setError('Please sign in to preview this store.');
+        } else {
+          setError(err?.message || 'Unable to load preview.');
+        }
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

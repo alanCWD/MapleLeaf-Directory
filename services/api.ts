@@ -39,6 +39,18 @@ export async function fetchStore(id: string): Promise<Store> {
   return apiFetch<Store>(`/stores/${id}`);
 }
 
+export async function fetchStorePreview(id: string): Promise<Store> {
+  const res = await fetch(`${API_BASE}/owner/stores/${id}/preview`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    const msg = err.error || err.message || 'Failed to load preview';
+    throw Object.assign(new Error(msg), { status: res.status });
+  }
+  return res.json();
+}
+
 export async function fetchTenantStore(): Promise<{ store: Store; directoryOrigin: string } | null> {
   return apiFetch<{ store: Store; directoryOrigin: string } | null>('/tenant');
 }
