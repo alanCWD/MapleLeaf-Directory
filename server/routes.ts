@@ -160,6 +160,21 @@ const requireOwnerOrAdmin: RequestHandler = async (req: any, res, next) => {
   next();
 };
 
+async function checkSovereignPlanEntitlement(req: any, res: any, storeId: string): Promise<boolean> {
+  const userId = getUserId(req);
+  if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return false; }
+  const role = await getUserRole(userId);
+  if (role === 'admin') return true;
+  const store = await getStoreById(storeId);
+  if (!store) { res.status(404).json({ error: 'Store not found' }); return false; }
+  const status = store.sovereignPlanStatus || 'inactive';
+  if (status !== 'active' && status !== 'trialing') {
+    res.status(403).json({ error: 'Sovereign Site plan required to access this feature' });
+    return false;
+  }
+  return true;
+}
+
 router.post('/search', async (req: Request, res: Response) => {
   try {
     const { query, userLocation } = req.body;
@@ -894,6 +909,7 @@ router.post('/owner/stores/:id/logo', isAuthenticated as RequestHandler, require
         return;
       }
     }
+    if (!await checkSovereignPlanEntitlement(req, res, storeId)) return;
     if (!req.file) {
       res.status(400).json({ error: 'No image file provided' });
       return;
@@ -939,6 +955,7 @@ router.post('/owner/stores/:id/photos', isAuthenticated as RequestHandler, requi
         return;
       }
     }
+    if (!await checkSovereignPlanEntitlement(req, res, storeId)) return;
     if (!req.file) {
       res.status(400).json({ error: 'No image file provided' });
       return;
@@ -991,6 +1008,7 @@ router.delete('/owner/stores/:id/photos/:index', isAuthenticated as RequestHandl
         return;
       }
     }
+    if (!await checkSovereignPlanEntitlement(req, res, storeId)) return;
     const existing = await getStoreById(storeId);
     if (!existing) {
       res.status(404).json({ error: 'Store not found' });
@@ -1056,6 +1074,7 @@ router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requ
         return;
       }
     }
+    if (!await checkSovereignPlanEntitlement(req, res, storeId)) return;
     const { customDomain, themeConfig } = req.body;
     const updates: any = {};
     if (customDomain !== undefined) {
@@ -1095,6 +1114,7 @@ router.post('/owner/stores/:id/domain/verify', isAuthenticated as RequestHandler
         return;
       }
     }
+    if (!await checkSovereignPlanEntitlement(req, res, storeId)) return;
     const existing = await getStoreById(storeId);
     if (!existing) {
       res.status(404).json({ error: 'Store not found' });
@@ -1169,14 +1189,14 @@ router.post('/owner/stores/:id/billing/checkout', isAuthenticated as RequestHand
         metadata: { storeId, userId },
       });
       customerId = customer.id;
-      await updateStore(storeId, { stripeCustomerId: customerId } as any);
+      await updateStore(storeId, { stripeCustomerId: customerId });
     }
 
     const products = await stripe.products.search({ query: "name:'Sovereign Site' AND active:'true'" });
     let priceId: string | undefined;
     if (products.data.length > 0) {
       const prices = await stripe.prices.list({ product: products.data[0].id, active: true, limit: 5 });
-      const monthly = prices.data.find(p => (p.recurring as any)?.interval === 'month');
+      const monthly = prices.data.find(p => p.recurring?.interval === 'month');
       priceId = monthly?.id || prices.data[0]?.id;
     }
     if (!priceId) {

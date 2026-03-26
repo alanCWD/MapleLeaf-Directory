@@ -988,7 +988,15 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
         )}
       </div>
       <div className="flex items-center justify-between mb-4 ml-7">
-        <p className="text-xs text-stone-400">Connect your own domain and customize your store's branded website.</p>
+        <div className="flex flex-col gap-0.5">
+          <p className="text-xs text-stone-400">Connect your own domain and customize your store's branded website.</p>
+          {store.sovereignPlanExpiresAt && (
+            <p className="text-xs text-stone-400">
+              {store.sovereignPlanStatus === 'inactive' ? 'Expired' : 'Renews'}{' '}
+              {new Date(store.sovereignPlanExpiresAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
+          )}
+        </div>
         <button
           onClick={handleManageBilling}
           disabled={portalLoading}
