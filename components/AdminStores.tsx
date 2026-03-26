@@ -493,7 +493,7 @@ export const AdminStores: React.FC = () => {
                                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-stone-100 text-stone-700 hover:bg-purple-100 hover:text-purple-700 transition"
                                 title="Preview sovereign site"
                               >
-                                Site
+                                Preview
                               </a>
                             </div>
                           </td>
