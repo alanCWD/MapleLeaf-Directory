@@ -486,6 +486,15 @@ export const AdminStores: React.FC = () => {
                               >
                                 Log
                               </button>
+                              <a
+                                href={`#/preview/store/${store.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-stone-100 text-stone-700 hover:bg-purple-100 hover:text-purple-700 transition"
+                                title="Preview sovereign site"
+                              >
+                                Site
+                              </a>
                             </div>
                           </td>
                         </tr>
@@ -837,7 +846,23 @@ export const AdminStores: React.FC = () => {
               </div>
 
               <div className="bg-stone-50 rounded-xl border border-stone-200 p-4">
-                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Custom Domain</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">Custom Domain</label>
+                  {editingStore && (
+                    <a
+                      href={`#/preview/store/${editingStore.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-purple-600 hover:text-purple-800 transition flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Preview Site
+                    </a>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-mono text-stone-800">{editingStore?.customDomain || '—'}</span>
                   {editingStore?.domainVerified ? (

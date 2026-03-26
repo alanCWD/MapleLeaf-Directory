@@ -1039,7 +1039,8 @@ router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requ
       updates.domainVerified = false;
     }
     if (themeConfig !== undefined) {
-      updates.themeConfig = themeConfig;
+      const existing = await getStoreById(storeId);
+      updates.themeConfig = { ...(existing?.themeConfig || {}), ...themeConfig };
     }
     const store = await updateStore(storeId, updates);
     if (!store) {

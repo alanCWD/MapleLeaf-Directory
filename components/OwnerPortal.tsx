@@ -754,6 +754,11 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
 
   useEffect(() => () => { if (autoCheckRef.current) clearTimeout(autoCheckRef.current); }, []);
 
+  useEffect(() => {
+    const propLogo = store.themeConfig?.logoUrl ?? '';
+    if (propLogo !== currentLogoUrl) setCurrentLogoUrl(propLogo);
+  }, [store.themeConfig?.logoUrl]);
+
   const savedDomain = store.customDomain ?? '';
   const savedBrand = store.themeConfig?.brandColor ?? DEFAULT_BRAND;
   const savedAccent = store.themeConfig?.accentColor ?? '';
@@ -1025,6 +1030,18 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
             )}
             {checking ? 'Checking…' : 'Check DNS'}
           </button>
+          <a
+            href={`#/preview/store/${store.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-purple-100 text-purple-800 px-5 py-2 rounded-xl text-sm font-bold hover:bg-purple-200 transition flex items-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Preview Site
+          </a>
         </div>
 
         {saving && domain.trim() && (

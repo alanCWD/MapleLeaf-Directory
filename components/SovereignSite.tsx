@@ -9,6 +9,7 @@ import { getStoreHeaderImage } from '../utils/defaultStoreImages';
 interface SovereignSiteProps {
   store: Store;
   directoryOrigin: string;
+  isPreview?: boolean;
 }
 
 function formatHour(time: string): string {
@@ -21,7 +22,7 @@ function getDayAbbrev(day: string): string {
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOrigin }) => {
+export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOrigin, isPreview = false }) => {
   const [posts, setPosts] = useState<CreatorPost[]>([]);
   const [integrityScore, setIntegrityScore] = useState<IntegrityScoreCard | null>(null);
   const [isLoadingIntegrity, setIsLoadingIntegrity] = useState(true);
@@ -120,6 +121,23 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
       className="min-h-screen bg-stone-50 flex flex-col overflow-x-hidden"
       style={{ '--brand': brandColor, ...(accentColor ? { '--accent': accentColor } : {}) } as React.CSSProperties}
     >
+      {isPreview && (
+        <div className="sticky top-0 z-50 bg-amber-400 text-amber-950 text-sm font-bold py-2.5 px-4 flex items-center justify-between gap-4 shadow-md">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>Preview Mode — this is how your site looks to visitors.</span>
+          </div>
+          <a
+            href="#/owners"
+            className="text-xs font-black uppercase tracking-widest bg-amber-950/15 hover:bg-amber-950/25 px-3 py-1 rounded-lg transition whitespace-nowrap"
+          >
+            Back to Portal
+          </a>
+        </div>
+      )}
       {lightboxPhoto && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"

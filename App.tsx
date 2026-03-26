@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, useLocation, useParams } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ProvinceSelector } from './components/ProvinceSelector';
@@ -25,7 +25,7 @@ import { ProfileSettings } from './components/ProfileSettings';
 import { UserProfilePage } from './components/UserProfilePage';
 import { SovereignSite } from './components/SovereignSite';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
-import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore } from './services/api';
+import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore, fetchStore } from './services/api';
 import { useAuth } from './hooks/useAuth';
 
 const FAVORITES_KEY = 'legacyleaf_favs_v2';
@@ -37,6 +37,55 @@ const ScrollToTop = () => {
     window.scrollTo(0, 0);
   }, [pathname]);
   return null;
+};
+
+const ConditionalNavbar: React.FC = () => {
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/preview/store/')) return null;
+  return <Navbar />;
+};
+
+const ConditionalFooter: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/preview/store/')) return null;
+  return <>{children}</>;
+};
+
+const StorePreviewPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [store, setStore] = useState<Store | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!id) { setError('No store ID'); setLoading(false); return; }
+    fetchStore(id)
+      .then(setStore)
+      .catch(() => setError('Store not found'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-stone-400 text-sm font-bold">Loading preview…</span>
+        </div>
+      </div>
+    );
+  }
+  if (error || !store) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-stone-500 font-bold text-lg mb-2">{error || 'Store not found'}</p>
+          <a href="#/owners" className="text-emerald-600 text-sm font-bold hover:underline">← Back to Owner Portal</a>
+        </div>
+      </div>
+    );
+  }
+  return <SovereignSite store={store} directoryOrigin={window.location.origin} isPreview />;
 };
 
 const DirectoryApp: React.FC = () => {
@@ -214,7 +263,7 @@ const DirectoryApp: React.FC = () => {
     <HashRouter>
       <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-stone-50 w-full max-w-full overflow-x-hidden">
-        <Navbar />
+        <ConditionalNavbar />
         <main className="flex-grow overflow-x-hidden w-full">
           <Routes>
             <Route path="/" element={
@@ -454,11 +503,12 @@ const DirectoryApp: React.FC = () => {
             <Route path="/submit" element={<CommunitySubmit />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/badges" element={<BadgeProgress />} />
+            <Route path="/preview/store/:id" element={<StorePreviewPage />} />
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/profile/:handle" element={<UserProfilePage />} />
           </Routes>
         </main>
-        <footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">
+        <ConditionalFooter><footer className="bg-[#0a2e1f] text-emerald-200/50 py-16 mt-20 border-t border-emerald-900">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-12 mb-12 border-b border-emerald-800/30 pb-12">
                <div>
@@ -500,7 +550,7 @@ const DirectoryApp: React.FC = () => {
               </div>
             </div>
           </div>
-        </footer>
+        </footer></ConditionalFooter>
       </div>
     </HashRouter>
   );
