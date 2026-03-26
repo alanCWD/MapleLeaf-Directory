@@ -306,11 +306,13 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
           <h1 className="text-4xl md:text-6xl font-black text-white mb-3 tracking-tight leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
             {store.name}
           </h1>
-          {tagline && (
-            <p className="text-white/90 text-xl font-semibold mb-2 leading-snug">{tagline}</p>
-          )}
-          {subHeadline && (
-            <p className="text-stone-200 text-base mb-3 max-w-xl leading-relaxed">{subHeadline}</p>
+          <p className="text-white/90 text-xl font-semibold mb-2 leading-snug">
+            {tagline || `Sovereign cannabis — ${store.province}, Canada`}
+          </p>
+          {(subHeadline || store.storeInsights?.community) && (
+            <p className="text-stone-200 text-base mb-3 max-w-xl leading-relaxed">
+              {subHeadline || store.storeInsights?.community}
+            </p>
           )}
           <p className="text-stone-300 text-lg flex items-center gap-2">
             <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

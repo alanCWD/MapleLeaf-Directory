@@ -74,6 +74,12 @@ const StorePreviewPage: React.FC = () => {
         }
       })
       .finally(() => setLoading(false));
+
+    const interval = setInterval(() => {
+      if (!id) return;
+      fetchStorePreview(id).then(setStore).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
   }, [id]);
 
   if (loading) {

@@ -1063,6 +1063,11 @@ router.patch('/owner/stores/:id/domain', isAuthenticated as RequestHandler, requ
       updates.domainVerified = false;
     }
     if (themeConfig !== undefined) {
+      const VALID_FONT_PAIRINGS = ['system', 'modern', 'classic', 'playful', 'elegant'];
+      if (themeConfig.fontPairing !== undefined && !VALID_FONT_PAIRINGS.includes(themeConfig.fontPairing)) {
+        res.status(400).json({ error: 'Invalid fontPairing value' });
+        return;
+      }
       const existing = await getStoreById(storeId);
       updates.themeConfig = { ...(existing?.themeConfig || {}), ...themeConfig };
     }
@@ -1263,6 +1268,11 @@ router.patch('/admin/stores/:id/theme', isAuthenticated as RequestHandler, requi
     const existing = await getStoreById(storeId);
     if (!existing) {
       res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    const VALID_FONT_PAIRINGS = ['system', 'modern', 'classic', 'playful', 'elegant'];
+    if (themeConfig.fontPairing !== undefined && !VALID_FONT_PAIRINGS.includes(themeConfig.fontPairing)) {
+      res.status(400).json({ error: 'Invalid fontPairing value' });
       return;
     }
     const merged = { ...(existing.themeConfig || {}), ...themeConfig };
