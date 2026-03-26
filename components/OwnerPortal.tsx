@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo } from '../services/api';
 import { VideoUploader } from './VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia } from '../types';
@@ -696,32 +696,106 @@ const DnsInstructions: React.FC<{ target: string; header: string; subtext: strin
   );
 };
 
+function extractDominantColors(img: HTMLImageElement, count = 2): string[] {
+  const canvas = document.createElement('canvas');
+  const size = 60;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [];
+  ctx.drawImage(img, 0, 0, size, size);
+  const { data } = ctx.getImageData(0, 0, size, size);
+  const colorMap: Record<string, number> = {};
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 128) continue;
+    const avg = (r + g + b) / 3;
+    if (avg < 15 || avg > 240) continue;
+    const maxC = Math.max(r, g, b), minC = Math.min(r, g, b);
+    if (maxC - minC < 30) continue;
+    const rq = Math.round(r / 32) * 32;
+    const gq = Math.round(g / 32) * 32;
+    const bq = Math.round(b / 32) * 32;
+    const key = `${rq},${gq},${bq}`;
+    colorMap[key] = (colorMap[key] || 0) + 1;
+  }
+  const sorted = Object.entries(colorMap).sort(([, a], [, b]) => b - a);
+  const picked: string[] = [];
+  for (const [key] of sorted) {
+    if (picked.length >= count) break;
+    const [r, g, b] = key.split(',').map(Number);
+    const hex = '#' + [r, g, b].map(x => Math.min(255, x).toString(16).padStart(2, '0')).join('');
+    const tooClose = picked.some(prev => {
+      const pr = parseInt(prev.slice(1, 3), 16);
+      const pg = parseInt(prev.slice(3, 5), 16);
+      const pb = parseInt(prev.slice(5, 7), 16);
+      return Math.abs(r - pr) + Math.abs(g - pg) + Math.abs(b - pb) < 80;
+    });
+    if (!tooClose) picked.push(hex);
+  }
+  return picked;
+}
+
 const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => void }> = ({ store, onUpdate }) => {
   const [domain, setDomain] = useState(store.customDomain ?? '');
   const [brandColor, setBrandColor] = useState(store.themeConfig?.brandColor ?? DEFAULT_BRAND);
+  const [accentColor, setAccentColor] = useState(store.themeConfig?.accentColor ?? '');
+  const [currentLogoUrl, setCurrentLogoUrl] = useState(store.themeConfig?.logoUrl ?? '');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [extractedColors, setExtractedColors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [dnsResult, setDnsResult] = useState<DnsResult | null>(null);
   const [dnsError, setDnsError] = useState('');
   const autoCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => { if (autoCheckRef.current) clearTimeout(autoCheckRef.current); }, []);
 
   const savedDomain = store.customDomain ?? '';
   const savedBrand = store.themeConfig?.brandColor ?? DEFAULT_BRAND;
-  const isDirty = domain !== savedDomain || brandColor !== savedBrand;
+  const savedAccent = store.themeConfig?.accentColor ?? '';
+  const isDirty = domain !== savedDomain || brandColor !== savedBrand || accentColor !== savedAccent;
 
   const hasDomain = !!savedDomain;
   const isVerified = dnsResult ? dnsResult.verified : store.domainVerified;
   const displayExpected = dnsResult?.expectedTarget || FALLBACK_CNAME_TARGET;
+
+  const handleLogoUpload = async (file: File) => {
+    setLogoUploading(true);
+    setLogoError('');
+    setExtractedColors([]);
+    try {
+      const { url, store: updated } = await ownerUploadStoreLogo(store.id, file);
+      setCurrentLogoUrl(url);
+      onUpdate(updated);
+      const tempImg = new Image();
+      tempImg.crossOrigin = 'anonymous';
+      tempImg.onload = () => {
+        const colors = extractDominantColors(tempImg, 2);
+        setExtractedColors(colors);
+        if (colors[0]) setBrandColor(colors[0]);
+        if (colors[1]) setAccentColor(colors[1]);
+      };
+      tempImg.src = url;
+    } catch (err: any) {
+      setLogoError(err.message || 'Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setSaveError('');
     setDnsResult(null);
     try {
-      const updated = await ownerSaveStoreDomain(store.id, domain.trim(), { brandColor });
+      const themeConfig: { brandColor?: string; accentColor?: string; logoUrl?: string } = { brandColor };
+      if (accentColor) themeConfig.accentColor = accentColor;
+      if (currentLogoUrl) themeConfig.logoUrl = currentLogoUrl;
+      const updated = await ownerSaveStoreDomain(store.id, domain.trim(), themeConfig);
       onUpdate(updated);
       if (domain.trim()) {
         if (autoCheckRef.current) clearTimeout(autoCheckRef.current);
@@ -775,7 +849,74 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
       </div>
       <p className="text-xs text-stone-400 mb-4 ml-7">Connect your own domain and customize your store's branded website.</p>
 
+      <input
+        ref={logoFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) handleLogoUpload(file);
+          e.target.value = '';
+        }}
+      />
+
       <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold text-stone-500 mb-1">Store Logo</label>
+          <div
+            className={`relative flex items-center gap-4 bg-stone-50 border border-stone-200 rounded-xl p-3 cursor-pointer hover:border-emerald-400 transition ${isFormBusy || logoUploading ? 'opacity-60 pointer-events-none' : ''}`}
+            onClick={() => !isFormBusy && !logoUploading && logoFileRef.current?.click()}
+          >
+            {currentLogoUrl ? (
+              <img
+                src={currentLogoUrl}
+                alt="Store logo"
+                className="w-16 h-16 object-contain rounded-lg border border-stone-200 bg-white flex-shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-lg border-2 border-dashed border-stone-300 flex items-center justify-center flex-shrink-0 bg-white">
+                <svg className="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              {logoUploading ? (
+                <div className="flex items-center gap-2 text-sm text-stone-500">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Uploading & extracting colours…
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-stone-700">{currentLogoUrl ? 'Change Logo' : 'Upload Logo'}</p>
+                  <p className="text-xs text-stone-400 mt-0.5">PNG, JPG or WebP · max 20 MB</p>
+                  {extractedColors.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-xs text-stone-400">Colours picked:</span>
+                      {extractedColors.map((c, i) => (
+                        <div key={i} className="w-4 h-4 rounded-full border border-stone-200 flex-shrink-0" style={{ backgroundColor: c }} title={c} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            {!logoUploading && (
+              <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            )}
+          </div>
+          {logoError && <p className="text-xs text-red-600 mt-1 font-medium">{logoError}</p>}
+          {extractedColors.length > 0 && (
+            <p className="text-xs text-emerald-600 mt-1 font-medium">Brand and accent colours auto-filled from your logo. Adjust below if needed.</p>
+          )}
+        </div>
+
         <div>
           <label className="block text-xs font-bold text-stone-500 mb-1">Custom Domain</label>
           <input
@@ -790,7 +931,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-stone-500 mb-1">Brand Colour</label>
+          <label className="block text-xs font-bold text-stone-500 mb-1">Primary Colour</label>
           <div className="flex items-center gap-3">
             <input
               type="color"
@@ -798,7 +939,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
               onChange={e => setBrandColor(e.target.value)}
               disabled={isFormBusy}
               className="w-10 h-10 rounded-xl border border-stone-200 cursor-pointer bg-stone-50 p-0.5 disabled:opacity-60"
-              title="Pick a colour"
+              title="Pick primary colour"
             />
             <input
               type="text"
@@ -812,11 +953,39 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
               className="w-28 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm font-mono focus:border-emerald-400 outline-none disabled:opacity-60"
               placeholder="#065f46"
             />
-            <div
-              className="w-8 h-8 rounded-full border border-stone-200 flex-shrink-0"
-              style={{ backgroundColor: brandColor }}
-              title="Colour preview"
+            <div className="w-8 h-8 rounded-full border border-stone-200 flex-shrink-0" style={{ backgroundColor: brandColor }} title="Primary colour preview" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-stone-500 mb-1">Accent Colour <span className="font-normal text-stone-400">(optional)</span></label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={accentColor || '#000000'}
+              onChange={e => setAccentColor(e.target.value)}
+              disabled={isFormBusy}
+              className="w-10 h-10 rounded-xl border border-stone-200 cursor-pointer bg-stone-50 p-0.5 disabled:opacity-60"
+              title="Pick accent colour"
             />
+            <input
+              type="text"
+              value={accentColor}
+              onChange={e => {
+                const v = e.target.value;
+                if (/^#?[0-9a-fA-F]{0,6}$/.test(v)) setAccentColor(v.startsWith('#') || v === '' ? v : `#${v}`);
+              }}
+              maxLength={7}
+              disabled={isFormBusy}
+              className="w-28 bg-stone-50 border border-stone-200 rounded-xl p-3 text-sm font-mono focus:border-emerald-400 outline-none disabled:opacity-60"
+              placeholder="auto from logo"
+            />
+            {accentColor && (
+              <>
+                <div className="w-8 h-8 rounded-full border border-stone-200 flex-shrink-0" style={{ backgroundColor: accentColor }} title="Accent colour preview" />
+                <button type="button" onClick={() => setAccentColor('')} className="text-xs text-stone-400 hover:text-red-500 transition">Clear</button>
+              </>
+            )}
           </div>
         </div>
 

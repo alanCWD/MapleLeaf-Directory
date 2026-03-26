@@ -29,6 +29,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; index: number } | null>(null);
 
   const brandColor = store.themeConfig?.brandColor || '#065f46';
+  const accentColor = store.themeConfig?.accentColor || '';
   const headerImageUrl = getStoreHeaderImage(store.id, store.headerImageUrl);
 
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -117,7 +118,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
   return (
     <div
       className="min-h-screen bg-stone-50 flex flex-col overflow-x-hidden"
-      style={{ '--brand': brandColor } as React.CSSProperties}
+      style={{ '--brand': brandColor, ...(accentColor ? { '--accent': accentColor } : {}) } as React.CSSProperties}
     >
       {lightboxPhoto && (
         <div

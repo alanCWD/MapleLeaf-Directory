@@ -78,6 +78,7 @@ export interface Store {
   domainVerified?: boolean;
   themeConfig?: {
     brandColor?: string;
+    accentColor?: string;
     logoUrl?: string;
   } | null;
 

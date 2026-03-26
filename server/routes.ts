@@ -882,6 +882,51 @@ router.post('/owner/stores/:id/header-image', isAuthenticated as RequestHandler,
   }
 });
 
+router.post('/owner/stores/:id/logo', isAuthenticated as RequestHandler, requireOwnerOrAdmin, imageUpload.single('image'), async (req: any, res) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req)!;
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const ownedStores = await getClaimedStoresForOwner(userId);
+      if (!ownedStores.includes(storeId)) {
+        res.status(403).json({ error: 'You do not own this store' });
+        return;
+      }
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer)
+      .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer();
+    const filename = `store-logo-${storeId}-${Date.now()}.png`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'store-logos');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'store-logos');
+    }
+    const existing = await getStoreById(storeId);
+    const mergedTheme = { ...(existing?.themeConfig || {}), logoUrl: url };
+    const store = await updateStore(storeId, { themeConfig: mergedTheme });
+    if (!store) {
+      res.status(404).json({ error: 'Store not found' });
+      return;
+    }
+    res.json({ url, store });
+  } catch (error: any) {
+    console.error('[OwnerLogo] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload logo' });
+  }
+});
+
 router.post('/owner/stores/:id/photos', isAuthenticated as RequestHandler, requireOwnerOrAdmin, imageUpload.single('image'), async (req: any, res) => {
   try {
     const storeId = paramId(req.params);

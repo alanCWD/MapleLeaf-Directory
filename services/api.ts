@@ -43,7 +43,22 @@ export async function fetchTenantStore(): Promise<{ store: Store; directoryOrigi
   return apiFetch<{ store: Store; directoryOrigin: string } | null>('/tenant');
 }
 
-export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: { brandColor?: string; logoUrl?: string }): Promise<Store> {
+export async function ownerUploadStoreLogo(storeId: string, file: File): Promise<{ url: string; store: Store }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`/api/owner/stores/${storeId}/logo`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to upload logo');
+  }
+  return res.json();
+}
+
+export async function ownerSaveStoreDomain(storeId: string, customDomain: string, themeConfig?: { brandColor?: string; accentColor?: string; logoUrl?: string }): Promise<Store> {
   return apiFetch<Store>(`/owner/stores/${storeId}/domain`, {
     method: 'PATCH',
     body: JSON.stringify({ customDomain, themeConfig }),
