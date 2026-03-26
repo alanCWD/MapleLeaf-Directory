@@ -43,7 +43,7 @@ async function handleStripeEvent(event: any): Promise<void> {
       else if (data.status === 'trialing') status = 'trialing';
       else status = 'inactive';
       const periodEnd = data.current_period_end ? new Date(data.current_period_end * 1000) : null;
-      await updateStorePlanByCustomerId(customerId, status, status === 'inactive' ? periodEnd : null);
+      await updateStorePlanByCustomerId(customerId, status, periodEnd);
       break;
     }
 

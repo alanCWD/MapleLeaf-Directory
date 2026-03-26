@@ -928,11 +928,11 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           </div>
           <ul className="space-y-2 mb-5">
             {[
-              'Your own branded domain — look fully sovereign, no directory watermark',
-              'Full colour, font, and content control — built around your identity',
-              'Hero tagline, sub-headline, and section visibility toggles',
-              'Integrated gallery, posts, hours, and contact — all in one site',
-              'Live preview and DNS verification tools included',
+              'Your own domain — serve your site at yourshop.ca, not a directory URL',
+              'Full colour, font & brand control — built around your identity, not ours',
+              'Custom hero tagline, sub-headline, and section visibility toggles',
+              'Gallery, posts, hours, contact, and menu — all owned by you',
+              'Live preview before you publish + DNS verification tools included',
             ].map((benefit, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-stone-700">
                 <svg className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -989,7 +989,7 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
       </div>
       <div className="flex items-center justify-between mb-4 ml-7">
         <div className="flex flex-col gap-0.5">
-          <p className="text-xs text-stone-400">Connect your own domain and customize your store's branded website.</p>
+          <p className="text-xs text-stone-400">Your branded sovereign microsite, on your own domain.</p>
           {store.sovereignPlanExpiresAt && (
             <p className="text-xs text-stone-400">
               {store.sovereignPlanStatus === 'inactive' ? 'Expired' : 'Renews'}{' '}
@@ -1005,6 +1005,18 @@ const OwnedSiteSection: React.FC<{ store: Store; onUpdate: (updated: Store) => v
           {portalLoading ? 'Loading…' : 'Manage Billing →'}
         </button>
       </div>
+
+      {showUpgradeSuccess && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+          <svg className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="font-bold text-emerald-800 text-sm">Welcome to Sovereign Site!</p>
+            <p className="text-emerald-700 text-xs mt-0.5">Your subscription is active. Start building your site below.</p>
+          </div>
+        </div>
+      )}
 
       <input
         ref={logoFileRef}
