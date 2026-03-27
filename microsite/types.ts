@@ -1,5 +1,12 @@
 export type FontPairing = 'system' | 'modern' | 'classic' | 'playful' | 'elegant';
 
+export interface MicrositeSection {
+  showHours?: boolean;
+  showGallery?: boolean;
+  showPosts?: boolean;
+  showContact?: boolean;
+}
+
 export interface MicrositeTheme {
   brandColor?: string;
   accentColor?: string;
@@ -7,12 +14,7 @@ export interface MicrositeTheme {
   tagline?: string;
   subHeadline?: string;
   fontPairing?: FontPairing;
-  sections?: {
-    showHours?: boolean;
-    showGallery?: boolean;
-    showPosts?: boolean;
-    showContact?: boolean;
-  };
+  sections?: MicrositeSection;
 }
 
 export type MicrositeStatus = 'active' | 'trialing' | 'inactive';
