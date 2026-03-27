@@ -3,7 +3,7 @@ import type { Store, StoreFlag } from '../types';
 
 const { Pool } = pg;
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
@@ -417,6 +417,29 @@ export async function getStoreByCustomDomain(domain: string): Promise<Store | nu
   );
   if (result.rows.length === 0) return null;
   return snakeToCamel(result.rows[0]);
+}
+
+export async function updateStorePlanByStripeCustomerId(
+  stripeCustomerId: string,
+  status: 'active' | 'trialing' | 'inactive',
+  expiresAt: Date | null,
+  storeId?: string,
+): Promise<void> {
+  if (storeId) {
+    await pool.query(
+      `UPDATE stores
+       SET sovereign_plan_status = $1, sovereign_plan_expires_at = $2, stripe_customer_id = $3
+       WHERE id = $4`,
+      [status, expiresAt, stripeCustomerId, storeId],
+    );
+  } else {
+    await pool.query(
+      `UPDATE stores
+       SET sovereign_plan_status = $1, sovereign_plan_expires_at = $2
+       WHERE stripe_customer_id = $3`,
+      [status, expiresAt, stripeCustomerId],
+    );
+  }
 }
 
 export async function ensureUserProfileColumns(): Promise<void> {
@@ -864,4 +887,3 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
   return Array.from(seen.values());
 }
 
-export { pool };

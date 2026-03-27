@@ -5,11 +5,13 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, ensureCustomDomainColumns, ensureSovereignPlanColumns, getStoreByCustomDomain } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, ensureCustomDomainColumns, ensureSovereignPlanColumns } from './db.ts';
 import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
 import { WebhookHandlers } from './webhookHandlers.ts';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.ts';
+import { createTenantMiddleware } from '../microsite/server/middleware.ts';
+import { legacyleafAdapter } from '../microsite/legacyleaf-adapter.ts';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -82,48 +84,7 @@ async function startServer() {
   await ensureSovereignPlanColumns();
 
   const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
-  const tenantCache = new Map<string, { store: any; expiresAt: number }>();
-  const TENANT_CACHE_TTL_MS = 60_000;
-  const TENANT_CACHE_MAX_SIZE = 500;
-
-  const pruneTenantCache = () => {
-    const now = Date.now();
-    for (const [key, val] of tenantCache) {
-      if (val.expiresAt <= now) tenantCache.delete(key);
-    }
-    if (tenantCache.size > TENANT_CACHE_MAX_SIZE) {
-      const oldest = Array.from(tenantCache.entries())
-        .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
-        .slice(0, tenantCache.size - TENANT_CACHE_MAX_SIZE);
-      for (const [key] of oldest) tenantCache.delete(key);
-    }
-  };
-  setInterval(pruneTenantCache, 5 * 60 * 1000).unref();
-
-  app.use(async (req: any, _res, next) => {
-    try {
-      const host = (req.headers.host || '').split(':')[0].toLowerCase().trim();
-      if (!host || host === 'localhost' || host === MAIN_DOMAIN || host.endsWith('.replit.app') || host.endsWith('.replit.dev')) {
-        req.tenantStore = null;
-        return next();
-      }
-      const cached = tenantCache.get(host);
-      if (cached) {
-        if (cached.expiresAt > Date.now()) {
-          req.tenantStore = cached.store;
-          return next();
-        }
-        tenantCache.delete(host);
-      }
-      if (tenantCache.size >= TENANT_CACHE_MAX_SIZE) pruneTenantCache();
-      const store = await getStoreByCustomDomain(host);
-      tenantCache.set(host, { store, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
-      req.tenantStore = store;
-    } catch {
-      req.tenantStore = null;
-    }
-    next();
-  });
+  app.use(createTenantMiddleware(legacyleafAdapter, MAIN_DOMAIN));
 
   app.use('/api', router);
 

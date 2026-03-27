@@ -53,9 +53,22 @@ Store owners can unlock a "Sovereign Site" — a branded microsite on a custom d
 - `sovereign_plan_expires_at TIMESTAMP` — optional expiry (for admin overrides)
 - `stripe_customer_id TEXT` — Stripe customer ID linked to the store
 
+**Microsite Engine (modular package — `microsite/`):**
+- Self-contained, drop-in module with adapter pattern for multi-tenant branded microsites
+- `microsite/types.ts` — `MicrositeConfig`, `MicrositeTheme`, `MicrositeStatus` generic types
+- `microsite/adapter.ts` — `MicrositeAdapter` interface (`resolveByDomain`, `resolveById`)
+- `microsite/legacyleaf-adapter.ts` — concrete adapter mapping `Store` → `MicrositeConfig`
+- `microsite/server/billing.ts` — Stripe client + webhook business logic (canonical source)
+- `microsite/server/middleware.ts` — `createTenantMiddleware(adapter, mainDomain)` factory
+- `microsite/server/routes.ts` — `createMicrositeRouter(deps)` factory with all 15 API routes
+- `microsite/components/SovereignSite.tsx` — React renderer (canonical source)
+- `server/stripeClient.ts` and `server/webhookHandlers.ts` are re-export shims pointing to `microsite/server/billing.ts`
+- `components/SovereignSite.tsx` is a re-export shim pointing to `microsite/components/SovereignSite.tsx`
+- See `microsite/README.md` for full wiring guide
+
 **Stripe integration:**
-- `server/stripeClient.ts` — Replit-managed credentials (no hardcoded keys); exports `getUncachableStripeClient()`, `getStripeSync()`, `getStripePublishableKey()`
-- `server/webhookHandlers.ts` — minimal webhook handler calling `stripe-replit-sync`'s `processWebhook()`
+- `microsite/server/billing.ts` — Replit-managed credentials (no hardcoded keys); exports `getUncachableStripeClient()`, `getStripeSync()`, `getStripePublishableKey()`, `WebhookHandlers`
+- `server/stripeClient.ts` / `server/webhookHandlers.ts` — re-export shims (backward compat)
 - Webhook route `/api/stripe/webhook` registered BEFORE `express.json()` in `server/index.ts`
 - `initStripe()` runs on startup: `runMigrations()` → `getStripeSync()` → `findOrCreateManagedWebhook()` → `syncBackfill()` (non-fatal on error)
 - Sovereign Site product seeded via `scripts/seed-sovereign-plan.ts` (run once in dev)
