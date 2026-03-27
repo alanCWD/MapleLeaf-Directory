@@ -24,6 +24,7 @@ import { CreatePost } from './components/CreatePost';
 import { ProfileSettings } from './components/ProfileSettings';
 import { UserProfilePage } from './components/UserProfilePage';
 import { SovereignSite } from './components/SovereignSite';
+import type { MicrositeConfig } from './microsite/types';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore, fetchStore, fetchStorePreview } from './services/api';
 import { useAuth } from './hooks/useAuth';
@@ -51,16 +52,42 @@ const ConditionalFooter: React.FC<{ children: React.ReactNode }> = ({ children }
   return <>{children}</>;
 };
 
+function storeToMicrositeConfig(store: Store): MicrositeConfig {
+  return {
+    tenantId: store.id,
+    name: store.name,
+    type: store.type,
+    address: store.address,
+    province: store.province,
+    phone: store.phone,
+    website: store.website,
+    rating: store.rating,
+    hours: store.hours,
+    featuredOfferings: store.featuredOfferings,
+    headerImageUrl: store.headerImageUrl,
+    storePhotos: store.storePhotos,
+    themeConfig: store.themeConfig,
+    customDomain: store.customDomain,
+    domainVerified: store.domainVerified,
+    planStatus: store.sovereignPlanStatus || 'inactive',
+    planExpiresAt: store.sovereignPlanExpiresAt,
+    stripeCustomerId: store.stripeCustomerId,
+    isClaimed: store.isClaimed,
+    verificationStatus: store.verificationStatus,
+    storeInsights: store.storeInsights,
+  };
+}
+
 const StorePreviewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [store, setStore] = useState<Store | null>(null);
+  const [store, setStore] = useState<MicrositeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!id) { setError('No store ID'); setLoading(false); return; }
     fetchStorePreview(id)
-      .then(setStore)
+      .then(s => setStore(storeToMicrositeConfig(s)))
       .catch((err: any) => {
         const status = err?.status;
         if (status === 403) {
@@ -77,7 +104,7 @@ const StorePreviewPage: React.FC = () => {
 
     const interval = setInterval(() => {
       if (!id) return;
-      fetchStorePreview(id).then(setStore).catch(() => {});
+      fetchStorePreview(id).then(s => setStore(storeToMicrositeConfig(s))).catch(() => {});
     }, 5000);
     return () => clearInterval(interval);
   }, [id]);
@@ -574,7 +601,7 @@ const DirectoryApp: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const [tenantStore, setTenantStore] = useState<Store | null>(null);
+  const [tenantStore, setTenantStore] = useState<MicrositeConfig | null>(null);
   const [directoryOrigin, setDirectoryOrigin] = useState('');
   const [tenantLoading, setTenantLoading] = useState(true);
 
@@ -582,7 +609,7 @@ const App: React.FC = () => {
     fetchTenantStore()
       .then(result => {
         if (result) {
-          setTenantStore(result.store);
+          setTenantStore(result.store as MicrositeConfig);
           setDirectoryOrigin(result.directoryOrigin);
         }
       })

@@ -51,8 +51,8 @@ export async function fetchStorePreview(id: string): Promise<Store> {
   return res.json();
 }
 
-export async function fetchTenantStore(): Promise<{ store: Store; directoryOrigin: string } | null> {
-  return apiFetch<{ store: Store; directoryOrigin: string } | null>('/tenant');
+export async function fetchTenantStore(): Promise<{ store: any; directoryOrigin: string } | null> {
+  return apiFetch<{ store: any; directoryOrigin: string } | null>('/tenant');
 }
 
 export async function ownerUploadStoreLogo(storeId: string, file: File): Promise<{ url: string; store: Store }> {

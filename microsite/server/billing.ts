@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { updateStorePlanByStripeCustomerId } from '../../server/db.ts';
+import { updateStorePlanByStripeCustomerId } from './db.ts';
 
 let connectionSettings: any;
 

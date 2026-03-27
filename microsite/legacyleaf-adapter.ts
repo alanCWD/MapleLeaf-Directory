@@ -1,6 +1,8 @@
-import { getStoreByCustomDomain, getStoreById } from '../server/db.ts';
+import { getStoreByCustomDomain, getStoreById, updateStore } from '../server/db.ts';
+import { getUserRole } from '../server/userDb.ts';
 import type { Store } from '../types.ts';
-import type { MicrositeAdapter, MicrositeConfig } from './types.ts';
+import type { MicrositeAdapter } from './adapter.ts';
+import type { MicrositeConfig } from './types.ts';
 
 function storeToConfig(store: Store): MicrositeConfig {
   return {
@@ -33,8 +35,32 @@ export const legacyleafAdapter: MicrositeAdapter = {
     const store = await getStoreByCustomDomain(domain);
     return store ? storeToConfig(store) : null;
   },
+
   async resolveById(id: string) {
     const store = await getStoreById(id);
+    return store ? storeToConfig(store) : null;
+  },
+
+  async checkPlanEntitlement(userId: string, tenantId: string) {
+    const role = await getUserRole(userId);
+    if (role === 'admin') return true;
+    const store = await getStoreById(tenantId);
+    if (!store) return false;
+    const status = store.sovereignPlanStatus || 'inactive';
+    return status === 'active' || status === 'trialing';
+  },
+
+  async updateConfig(tenantId: string, updates: Partial<Omit<MicrositeConfig, 'tenantId'>>) {
+    const storeUpdates: Partial<Store> = {};
+    if (updates.headerImageUrl !== undefined) storeUpdates.headerImageUrl = updates.headerImageUrl;
+    if (updates.storePhotos !== undefined) storeUpdates.storePhotos = updates.storePhotos;
+    if (updates.themeConfig !== undefined) storeUpdates.themeConfig = updates.themeConfig;
+    if (updates.customDomain !== undefined) storeUpdates.customDomain = updates.customDomain;
+    if (updates.domainVerified !== undefined) storeUpdates.domainVerified = updates.domainVerified;
+    if (updates.planStatus !== undefined) storeUpdates.sovereignPlanStatus = updates.planStatus;
+    if (updates.planExpiresAt !== undefined) storeUpdates.sovereignPlanExpiresAt = updates.planExpiresAt;
+    if (updates.stripeCustomerId !== undefined) storeUpdates.stripeCustomerId = updates.stripeCustomerId;
+    const store = await updateStore(tenantId, storeUpdates);
     return store ? storeToConfig(store) : null;
   },
 };
