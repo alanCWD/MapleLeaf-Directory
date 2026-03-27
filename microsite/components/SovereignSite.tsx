@@ -66,17 +66,15 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
 
-  const address = store.address || '';
-  const province = store.province || '';
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${store.name}, ${address}, ${province}, Canada`)}`;
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${store.name}, ${store.address}, ${store.province}, Canada`)}`;
   const directoryListingUrl = `${directoryOrigin}/#/store/${store.tenantId}`;
   const directoryPostUrl = (postId: number) => `${directoryOrigin}/#/posts/${postId}`;
 
-  const addressParts = address.split(',');
-  const city = (addressParts.length > 1 ? addressParts[addressParts.length - 1]?.trim() : addressParts[0]?.trim()) || province;
+  const addressParts = store.address.split(',');
+  const city = (addressParts.length > 1 ? addressParts[addressParts.length - 1]?.trim() : addressParts[0]?.trim()) || store.province;
 
   useEffect(() => {
-    document.title = `${store.name} — ${city}, ${province}`;
+    document.title = `${store.name} — ${city}, ${store.province}`;
 
     const setMeta = (name: string, content: string) => {
       let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
@@ -98,7 +96,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
       el.setAttribute('content', content);
     };
 
-    const desc = `${store.name} is a ${store.type} cannabis dispensary in ${address}, ${province}, Canada. ${store.featuredOfferings?.length ? `Specializing in: ${store.featuredOfferings.slice(0, 3).join(', ')}.` : ''}`;
+    const desc = `${store.name} is a ${store.type} cannabis dispensary in ${store.address}, ${store.province}, Canada. ${store.featuredOfferings?.length ? `Specializing in: ${store.featuredOfferings.slice(0, 3).join(', ')}.` : ''}`;
 
     setMeta('description', desc);
     setOg('og:title', store.name);
@@ -210,7 +208,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
                   const prev = (lightboxPhoto.index - 1 + photos.length) % photos.length;
                   setLightboxPhoto({ url: photos[prev], index: prev });
                 }}
-                aria-label="Previous photo"
+                aria-label="Previous"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -223,7 +221,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
                   const next = (lightboxPhoto.index + 1) % photos.length;
                   setLightboxPhoto({ url: photos[next], index: next });
                 }}
-                aria-label="Next photo"
+                aria-label="Next"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
@@ -234,345 +232,365 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
           <img
             src={lightboxPhoto.url}
             alt={`Interior photo ${lightboxPhoto.index + 1}`}
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
-          <div className="absolute bottom-4 text-white/50 text-sm">
-            {lightboxPhoto.index + 1} / {photos.length}
-          </div>
+          {photos.length > 1 && (
+            <div className="absolute bottom-4 text-white/50 text-xs font-bold">
+              {lightboxPhoto.index + 1} / {photos.length}
+            </div>
+          )}
         </div>
       )}
 
-      <div
-        className="relative w-full"
-        style={{ minHeight: '480px', maxHeight: '640px', overflow: 'hidden' }}
+      <header
+        className="relative overflow-hidden"
+        style={{ minHeight: '420px' }}
       >
         <img
           src={headerImageUrl}
           alt={store.name}
-          className="w-full h-full object-cover"
-          style={{ minHeight: '480px', maxHeight: '640px' }}
+          className="absolute inset-0 w-full h-full object-cover"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = getStoreHeaderImage(store.tenantId);
+            (e.target as HTMLImageElement).src = `https://placehold.co/1600x600/065f46/ffffff?text=${encodeURIComponent(store.name)}`;
           }}
         />
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(to bottom, ${brandColor}22 0%, ${brandColor}cc 60%, ${brandColor}f5 100%)`,
-          }}
-        />
-        {store.themeConfig?.logoUrl && (
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10">
-            <img
-              src={store.themeConfig.logoUrl}
-              alt={`${store.name} logo`}
-              className="h-20 w-auto drop-shadow-lg"
-            />
-          </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 p-8 md:p-12 text-white z-10">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {store.verificationStatus === 'verified' && (
-                <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-xs font-bold border border-white/30">
-                  <svg className="w-3 h-3 text-emerald-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  Verified
-                </span>
-              )}
-              {store.type && (
-                <span className="bg-white/15 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full text-xs font-semibold border border-white/20">
-                  {store.type}
-                </span>
-              )}
-            </div>
-            <h1
-              className="text-4xl md:text-6xl font-black tracking-tight text-white drop-shadow-sm"
-              style={{ fontFamily: 'var(--font-heading)', textShadow: '0 2px 20px rgba(0,0,0,0.35)' }}
-            >
-              {store.name}
-            </h1>
-            {tagline && (
-              <p
-                className="mt-3 text-white/85 text-lg md:text-xl font-medium"
-                style={{ textShadow: '0 1px 8px rgba(0,0,0,0.3)' }}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <nav className="relative z-10 flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            {store.themeConfig?.logoUrl ? (
+              <img src={store.themeConfig.logoUrl} alt={`${store.name} logo`} className="h-10 w-auto rounded-lg" />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg"
+                style={{ backgroundColor: 'var(--brand)' }}
               >
-                {tagline}
-              </p>
-            )}
-            {subHeadline && (
-              <p
-                className="mt-2 text-white/70 text-base"
-                style={{ textShadow: '0 1px 8px rgba(0,0,0,0.3)' }}
-              >
-                {subHeadline}
-              </p>
-            )}
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-white/80 text-sm font-medium">
-              {address && (
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {city}, {province}
-                </span>
-              )}
-              {store.rating && (
-                <>
-                  <span className="opacity-40">•</span>
-                  <span className="flex items-center gap-1">
-                    <svg className="w-4 h-4 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    {store.rating.toFixed(1)}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto w-full px-4 py-10 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-10">
-            {store.featuredOfferings && store.featuredOfferings.length > 0 && (
-              <section>
-                <h2
-                  className="text-2xl font-black mb-4 tracking-tight flex items-center gap-3"
-                  style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
-                >
-                  <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
-                  What We Offer
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {store.featuredOfferings.map((item) => (
-                    <span
-                      key={item}
-                      className="px-4 py-2 rounded-full text-sm font-bold border-2"
-                      style={{ borderColor: 'var(--brand)', color: 'var(--brand)', backgroundColor: `${brandColor}10` }}
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {store.storeInsights && (
-              <section>
-                <h2
-                  className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
-                  style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
-                >
-                  <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
-                  About This Store
-                </h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {store.storeInsights.atmosphere && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
-                      <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: 'var(--brand)' }}>Atmosphere</div>
-                      <p className="text-stone-700 text-sm leading-relaxed">{store.storeInsights.atmosphere}</p>
-                    </div>
-                  )}
-                  {store.storeInsights.community && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
-                      <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: 'var(--brand)' }}>Community</div>
-                      <p className="text-stone-700 text-sm leading-relaxed">{store.storeInsights.community}</p>
-                    </div>
-                  )}
-                  {store.storeInsights.specialties && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
-                      <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: 'var(--brand)' }}>Specialties</div>
-                      <p className="text-stone-700 text-sm leading-relaxed">{store.storeInsights.specialties}</p>
-                    </div>
-                  )}
-                  {store.storeInsights.sovereignty && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
-                      <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: 'var(--brand)' }}>Sovereignty</div>
-                      <p className="text-stone-700 text-sm leading-relaxed">{store.storeInsights.sovereignty}</p>
-                    </div>
-                  )}
-                  {store.storeInsights.proTip && (
-                    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 sm:col-span-2" style={{ borderColor: `${brandColor}40`, backgroundColor: `${brandColor}08` }}>
-                      <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: 'var(--brand)' }}>Pro Tip</div>
-                      <p className="text-stone-700 text-sm leading-relaxed">{store.storeInsights.proTip}</p>
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {showGallery && photos.length > 0 && (
-              <section>
-                <h2
-                  className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
-                  style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
-                >
-                  <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
-                  Inside the Store
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {photos.map((url, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setLightboxPhoto({ url, index: idx })}
-                      className="relative aspect-square overflow-hidden rounded-2xl group focus:outline-none focus:ring-2 focus:ring-offset-2"
-                      style={{ '--tw-ring-color': 'var(--brand)' } as React.CSSProperties}
-                    >
-                      <img
-                        src={url}
-                        alt={`Interior photo ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors" />
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {showPosts && (isLoadingPosts || posts.length > 0) && (
-              <section>
-                <h2
-                  className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
-                  style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
-                >
-                  <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
-                  Latest from the Hub
-                </h2>
-                {isLoadingPosts ? (
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {[1, 2].map(i => (
-                      <div key={i} className="bg-white rounded-2xl border border-stone-200 p-5 animate-pulse">
-                        <div className="h-3 bg-stone-100 rounded w-1/3 mb-3" />
-                        <div className="h-5 bg-stone-100 rounded w-2/3 mb-2" />
-                        <div className="h-3 bg-stone-100 rounded w-full" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {posts.map(post => (
-                      <a
-                        key={post.id}
-                        href={directoryPostUrl(post.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:border-stone-300 hover:shadow-md transition"
-                      >
-                        {post.media && post.media[0]?.cdnUrl && (
-                          <div className="relative aspect-video rounded-xl overflow-hidden mb-4">
-                            <img
-                              src={post.media[0].cdnUrl}
-                              alt={post.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 mb-2">
-                          {post.authorImageUrl ? (
-                            <img src={post.authorImageUrl} alt="" className="w-6 h-6 rounded-full" />
-                          ) : (
-                            <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black"
-                              style={{ backgroundColor: 'var(--brand)' }}
-                            >
-                              {(post.authorName?.[0] || 'U').toUpperCase()}
-                            </div>
-                          )}
-                          <span className="text-xs text-stone-500 font-medium">{post.authorName || 'Community'}</span>
-                          <span className="text-stone-300">·</span>
-                          <span className="text-xs text-stone-400">
-                            {new Date(post.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                        </div>
-                        <h3 className="font-black text-stone-900 leading-snug">{post.title}</h3>
-                        {post.subtitle && (
-                          <p className="text-sm text-stone-500 mt-1 line-clamp-2">{post.subtitle}</p>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            {showHours && sortedHours.length > 0 && (
-              <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
-                <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
-                  <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Hours
-                </h3>
-                <div className="space-y-1.5">
-                  {sortedHours.map((h) => {
-                    const isToday = h.day === currentDay;
-                    return (
-                      <div
-                        key={h.day}
-                        className={`flex justify-between items-center py-1.5 px-2 rounded-lg text-sm ${isToday ? 'font-black' : 'font-medium'}`}
-                        style={isToday ? { backgroundColor: `${brandColor}15`, color: brandColor } : { color: '#44403c' }}
-                      >
-                        <span>{getDayAbbrev(h.day)}</span>
-                        <span>{formatHour(h.time)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {store.name[0]}
               </div>
             )}
+            <span className="text-white font-black text-lg tracking-tight">{store.name}</span>
+          </div>
+          {store.phone && (
+            <a
+              href={`tel:${store.phone}`}
+              className="hidden md:flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-sm font-bold transition backdrop-blur-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              {store.phone}
+            </a>
+          )}
+        </nav>
+        <div className="relative z-10 px-6 pb-10 pt-16 md:pt-24 max-w-4xl">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-lg"
+              style={{ backgroundColor: 'var(--brand)' }}
+            >
+              {store.type}
+            </span>
+            {store.verificationStatus === 'verified' && (
+              <span className="bg-emerald-500/90 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+                Verified
+              </span>
+            )}
+            {store.isClaimed && (
+              <span className="bg-blue-500/90 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 01-2.812 2.812c.051.64.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
+                </svg>
+                Owner Managed
+              </span>
+            )}
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black text-white mb-3 tracking-tight leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+            {store.name}
+          </h1>
+          <p className="text-white/90 text-xl font-semibold mb-2 leading-snug">
+            {tagline || `Sovereign cannabis — ${store.province}, Canada`}
+          </p>
+          {(subHeadline || store.storeInsights?.community) && (
+            <p className="text-stone-200 text-base mb-3 max-w-xl leading-relaxed">
+              {subHeadline || store.storeInsights?.community}
+            </p>
+          )}
+          <p className="text-stone-300 text-lg flex items-center gap-2">
+            <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {store.address}, {store.province}
+          </p>
+        </div>
+      </header>
 
-            {showContact && (
-              <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
-                <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
-                  <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Location
-                </h3>
-                <address className="not-italic text-stone-700 text-sm font-medium leading-relaxed mb-4">
-                  {address}<br />{province}, Canada
-                </address>
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+      <div className="flex-1">
+        <div className="max-w-6xl mx-auto px-4 py-12">
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            {store.phone && (
+              <a
+                href={`tel:${store.phone}`}
+                className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-stone-200 p-5 hover:border-stone-300 transition text-center shadow-sm"
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
                   style={{ backgroundColor: 'var(--brand)' }}
                 >
-                  Get Directions
-                </a>
-                {store.phone && (
-                  <a
-                    href={`tel:${store.phone}`}
-                    className="block text-center py-2.5 rounded-xl text-sm font-bold border-2 mt-2 transition hover:bg-stone-50"
-                    style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}
-                  >
-                    {store.phone}
-                  </a>
-                )}
-                {store.website && (
-                  <a
-                    href={store.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-center py-2.5 rounded-xl text-sm font-semibold text-stone-500 hover:text-stone-700 mt-2 transition"
-                  >
-                    Visit Website ↗
-                  </a>
-                )}
-              </div>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-stone-400 uppercase tracking-widest">Call Us</div>
+                  <div className="text-sm font-bold text-stone-800 mt-0.5 truncate">{store.phone}</div>
+                </div>
+              </a>
             )}
 
-            <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-stone-200 p-5 hover:border-stone-300 transition text-center shadow-sm"
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                style={{ backgroundColor: 'var(--brand)' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 01-1.447-.894L15 7m0 10V7" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-stone-400 uppercase tracking-widest">Get Directions</div>
+                <div className="text-sm font-bold text-stone-800 mt-0.5">Open Maps</div>
+              </div>
+            </a>
+
+            {store.website && (
+              <a
+                href={store.website.startsWith('http') ? store.website : `https://${store.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-stone-200 p-5 hover:border-stone-300 transition text-center shadow-sm"
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                  style={{ backgroundColor: 'var(--brand)' }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-stone-400 uppercase tracking-widest">Visit Website</div>
+                  <div className="text-sm font-bold text-stone-800 mt-0.5 truncate">
+                    {store.website.replace(/^https?:\/\//, '').replace(/\/$/, '').split('/')[0]}
+                  </div>
+                </div>
+              </a>
+            )}
+
+            {store.rating != null && (
+              <div className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-stone-200 p-5 text-center shadow-sm">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                  style={{ backgroundColor: 'var(--brand)' }}
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-stone-400 uppercase tracking-widest">Rating</div>
+                  <div className="text-sm font-bold text-stone-800 mt-0.5">{store.rating.toFixed(1)} / 5</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-10">
+
+              {store.featuredOfferings && store.featuredOfferings.length > 0 && (
+                <section>
+                  <h2
+                    className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
+                    style={{ color: 'var(--brand)' }}
+                  >
+                    <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
+                    Featured Selection
+                  </h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {store.featuredOfferings.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-white rounded-2xl border border-stone-200 shadow-sm px-5 py-4 flex items-center justify-between"
+                      >
+                        <span className="font-bold text-stone-800">{item}</span>
+                        <span
+                          className="text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full text-white"
+                          style={{ backgroundColor: 'var(--brand)' }}
+                        >
+                          In Stock
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {showGallery && photos.length > 0 && (
+                <section>
+                  <h2
+                    className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
+                    style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
+                  >
+                    <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
+                    Inside the Store
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {photos.map((url, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setLightboxPhoto({ url, index: idx })}
+                        className="relative aspect-square overflow-hidden rounded-2xl group focus:outline-none focus:ring-2 focus:ring-offset-2"
+                        style={{ '--tw-ring-color': 'var(--brand)' } as React.CSSProperties}
+                      >
+                        <img
+                          src={url}
+                          alt={`Interior photo ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {showPosts && (isLoadingPosts || posts.length > 0) && (
+                <section>
+                  <h2
+                    className="text-2xl font-black mb-6 tracking-tight flex items-center gap-3"
+                    style={{ color: 'var(--brand)', fontFamily: 'var(--font-heading)' }}
+                  >
+                    <span className="w-1.5 h-7 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: 'var(--brand)' }} />
+                    Latest from the Hub
+                  </h2>
+                  {isLoadingPosts ? (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {[1, 2].map(i => (
+                        <div key={i} className="bg-white rounded-2xl border border-stone-200 p-5 animate-pulse">
+                          <div className="h-3 bg-stone-100 rounded w-1/3 mb-3" />
+                          <div className="h-5 bg-stone-100 rounded w-2/3 mb-2" />
+                          <div className="h-3 bg-stone-100 rounded w-full" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {posts.map(post => (
+                        <a
+                          key={post.id}
+                          href={directoryPostUrl(post.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:border-stone-300 hover:shadow-md transition"
+                        >
+                          {post.media && post.media[0]?.cdnUrl && (
+                            <div className="relative aspect-video rounded-xl overflow-hidden mb-4">
+                              <img
+                                src={post.media[0].cdnUrl}
+                                alt={post.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mb-2">
+                            {post.authorImageUrl ? (
+                              <img src={post.authorImageUrl} alt="" className="w-6 h-6 rounded-full" />
+                            ) : (
+                              <div
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black"
+                                style={{ backgroundColor: 'var(--brand)' }}
+                              >
+                                {(post.authorName?.[0] || 'U').toUpperCase()}
+                              </div>
+                            )}
+                            <span className="text-xs text-stone-500 font-medium">{post.authorName || 'Community'}</span>
+                            <span className="text-stone-300">·</span>
+                            <span className="text-xs text-stone-400">
+                              {new Date(post.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <h3 className="font-black text-stone-900 leading-snug">{post.title}</h3>
+                          {post.subtitle && (
+                            <p className="text-sm text-stone-500 mt-1 line-clamp-2">{post.subtitle}</p>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {showHours && sortedHours.length > 0 && (
+                <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
+                  <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
+                    <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Hours
+                  </h3>
+                  <div className="space-y-1.5">
+                    {sortedHours.map((h) => {
+                      const isToday = h.day === currentDay;
+                      return (
+                        <div
+                          key={h.day}
+                          className={`flex justify-between items-center py-1.5 px-2 rounded-lg text-sm ${isToday ? 'font-black' : 'font-medium'}`}
+                          style={isToday ? { backgroundColor: `${brandColor}15`, color: brandColor } : { color: '#44403c' }}
+                        >
+                          <span>{getDayAbbrev(h.day)}</span>
+                          <span>{formatHour(h.time)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {showContact && (
+                <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6">
+                  <h3 className="font-black text-stone-900 mb-4 uppercase text-xs tracking-widest flex items-center gap-2">
+                    <svg className="w-4 h-4" style={{ color: 'var(--brand)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Location
+                  </h3>
+                  <address className="not-italic text-stone-700 text-sm font-medium leading-relaxed mb-4">
+                    {store.address}<br />{store.province}, Canada
+                  </address>
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-center py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+                    style={{ backgroundColor: 'var(--brand)' }}
+                  >
+                    Get Directions
+                  </a>
+                </div>
+              )}
+
+              <IntegrityCard score={integrityScore} isLoading={isLoadingIntegrity} />
+            </div>
           </div>
         </div>
       </div>
@@ -588,7 +606,7 @@ export const SovereignSite: React.FC<SovereignSiteProps> = ({ store, directoryOr
             </div>
             <div>
               <div className="font-black text-stone-900 text-sm">{store.name}</div>
-              <div className="text-xs text-stone-400">{address.split(',')[0]?.trim()}, {province}</div>
+              <div className="text-xs text-stone-400">{store.address.split(',')[0]?.trim()}, {store.province}</div>
             </div>
           </div>
 

@@ -395,12 +395,31 @@ export async function ensureStorePhotosColumn(): Promise<void> {
   console.log('[DB] store_photos column ensured');
 }
 
-export {
-  ensureSovereignPlanColumns,
-  ensureCustomDomainColumns,
-  getStoreByCustomDomain,
-  updateStorePlanByStripeCustomerId,
-} from '../microsite/server/db.ts';
+export async function ensureSovereignPlanColumns(): Promise<void> {
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS sovereign_plan_status VARCHAR(20) DEFAULT 'inactive'`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS sovereign_plan_expires_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+  console.log('[DB] sovereign_plan columns ensured');
+}
+
+export async function ensureCustomDomainColumns(): Promise<void> {
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS custom_domain TEXT`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS domain_verified BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS theme_config JSONB`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_stores_custom_domain ON stores(custom_domain) WHERE custom_domain IS NOT NULL`);
+  console.log('[DB] custom_domain columns ensured');
+}
+
+export async function getStoreByCustomDomain(domain: string): Promise<Store | null> {
+  const result = await pool.query(
+    `SELECT * FROM stores WHERE custom_domain = $1 AND domain_verified = true LIMIT 1`,
+    [domain],
+  );
+  if (result.rows.length === 0) return null;
+  return snakeToCamel(result.rows[0]);
+}
+
+export { updateStorePlanByStripeCustomerId } from '../microsite/server/db.ts';
 
 export async function ensureUserProfileColumns(): Promise<void> {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS handle TEXT UNIQUE`);
