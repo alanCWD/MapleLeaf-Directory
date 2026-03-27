@@ -23,7 +23,7 @@ import { PostDetailPage } from './components/PostDetailPage';
 import { CreatePost } from './components/CreatePost';
 import { ProfileSettings } from './components/ProfileSettings';
 import { UserProfilePage } from './components/UserProfilePage';
-import { SovereignSite } from './components/SovereignSite';
+import { SovereignSite } from './microsite/components/SovereignSite';
 import type { MicrositeConfig } from './microsite/types';
 import { Store, Province, StoreType, UserProfile, VerificationStatus } from './types';
 import { fetchStores, bulkUpsertStores, updateStore as apiUpdateStore, getUserFavoritesAPI, addFavoriteAPI, removeFavoriteAPI, syncFavoritesAPI, fetchTenantStore, fetchStore, fetchStorePreview } from './services/api';
@@ -609,7 +609,7 @@ const App: React.FC = () => {
     fetchTenantStore()
       .then(result => {
         if (result) {
-          setTenantStore(result.store as MicrositeConfig);
+          setTenantStore(result.store);
           setDirectoryOrigin(result.directoryOrigin);
         }
       })
