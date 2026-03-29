@@ -1040,10 +1040,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           storeId={store.id}
           storeName={store.name}
           storeType={store.type}
-          onComplete={(review) => {
+          onSubmitReview={submitReview}
+          onComplete={(result) => {
             setReviewVideoMode('none');
-            if (review.videoAssetId) {
-              setReviewVideoAssetId(review.videoAssetId);
+            if (result.videoAssetId) {
+              setReviewVideoAssetId(result.videoAssetId);
             }
             loadMedia();
           }}
@@ -1082,10 +1083,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           storeId={store.id}
           storeName={store.name}
           storeType={store.type}
-          onComplete={(review) => {
+          onSubmitReview={submitReview}
+          onComplete={(_result) => {
             setShowVideoRecorder(false);
-            setWeightedReviews(prev => [review, ...prev]);
             loadMedia();
+            fetchStoreReviews(store.id).then(setWeightedReviews).catch(() => {});
           }}
           onCancel={() => setShowVideoRecorder(false)}
         />

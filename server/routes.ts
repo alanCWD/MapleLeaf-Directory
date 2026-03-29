@@ -168,8 +168,6 @@ router.use('/', createMicrositeRouter({
 }));
 
 router.use('/', createVideoReviewRouter(legacyleafVideoAdapter, {
-  isAuthenticated: isAuthenticated as RequestHandler,
-  requireAdmin: requireAdmin as RequestHandler,
   getUserId,
   getUserRole,
   getClaimedStoresForOwner,

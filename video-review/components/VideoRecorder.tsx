@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchRecorderQuestions, initMediaUpload, submitReview, stitchVideoClips } from '../../services/api';
-import type { RecorderQuestion, WeightedReview } from '../../services/api';
+import { fetchRecorderQuestions, initMediaUpload, stitchVideoClips } from '../client/api.ts';
+import type {
+  RecorderQuestion,
+  SubmitReviewData,
+  VideoReviewSubmitResult,
+} from '../types.ts';
 import * as tus from 'tus-js-client';
 
 interface VideoRecorderProps {
   storeId: string;
   storeName: string;
   storeType: string;
-  onComplete: (review: WeightedReview) => void;
+  onSubmitReview: (storeId: string, data: SubmitReviewData) => Promise<VideoReviewSubmitResult>;
+  onComplete: (result: VideoReviewSubmitResult) => void;
   onCancel: () => void;
 }
 
@@ -25,6 +30,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   storeId,
   storeName,
   storeType,
+  onSubmitReview,
   onComplete,
   onCancel,
 }) => {
@@ -43,7 +49,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   const [uploadError, setUploadError] = useState('');
   const [stitchPhase, setStitchPhase] = useState<StitchPhase>('uploading');
   const [trustWeightEarned, setTrustWeightEarned] = useState(0);
-  const [completedReview, setCompletedReview] = useState<WeightedReview | null>(null);
+  const [completedReview, setCompletedReview] = useState<VideoReviewSubmitResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
@@ -351,7 +357,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
       setStitchPhase('submitting');
       setUploadProgress(90);
 
-      const review = await submitReview(storeId, {
+      const review = await onSubmitReview(storeId, {
         rating,
         contentText: commentText || `Video review of ${storeName}`,
         videoAssetId: mediaId,

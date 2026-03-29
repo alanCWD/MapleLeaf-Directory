@@ -80,3 +80,15 @@ export interface RecorderQuestion {
   maxDurationSeconds: number;
   isRequired: boolean;
 }
+
+export interface SubmitReviewData {
+  rating: number;
+  contentText: string;
+  videoAssetId?: number;
+}
+
+export interface VideoReviewSubmitResult {
+  id: number;
+  videoAssetId?: number | null;
+  trustWeight?: { final: number } | null;
+}

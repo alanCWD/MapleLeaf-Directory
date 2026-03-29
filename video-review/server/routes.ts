@@ -17,11 +17,9 @@ import type { RecorderQuestion } from '../types.ts';
 
 /**
  * Dependencies injected by the host application.
- * These are auth/user concerns separate from the media adapter.
+ * Auth middleware (requireAuth, requireAdminAccess) is now part of the adapter.
  */
 export interface VideoReviewRouterDeps {
-  isAuthenticated: RequestHandler;
-  requireAdmin: RequestHandler;
   getUserId: (req: any) => string | null;
   getUserRole: (userId: string) => Promise<string>;
   getClaimedStoresForOwner: (userId: string) => Promise<string[]>;
@@ -56,14 +54,15 @@ export function createVideoReviewRouter(
   deps: VideoReviewRouterDeps
 ): Router {
   const {
-    isAuthenticated,
-    requireAdmin,
     getUserId,
     getUserRole,
     getClaimedStoresForOwner,
     createAuditLog,
     paramId,
   } = deps;
+
+  const isAuthenticated = adapter.requireAuth();
+  const requireAdmin = adapter.requireAdminAccess();
 
   const mediaService = createVideoReviewMediaService(adapter);
 
@@ -226,6 +225,7 @@ export function createVideoReviewRouter(
 
         res.json({
           mediaId: media.id,
+          videoId: bunnyVideo.guid,
           bunnyVideoId: bunnyVideo.guid,
           embedUrl: media.embedUrl,
           thumbnailUrl: media.thumbnailUrl,
@@ -346,6 +346,9 @@ export function createVideoReviewRouter(
           isRequired: false,
         },
       ];
+
+      const extras = await adapter.getExtraQuestions?.(subjectId.toString()) ?? [];
+      questions.push(...extras);
 
       res.json(questions);
     } catch (error) {

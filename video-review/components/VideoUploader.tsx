@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import * as tus from 'tus-js-client';
-import { MediaType } from '../../types';
-import { initMediaUpload } from '../../services/api';
+import type { VideoMediaType } from '../types.ts';
+import { initMediaUpload } from '../client/api.ts';
 
 type UploadState = 'selecting' | 'uploading' | 'processing' | 'ready' | 'error';
 
@@ -19,7 +19,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ storeId, onComplet
   const [state, setState] = useState<UploadState>('selecting');
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [mediaType, setMediaType] = useState<MediaType>('video');
+  const [mediaType, setMediaType] = useState<VideoMediaType>('video');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -311,7 +311,7 @@ export const VideoUploader: React.FC<VideoUploaderProps> = ({ storeId, onComplet
           <label className="block text-xs font-black uppercase tracking-widest text-stone-500 mb-2">Type</label>
           <select
             value={mediaType}
-            onChange={e => setMediaType(e.target.value as MediaType)}
+            onChange={e => setMediaType(e.target.value as VideoMediaType)}
             className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-4 focus:border-emerald-400 outline-none text-stone-900 font-medium"
           >
             <option value="video">Video</option>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchAdminVideoReviews, moderateVideoReview } from '../../services/api';
-import type { AdminVideoReview } from '../../services/api';
+import { fetchAdminVideoReviews, moderateVideoReview } from '../client/api.ts';
+import type { AdminVideoReview } from '../types.ts';
 
 export type { AdminVideoReview };
 

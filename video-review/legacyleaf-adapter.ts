@@ -1,3 +1,4 @@
+import type { RequestHandler } from 'express';
 import {
   createStoreMedia,
   getStoreMedia,
@@ -9,6 +10,8 @@ import {
 } from '../server/integrity/models.ts';
 import { getStoreById } from '../server/db.ts';
 import { createAuditLog } from '../server/db.ts';
+import { isAuthenticated } from '../server/replit_integrations/auth/index.ts';
+import { getUserRole } from '../server/userDb.ts';
 import type { VideoReviewAdapter } from './adapter.ts';
 import type { StoreMedia } from '../types';
 import type {
@@ -20,6 +23,7 @@ import type {
   CreateMediaInput,
   ModerationInput,
   AdminVideoReview,
+  RecorderQuestion,
 } from './types.ts';
 
 interface StoreMediaRow extends StoreMedia {
@@ -160,6 +164,44 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
   async listVideoReviews(): Promise<AdminVideoReview[]> {
     const records = await getVideoReviews();
     return records.map(videoReviewToAdminRecord);
+  },
+
+  requireAuth(): RequestHandler {
+    return isAuthenticated as RequestHandler;
+  },
+
+  requireAdminAccess(): RequestHandler {
+    const adminGuard: RequestHandler = async (req: any, res, next) => {
+      try {
+        const userId: string | undefined = req.user?.id ?? req.user?.claims?.sub;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+        const role = await getUserRole(userId);
+        if (role !== 'admin') {
+          res.status(403).json({ error: 'Forbidden' });
+          return;
+        }
+        next();
+      } catch {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    };
+    return adminGuard;
+  },
+
+  async getExtraQuestions(subjectId: string): Promise<RecorderQuestion[]> {
+    const store = await getStoreById(subjectId);
+    if (!store || store.type !== 'Sovereign') return [];
+    return [
+      {
+        id: 'q4',
+        prompt: 'How does this business connect to its community or culture?',
+        maxDurationSeconds: 45,
+        isRequired: false,
+      },
+    ];
   },
 
   async logAudit(

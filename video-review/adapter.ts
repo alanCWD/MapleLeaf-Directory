@@ -1,3 +1,4 @@
+import type { RequestHandler } from 'express';
 import type {
   StreamConfig,
   VideoMediaRecord,
@@ -5,6 +6,7 @@ import type {
   CreateMediaInput,
   ModerationInput,
   AdminVideoReview,
+  RecorderQuestion,
 } from './types.ts';
 
 /**
@@ -69,6 +71,24 @@ export interface VideoReviewAdapter {
    * associated review metadata for the admin moderation queue.
    */
   listVideoReviews(): Promise<AdminVideoReview[]>;
+
+  /**
+   * Return an Express middleware that rejects unauthenticated requests (401).
+   * The router uses this to protect all write and user-specific endpoints.
+   */
+  requireAuth(): RequestHandler;
+
+  /**
+   * Return an Express middleware that rejects non-admin requests (403).
+   * Used to protect moderation and admin list endpoints.
+   */
+  requireAdminAccess(): RequestHandler;
+
+  /**
+   * Optional: return additional recorder questions for a given subject.
+   * Return an empty array (or omit) when no extras apply.
+   */
+  getExtraQuestions?(subjectId: string): Promise<RecorderQuestion[]>;
 
   /**
    * Optional: write an audit log entry.
