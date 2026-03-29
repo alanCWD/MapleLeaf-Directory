@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { pool } from '../../server/db.ts';
 import {
   BunnyApiError,
   createVideo,
@@ -625,10 +626,25 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
           })
         );
 
-        console.log(
-          `[VideoReview:sync] sync-all-stuck: ${fixed} fixed, ${stillPending} still pending, ${failed} failed, ${errors.length} errors`
+        // Also trigger branding for any already-ready videos that were never
+        // successfully branded (branding_applied_at IS NULL).
+        const unbrandedRes = await pool.query<{ bunny_video_id: string }>(
+          `SELECT bunny_video_id FROM store_media
+           WHERE status = 'ready' AND branding_applied_at IS NULL AND bunny_video_id IS NOT NULL`
         );
-        res.json({ fixed, stillPending, failed, errors });
+        let brandingQueued = 0;
+        for (const row of unbrandedRes.rows) {
+          maybeApplyBranding(row.bunny_video_id, adapter);
+          brandingQueued++;
+        }
+        if (brandingQueued > 0) {
+          console.log(`[VideoReview:sync] Queued branding for ${brandingQueued} unbranded ready video(s)`);
+        }
+
+        console.log(
+          `[VideoReview:sync] sync-all-stuck: ${fixed} fixed, ${stillPending} still pending, ${failed} failed, ${errors.length} errors, ${brandingQueued} branding queued`
+        );
+        res.json({ fixed, stillPending, failed, errors, brandingQueued });
       } catch (error: any) {
         console.error('[VideoReview:sync] sync-all-stuck error:', error.message);
         res.status(500).json({ error: error.message });
@@ -756,6 +772,10 @@ async function applyBrandingToUploadedVideo(
 
     await uploadVideoBuffer(brandedPath, videoId, streamConfig);
     console.log(`[VideoReview:branding] Branded and re-uploaded ${videoId}`);
+    await pool.query(
+      `UPDATE store_media SET branding_applied_at = NOW() WHERE bunny_video_id = $1`,
+      [videoId]
+    );
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   }
