@@ -519,7 +519,7 @@ export async function getVideoReviews(): Promise<any[]> {
          ELSE 1
        END DESC LIMIT 1
      ) top_badge ON true
-     WHERE sm.media_type = 'review'
+     WHERE sm.media_type IN ('review', 'video', 'walkthrough')
      ORDER BY sm.created_at DESC`
   );
   return result.rows.map(row => ({

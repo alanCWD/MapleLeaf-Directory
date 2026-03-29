@@ -118,6 +118,7 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
       apiKey: process.env.BUNNY_STREAM_API_KEY || '',
       libraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '',
       cdnHostname: process.env.BUNNY_CDN_HOSTNAME || `vz-${process.env.BUNNY_STREAM_LIBRARY_ID || ''}.b-cdn.net`,
+      cdnAuthToken: process.env.BUNNY_CDN_AUTH_TOKEN || undefined,
     };
   },
 

@@ -15,6 +15,12 @@ export interface StreamConfig {
   apiKey: string;
   libraryId: string;
   cdnHostname: string;
+  /**
+   * Optional: CDN pull-zone Authentication Key (from Bunny Dashboard → Pull Zone → Security).
+   * Required when "Token Authentication" is enabled on the pull zone. Used to sign
+   * download URLs so the server can fetch MP4 files for branding.
+   */
+  cdnAuthToken?: string;
 }
 
 export interface VideoMediaRecord {
