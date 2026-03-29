@@ -760,22 +760,34 @@ async function applyBrandingToUploadedVideo(
   adapter: VideoReviewAdapter,
   brandingConfig: BrandingConfig
 ): Promise<void> {
+  const short = videoId.slice(0, 8);
   const streamConfig = adapter.getStreamConfig();
-  const tmpDir = fs.mkdtempSync(path.join('/tmp', `brand-${videoId.slice(0, 8)}-`));
+  const tmpDir = fs.mkdtempSync(path.join('/tmp', `brand-${short}-`));
+  const t0 = Date.now();
   try {
     const downloadPath = path.join(tmpDir, 'original.mp4');
-    console.log(`[VideoReview:branding] Downloading ${videoId} for single-upload branding…`);
+    console.log(`[VideoReview:branding] [${short}] Step 1/4 — downloading from CDN…`);
     await downloadVideo(videoId, streamConfig, downloadPath);
+    const dlSize = Math.round(fs.statSync(downloadPath).size / 1024);
+    console.log(`[VideoReview:branding] [${short}] Step 1/4 — downloaded ${dlSize} KB in ${Date.now() - t0}ms`);
 
     const brandedPath = path.join(tmpDir, 'branded.mp4');
+    console.log(`[VideoReview:branding] [${short}] Step 2-4/4 — applying branding (FFmpeg)…`);
+    const t1 = Date.now();
     await applyBranding(downloadPath, brandedPath, brandingConfig, tmpDir);
+    const brandSize = Math.round(fs.statSync(brandedPath).size / 1024);
+    console.log(`[VideoReview:branding] [${short}] Step 2-4/4 — branding done in ${Date.now() - t1}ms, ${brandSize} KB`);
 
+    console.log(`[VideoReview:branding] [${short}] Uploading branded video back to Bunny…`);
+    const t2 = Date.now();
     await uploadVideoBuffer(brandedPath, videoId, streamConfig);
-    console.log(`[VideoReview:branding] Branded and re-uploaded ${videoId}`);
+    console.log(`[VideoReview:branding] [${short}] Upload done in ${Date.now() - t2}ms`);
+
     await pool.query(
       `UPDATE store_media SET branding_applied_at = NOW() WHERE bunny_video_id = $1`,
       [videoId]
     );
+    console.log(`[VideoReview:branding] [${short}] ✓ Branded and re-uploaded in ${Date.now() - t0}ms total`);
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   }

@@ -1,4 +1,8 @@
 import crypto from 'crypto';
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+import { pipeline } from 'stream/promises';
 import type { StreamConfig, VideoProcessingStatus } from '../types.ts';
 
 const BUNNY_BASE_URL = 'https://video.bunnycdn.com';
@@ -202,40 +206,44 @@ function buildCdnDownloadUrl(videoId: string, config: StreamConfig): string {
  * If the pull zone has token authentication enabled, set StreamConfig.cdnAuthToken
  * (env var BUNNY_CDN_AUTH_TOKEN) to the pull-zone Authentication Key.
  */
-export async function downloadVideo(
+export function downloadVideo(
   videoId: string,
   config: StreamConfig,
   destPath: string
 ): Promise<void> {
-  const { default: fs } = await import('fs');
-  const { Readable } = await import('stream');
-  const { pipeline } = await import('stream/promises');
   const cdn = config.cdnHostname || `vz-${config.libraryId}.b-cdn.net`;
   const url = buildCdnDownloadUrl(videoId, config);
 
-  // Bunny CDN pull zone has hotlink protection enabled — requests without a
-  // Referer header are rejected with 403. Setting Referer to the CDN host
-  // itself satisfies the check without needing token signing.
-  // AbortController covers the full operation (headers + body streaming).
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10-minute hard limit
-  try {
-    const response = await fetch(url, {
-      headers: { Referer: `https://${cdn}` },
-      signal: controller.signal,
+  // Use native https.get (not fetch/Readable.fromWeb) to avoid the silent
+  // stall that occurs with Node's undici-backed fetch in production.
+  // Bunny CDN pull zone has hotlink protection — Referer header required.
+  const parsed = new URL(url);
+  const client = parsed.protocol === 'https:' ? https : http;
+  return new Promise<void>((resolve, reject) => {
+    const req = client.get(
+      url,
+      {
+        headers: {
+          Referer: `https://${cdn}`,
+          'User-Agent': 'LegacyLeaf-Branding/1.0',
+        },
+        timeout: 10 * 60 * 1000, // 10-minute socket idle timeout
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume(); // drain so socket can be reused
+          reject(new Error(`Bunny CDN download failed (${res.statusCode}) for ${url}`));
+          return;
+        }
+        const writeStream = fs.createWriteStream(destPath);
+        pipeline(res, writeStream).then(resolve).catch(reject);
+      }
+    );
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy(new Error(`Download timed out for ${videoId}`));
     });
-    if (!response.ok || !response.body) {
-      throw new Error(`Bunny CDN download failed (${response.status}) for ${url}`);
-    }
-
-    // Use stream/promises pipeline instead of manual pipe — it properly handles
-    // all termination cases (finish, error, premature close) without hanging.
-    const readable = Readable.fromWeb(response.body as any);
-    const writeStream = fs.createWriteStream(destPath);
-    await pipeline(readable, writeStream);
-  } finally {
-    clearTimeout(timeout);
-  }
+  });
 }
 
 export function getVideoStatusLabel(status: number): VideoProcessingStatus {

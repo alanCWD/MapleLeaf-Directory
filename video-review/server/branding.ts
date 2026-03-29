@@ -364,7 +364,10 @@ export async function applyBranding(
   }
 
   const normalizedPath = path.join(workDir, `branding_norm_${stamp}.mp4`);
+  console.log('[VideoReview:branding] FFmpeg step: normalize…');
+  const tNorm = Date.now();
   await normalizeForBranding(inputPath, normalizedPath);
+  console.log(`[VideoReview:branding] FFmpeg step: normalize done in ${Date.now() - tNorm}ms`);
 
   let workPath = normalizedPath;
 
@@ -375,13 +378,19 @@ export async function applyBranding(
       ...(assets.outroExists ? [assets.outroPath] : []),
     ];
     const concatPath = path.join(workDir, `branding_concat_${stamp}.mp4`);
+    console.log('[VideoReview:branding] FFmpeg step: concat segments…');
+    const tConcat = Date.now();
     await concatSegments(segments, concatPath);
+    console.log(`[VideoReview:branding] FFmpeg step: concat done in ${Date.now() - tConcat}ms`);
     workPath = concatPath;
   }
 
   if (assets.watermarkExists) {
     const wmPath = path.join(workDir, `branding_wm_${stamp}.mp4`);
+    console.log('[VideoReview:branding] FFmpeg step: watermark overlay…');
+    const tWm = Date.now();
     await overlayWatermarkImage(workPath, assets.watermarkPath, wmPath, config);
+    console.log(`[VideoReview:branding] FFmpeg step: watermark done in ${Date.now() - tWm}ms`);
     if (workPath !== normalizedPath) {
       try { fs.unlinkSync(workPath); } catch {}
     }
