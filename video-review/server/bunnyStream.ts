@@ -209,17 +209,16 @@ export async function downloadVideo(
 ): Promise<void> {
   const { default: fs } = await import('fs');
   const { Readable } = await import('stream');
+  const cdn = config.cdnHostname || `vz-${config.libraryId}.b-cdn.net`;
   const url = buildCdnDownloadUrl(videoId, config);
 
-  const response = await fetch(url);
+  // Bunny CDN pull zone has hotlink protection enabled — requests without a
+  // Referer header are rejected with 403. Setting Referer to the CDN host
+  // itself satisfies the check without needing token signing.
+  const response = await fetch(url, {
+    headers: { Referer: `https://${cdn}` },
+  });
   if (!response.ok || !response.body) {
-    if (response.status === 403 && !config.cdnAuthToken) {
-      throw new Error(
-        `Bunny CDN download failed (403) — the CDN pull zone likely has Token Authentication enabled. ` +
-        `Set the BUNNY_CDN_AUTH_TOKEN environment variable to the pull-zone Authentication Key ` +
-        `(Bunny Dashboard → Pull Zone → Security tab).`
-      );
-    }
     throw new Error(`Bunny CDN download failed (${response.status}) for ${url}`);
   }
 
