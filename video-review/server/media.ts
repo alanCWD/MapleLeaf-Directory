@@ -118,22 +118,27 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
 
   /**
    * syncVideoStatus — queries Bunny for the real encoding status of a video
-   * and updates our database to match. Reuses the same `updateMediaProcessing`
-   * path as handleWebhook so embedUrl / thumbnailUrl are set on the ready
-   * transition. Returns null if Bunny has no record of the video.
+   * and delegates to handleWebhook with a synthetic payload so that all
+   * status-mapping, embed/thumbnail URL population, and DB update logic live
+   * in a single place. Returns null when Bunny has no record of the video
+   * (404) or our database has no matching media record.
    */
   async function syncVideoStatus(bunnyVideoId: string): Promise<VideoMediaRecord | null> {
     const config = streamConfig();
-    const bunnyVideo = await getVideo(bunnyVideoId, config);
-    const statusLabel = getVideoStatusLabel(bunnyVideo.status);
 
-    const extras: { thumbnailUrl?: string; embedUrl?: string } = {};
-    if (statusLabel === 'ready') {
-      extras.thumbnailUrl = getThumbnailUrl(bunnyVideoId, config);
-      extras.embedUrl = getEmbedUrl(bunnyVideoId, config);
+    let bunnyVideo: Awaited<ReturnType<typeof getVideo>>;
+    try {
+      bunnyVideo = await getVideo(bunnyVideoId, config);
+    } catch (err: any) {
+      if (err.message?.includes('(404)')) return null;
+      throw err;
     }
 
-    return adapter.updateMediaProcessing(bunnyVideoId, statusLabel, extras);
+    return handleWebhook({
+      VideoGuid: bunnyVideoId,
+      Status: bunnyVideo.status,
+      VideoLibraryId: bunnyVideo.videoLibraryId,
+    });
   }
 
   return {
