@@ -57,9 +57,25 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
   // so they are ready before the first video is processed.
   const brandingConfig = adapter.getBrandingConfig?.();
   if (brandingConfig) {
-    ensureBrandingAssets(brandingConfig).catch((err: any) => {
-      console.warn('[VideoReview:branding] Startup asset generation failed:', err.message);
-    });
+    ensureBrandingAssets(brandingConfig)
+      .then((assets) => {
+        if (!brandingConfig.generatePlaceholders) {
+          // For custom adapters (no placeholder generation), warn about any
+          // missing asset files so operators know they need to supply them.
+          if (!assets.introExists && brandingConfig.introVideoPath) {
+            console.warn(`[VideoReview:branding] Startup: introVideoPath not found: ${brandingConfig.introVideoPath}`);
+          }
+          if (!assets.outroExists && brandingConfig.outroVideoPath) {
+            console.warn(`[VideoReview:branding] Startup: outroVideoPath not found: ${brandingConfig.outroVideoPath}`);
+          }
+          if (!assets.watermarkExists && brandingConfig.watermarkImagePath) {
+            console.warn(`[VideoReview:branding] Startup: watermarkImagePath not found: ${brandingConfig.watermarkImagePath}`);
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn('[VideoReview:branding] Startup asset check failed:', err.message);
+      });
   }
 
   const clipUpload = multer({

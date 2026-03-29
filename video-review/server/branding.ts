@@ -353,7 +353,11 @@ export async function applyBranding(
       try { fs.unlinkSync(workPath); } catch {}
     }
     workPath = wmPath;
-  } else if (config.watermarkText || config.brandName) {
+  } else if (config.watermarkText) {
+    // Only fall back to text watermark when `watermarkText` is explicitly
+    // configured. `brandName` alone is metadata, not a watermark trigger —
+    // using it here would silently apply branding even when all asset paths
+    // are absent, violating the "no branding when paths absent" contract.
     const wmPath = path.join(workDir, `branding_wm_${stamp}.mp4`);
     await overlayWatermarkText(workPath, wmPath, config);
     if (workPath !== normalizedPath) {
