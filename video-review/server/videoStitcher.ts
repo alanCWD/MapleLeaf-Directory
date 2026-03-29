@@ -2,6 +2,8 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { uploadVideoBuffer } from './bunnyStream.ts';
+import type { StreamConfig } from '../types.ts';
 
 const STITCH_DIR = '/tmp/video-stitch';
 
@@ -13,10 +15,9 @@ interface ClipInput {
 
 interface StitchOptions {
   clips: ClipInput[];
-  storeName: string;
+  subjectName: string;
   transitionDuration?: number;
   titleCardDuration?: number;
-  outputFormat?: string;
 }
 
 interface StitchResult {
@@ -134,10 +135,7 @@ async function createTitleCard(
   return outputPath;
 }
 
-async function normalizeClip(
-  inputPath: string,
-  outputPath: string
-): Promise<void> {
+async function normalizeClip(inputPath: string, outputPath: string): Promise<void> {
   const args = [
     '-y',
     '-i', inputPath,
@@ -159,7 +157,7 @@ async function normalizeClip(
 export async function stitchClips(options: StitchOptions): Promise<StitchResult> {
   const {
     clips,
-    storeName,
+    subjectName,
     transitionDuration = 0.5,
     titleCardDuration = 2.5,
   } = options;
@@ -170,13 +168,13 @@ export async function stitchClips(options: StitchOptions): Promise<StitchResult>
 
   const jobDir = path.dirname(clips[0].filePath);
 
-  console.log(`[VideoStitcher] Starting stitch: ${clips.length} clips for "${storeName}"`);
+  console.log(`[VideoStitcher] Starting stitch: ${clips.length} clips for "${subjectName}"`);
 
   const segments: string[] = [];
 
   const introPath = await createTitleCard(
     jobDir,
-    `Video Review\\n${storeName}`,
+    `Video Review\\n${subjectName}`,
     999,
     3
   );
@@ -334,38 +332,11 @@ async function stitchWithConcat(
   ]);
 }
 
-export async function uploadStitchedToBunny(
+export async function uploadStitchedVideo(
   filePath: string,
-  videoId: string
+  videoId: string,
+  config: StreamConfig
 ): Promise<void> {
-  const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID || '';
-  const apiKey = process.env.BUNNY_STREAM_API_KEY || '';
-
-  if (!libraryId || !apiKey) {
-    throw new Error('Bunny Stream not configured');
-  }
-
-  const stats = fs.statSync(filePath);
-  const fileStream = fs.createReadStream(filePath);
-
-  const res = await fetch(
-    `https://video.bunnycdn.com/library/${libraryId}/videos/${videoId}`,
-    {
-      method: 'PUT',
-      headers: {
-        AccessKey: apiKey,
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': String(stats.size),
-      },
-      body: fileStream as any,
-      duplex: 'half' as any,
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Bunny upload failed (${res.status}): ${text}`);
-  }
-
-  console.log(`[VideoStitcher] Uploaded stitched video to Bunny: ${videoId}`);
+  await uploadVideoBuffer(filePath, videoId, config);
+  console.log(`[VideoStitcher] Uploaded stitched video to stream provider: ${videoId}`);
 }

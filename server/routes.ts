@@ -41,11 +41,6 @@ import {
   getUserSocialProfile,
 } from './userDb.ts';
 import {
-  initUpload,
-  getStoreMediaList,
-  getSingleMedia,
-  removeMedia,
-  isBunnyConfigured,
   createReview,
   getReviewsByStore,
   calculateTrustWeight,
@@ -54,8 +49,6 @@ import {
   evaluateUserBadges,
   getUserBadges,
   getReviewsWithBadges,
-  updateMediaModeration,
-  getVideoReviews,
   awardBadge,
   revokeBadge,
   getCurrentQRPayload,
@@ -65,11 +58,10 @@ import {
   hasRecentCheckin,
   calculateDistance,
 } from './integrity/index.ts';
-import type { RecorderQuestion } from './integrity/types.ts';
 import multer from 'multer';
-import { createJobDir, stitchClips, uploadStitchedToBunny, cleanupJobDir } from './videoStitcher.ts';
-import { createVideo, generateTusCredentials, getEmbedUrl, getThumbnailUrl } from './bunnyStream.ts';
-import { createStoreMedia, updateMediaStatus } from './integrity/models.ts';
+import { createVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
+import { createVideoReviewRouter } from '../video-review/server/routes.ts';
+import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
 import {
   createPost,
   getPostById,
@@ -87,7 +79,7 @@ import {
   setUserCreatorStatus,
   moderateCleanContent,
 } from './posts.ts';
-import type { PostStatus, ContentTier } from '../types';
+import type { PostStatus, ContentTier, CreatorPost } from '../types';
 import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal } from './bunnyStorage.ts';
 import sharp from 'sharp';
 import path from 'path';
@@ -113,11 +105,6 @@ async function convertHeicToJpegBuffer(buffer: Buffer): Promise<Buffer> {
   const result = await (heicConvert as any)({ buffer, format: 'JPEG', quality: 0.92 });
   return Buffer.from(result);
 }
-
-const clipUpload = multer({
-  dest: '/tmp/video-stitch/uploads',
-  limits: { fileSize: 200 * 1024 * 1024 },
-});
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
@@ -177,6 +164,16 @@ router.use('/', createMicrositeRouter({
   uploadImageLocal,
   isHeicBuffer,
   convertHeicToJpegBuffer,
+  paramId,
+}));
+
+router.use('/', createVideoReviewRouter(legacyleafVideoAdapter, {
+  isAuthenticated: isAuthenticated as RequestHandler,
+  requireAdmin: requireAdmin as RequestHandler,
+  getUserId,
+  getUserRole,
+  getClaimedStoresForOwner,
+  createAuditLog,
   paramId,
 }));
 
@@ -1104,209 +1101,6 @@ const requireBunny: RequestHandler = (_req, res, next) => {
   next();
 };
 
-router.post('/stores/:id/media/init', isAuthenticated as RequestHandler, requireBunny, async (req: any, res) => {
-  try {
-    const storeId = paramId(req.params);
-    const userId = getUserId(req)!;
-    const { title, mediaType } = req.body;
-    if (!title || typeof title !== 'string') {
-      res.status(400).json({ error: 'Title is required' });
-      return;
-    }
-    const credentials = await initUpload(storeId, userId, title, mediaType || 'video');
-    res.json(credentials);
-  } catch (error: any) {
-    console.error('Error initializing media upload:', error);
-    res.status(500).json({ error: 'Failed to initialize upload' });
-  }
-});
-
-const ALLOWED_VIDEO_MIMES = ['video/webm', 'video/mp4', 'video/quicktime', 'video/x-matroska', 'video/ogg', 'application/octet-stream'];
-
-router.post('/stores/:id/media/stitch', isAuthenticated as RequestHandler, requireBunny, (req: any, res: any, next: any) => {
-  clipUpload.array('clips', 10)(req, res, (err: any) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large. Maximum 200MB per clip.' });
-      }
-      if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({ error: 'Too many clips. Maximum 10 clips.' });
-      }
-      return res.status(400).json({ error: err.message || 'Upload error' });
-    }
-    next();
-  });
-}, async (req: any, res: any) => {
-  let jobDir: string | null = null;
-  try {
-    const storeId = paramId(req.params);
-    const userId = getUserId(req)!;
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      res.status(400).json({ error: 'No clips provided' });
-      return;
-    }
-
-    for (const file of files) {
-      const baseMime = file.mimetype.split(';')[0].trim();
-      if (!ALLOWED_VIDEO_MIMES.includes(baseMime) && !baseMime.startsWith('video/')) {
-        res.status(400).json({ error: `Invalid file type: ${file.mimetype}. Only video files are accepted.` });
-        return;
-      }
-    }
-
-    let questions: { id: string; prompt: string }[] = [];
-    try {
-      questions = JSON.parse(req.body.questions || '[]');
-    } catch {
-      questions = [];
-    }
-
-    const storeName = req.body.storeName || 'Store Review';
-    const title = req.body.title || `Video Review - ${storeName}`;
-
-    jobDir = createJobDir();
-
-    const clipInputs = files.map((file, idx) => {
-      const destPath = path.join(jobDir!, `clip_${idx}${path.extname(file.originalname) || '.webm'}`);
-      fs.renameSync(file.path, destPath);
-      const q = questions[idx];
-      return {
-        filePath: destPath,
-        questionPrompt: q?.prompt || `Part ${idx + 1}`,
-        index: idx,
-      };
-    });
-
-    console.log(`[Stitch] Starting stitch job for store ${storeId}: ${clipInputs.length} clips`);
-
-    const stitchResult = await stitchClips({
-      clips: clipInputs,
-      storeName,
-      transitionDuration: 0.5,
-      titleCardDuration: 2.5,
-    });
-
-    const bunnyVideo = await createVideo(title);
-    let media: any = null;
-    try {
-      media = await createStoreMedia({
-        storeId,
-        userId,
-        bunnyVideoId: bunnyVideo.guid,
-        bunnyLibraryId: String(bunnyVideo.videoLibraryId),
-        title,
-        embedUrl: getEmbedUrl(bunnyVideo.guid),
-        thumbnailUrl: getThumbnailUrl(bunnyVideo.guid),
-        mediaType: 'review',
-        status: 'processing',
-      });
-
-      await uploadStitchedToBunny(stitchResult.outputPath, bunnyVideo.guid);
-    } catch (uploadErr: any) {
-      console.error('[Stitch] Upload/DB error, cleaning up Bunny asset:', uploadErr);
-      if (media) {
-        try { await updateMediaStatus(bunnyVideo.guid, 'failed', {}); } catch {}
-      }
-      try {
-        const { deleteVideo } = await import('./bunnyStream.ts');
-        await deleteVideo(bunnyVideo.guid);
-      } catch {}
-      throw uploadErr;
-    }
-
-    cleanupJobDir(jobDir);
-    jobDir = null;
-
-    console.log(`[Stitch] Complete: mediaId=${media.id}, bunnyVideoId=${bunnyVideo.guid}`);
-
-    res.json({
-      mediaId: media.id,
-      videoId: bunnyVideo.guid,
-      embedUrl: getEmbedUrl(bunnyVideo.guid),
-      durationSeconds: stitchResult.durationSeconds,
-      fileSizeBytes: stitchResult.fileSizeBytes,
-    });
-  } catch (error: any) {
-    console.error('[Stitch] Error:', error);
-    if (jobDir) cleanupJobDir(jobDir);
-    res.status(500).json({ error: error.message || 'Video stitching failed' });
-  }
-});
-
-router.get('/stores/:id/media', async (req: Request, res: Response) => {
-  try {
-    const media = await getStoreMediaList(paramId(req.params));
-    res.json(media);
-  } catch (error) {
-    console.error('Error fetching store media:', error);
-    res.status(500).json({ error: 'Failed to fetch media' });
-  }
-});
-
-router.get('/stores/:id/media/:mediaId', async (req: any, res: Response) => {
-  try {
-    const mediaId = parseInt(req.params.mediaId);
-    if (isNaN(mediaId)) {
-      res.status(400).json({ error: 'Invalid media ID' });
-      return;
-    }
-    const media = await getSingleMedia(mediaId);
-    if (!media) {
-      res.status(404).json({ error: 'Media not found' });
-      return;
-    }
-    res.json(media);
-  } catch (error) {
-    console.error('Error fetching media:', error);
-    res.status(500).json({ error: 'Failed to fetch media' });
-  }
-});
-
-router.delete('/stores/:id/media/:mediaId', isAuthenticated as RequestHandler, async (req: any, res) => {
-  try {
-    const mediaId = parseInt(req.params.mediaId);
-    if (isNaN(mediaId)) {
-      res.status(400).json({ error: 'Invalid media ID' });
-      return;
-    }
-    const userId = getUserId(req)!;
-    const role = await getUserRole(userId);
-    const media = await getSingleMedia(mediaId);
-    if (!media) {
-      res.status(404).json({ error: 'Media not found' });
-      return;
-    }
-
-    if (media.storeId !== paramId(req.params)) {
-      res.status(404).json({ error: 'Media not found for this store' });
-      return;
-    }
-    const isMediaOwner = media.userId === userId;
-    const isAdmin = role === 'admin';
-    let isStoreOwner = false;
-    if (role === 'owner' || role === 'admin') {
-      const ownedStores = await getClaimedStoresForOwner(userId);
-      isStoreOwner = ownedStores.includes(paramId(req.params));
-    }
-
-    if (!isMediaOwner && !isStoreOwner && !isAdmin) {
-      res.status(403).json({ error: 'Not authorized to delete this media' });
-      return;
-    }
-
-    const deleted = await removeMedia(mediaId, userId);
-    if (!deleted) {
-      res.status(404).json({ error: 'Media not found' });
-      return;
-    }
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting media:', error);
-    res.status(500).json({ error: 'Failed to delete media' });
-  }
-});
-
 router.post('/stores/:id/reviews', isAuthenticated as RequestHandler, async (req: any, res) => {
   try {
     const storeId = paramId(req.params);
@@ -1435,50 +1229,6 @@ router.get('/stores/:id/integrity-score', async (req: Request, res: Response) =>
   }
 });
 
-router.get('/stores/:id/recorder-questions', async (req: Request, res: Response) => {
-  try {
-    const store = await getStoreById(paramId(req.params));
-    if (!store) {
-      res.status(404).json({ error: 'Store not found' });
-      return;
-    }
-
-    const questions: RecorderQuestion[] = [
-      {
-        id: 'q1',
-        prompt: `What brought you to ${store.name} today?`,
-        maxDurationSeconds: 30,
-        isRequired: true,
-      },
-      {
-        id: 'q2',
-        prompt: 'What makes this spot special or unique?',
-        maxDurationSeconds: 45,
-        isRequired: true,
-      },
-      {
-        id: 'q3',
-        prompt: 'Would you recommend this place to others? Why?',
-        maxDurationSeconds: 30,
-        isRequired: false,
-      },
-    ];
-
-    if (store.type === 'Sovereign') {
-      questions.push({
-        id: 'q4',
-        prompt: 'How does this business connect to its community or culture?',
-        maxDurationSeconds: 45,
-        isRequired: false,
-      });
-    }
-
-    res.json(questions);
-  } catch (error) {
-    console.error('Error fetching recorder questions:', error);
-    res.status(500).json({ error: 'Failed to fetch recorder questions' });
-  }
-});
 
 router.get('/stores/:id/presence/qr', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res) => {
   try {
@@ -1756,51 +1506,6 @@ router.get('/admin/posts', isAuthenticated as RequestHandler, requireAdmin, asyn
 });
 
 
-router.get('/admin/media/video-reviews', isAuthenticated as RequestHandler, requireAdmin, async (_req, res) => {
-  try {
-    const reviews = await getVideoReviews();
-    res.json(reviews);
-  } catch (error) {
-    console.error('Error fetching video reviews:', error);
-    res.status(500).json({ error: 'Failed to fetch video reviews' });
-  }
-});
-
-router.post('/admin/media/:id/moderate', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) { res.status(400).json({ error: 'Invalid media ID' }); return; }
-    const { moderationStatus, contentRating, moderationNotes } = req.body;
-    const validStatuses = ['approved', 'disapproved'];
-    const validRatings = ['clean', 'raw'];
-    if (moderationStatus && !validStatuses.includes(moderationStatus)) {
-      res.status(400).json({ error: 'moderationStatus must be approved or disapproved' });
-      return;
-    }
-    if (contentRating && !validRatings.includes(contentRating)) {
-      res.status(400).json({ error: 'contentRating must be clean or raw' });
-      return;
-    }
-    const existing = await getMediaById(id);
-    if (!existing) { res.status(404).json({ error: 'Media not found' }); return; }
-    if ((existing as any).mediaType !== 'review') {
-      res.status(400).json({ error: 'Only video reviews can be moderated via this endpoint' });
-      return;
-    }
-    const updated = await updateMediaModeration(id, { moderationStatus, contentRating, moderationNotes });
-    if (!updated) { res.status(404).json({ error: 'Media not found' }); return; }
-    const adminId = getUserId(req)!;
-    await createAuditLog(adminId, 'media_moderate', 'store_media', String(id), {
-      moderationStatus,
-      contentRating,
-      moderationNotes: moderationNotes || null,
-    });
-    res.json(updated);
-  } catch (error) {
-    console.error('Error moderating media:', error);
-    res.status(500).json({ error: 'Failed to moderate media' });
-  }
-});
 
 router.get('/posts/:id', async (req: any, res: Response) => {
   try {

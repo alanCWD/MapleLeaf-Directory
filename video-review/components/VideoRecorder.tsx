@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchRecorderQuestions, initMediaUpload, submitReview, stitchVideoClips } from '../services/api';
-import type { RecorderQuestion, WeightedReview } from '../services/api';
+import { fetchRecorderQuestions, initMediaUpload, submitReview, stitchVideoClips } from '../../services/api';
+import type { RecorderQuestion, WeightedReview } from '../../services/api';
 import * as tus from 'tus-js-client';
 
 interface VideoRecorderProps {

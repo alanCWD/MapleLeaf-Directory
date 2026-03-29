@@ -34,7 +34,6 @@ export {
   getUserStats,
 } from './badges';
 
-export { initUpload, handleWebhook, removeMedia, getStoreMediaList, getSingleMedia, isBunnyConfigured } from './media';
 
 export {
   generateQRSecret,

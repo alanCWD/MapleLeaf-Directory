@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, CreatorPost } from '../types';
-import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost, fetchAdminVideoReviews, moderateVideoReview, AdminVideoReview } from '../services/api';
+import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost } from '../services/api';
+import { AdminVideoPanel } from '../video-review/components/AdminVideoPanel';
+import type { AdminVideoReview } from '../video-review/components/AdminVideoPanel';
 import { VerificationBadge } from './VerificationBadge';
 import { useAuth } from '../hooks/useAuth';
 
@@ -15,9 +17,7 @@ export const AdminReviewQueue: React.FC = () => {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [postNotes, setPostNotes] = useState<Record<number, string>>({});
-  const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts' | 'videos'>('stores');
-  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const [playingPostId, setPlayingPostId] = useState<number | null>(null);
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
@@ -43,21 +43,14 @@ export const AdminReviewQueue: React.FC = () => {
   const loadQueue = async () => {
     setIsLoading(true);
     try {
-      const [storeData, claimData, postsData, videoData] = await Promise.all([
+      const [storeData, claimData, postsData] = await Promise.all([
         fetchReviewQueue(),
         getAdminClaimsAPI(),
         fetchAllAdminPosts(),
-        fetchAdminVideoReviews(),
       ]);
       setStores(storeData);
       setClaims(claimData);
       setAllPosts(postsData);
-      setVideoReviews(videoData);
-      const preloadedNotes: Record<number, string> = {};
-      for (const vr of videoData) {
-        if (vr.moderationNotes) preloadedNotes[vr.id] = vr.moderationNotes;
-      }
-      setVideoNotes(preloadedNotes);
     } catch (err: any) {
       console.error('Failed to load review queue:', err);
     } finally {
@@ -147,17 +140,6 @@ export const AdminReviewQueue: React.FC = () => {
     }
   };
 
-  const handleVideoModerate = async (id: number, data: { moderationStatus?: string; contentRating?: string }) => {
-    setActionInProgress(`video-${id}`);
-    try {
-      const updated = await moderateVideoReview(id, { ...data, moderationNotes: videoNotes[id] });
-      setVideoReviews(prev => prev.map(v => v.id === id ? { ...v, ...updated } : v));
-    } catch (err) {
-      console.error('Video moderation failed:', err);
-    } finally {
-      setActionInProgress(null);
-    }
-  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
@@ -481,146 +463,7 @@ export const AdminReviewQueue: React.FC = () => {
               </div>
             )
           ) : activeTab === 'videos' ? (
-            videoReviews.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="text-4xl mb-4">🎬</div>
-                <p className="text-stone-500 font-bold text-lg">No video reviews yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {videoReviews.map((vr) => {
-                  const isDisapproved = vr.moderationStatus === 'disapproved';
-                  const isPlaying = playingVideoId === vr.id;
-                  const thumb = vr.thumbnailUrl;
-                  return (
-                    <div key={vr.id} className={`border rounded-2xl p-6 ${isDisapproved ? 'border-red-200 bg-red-50/20' : 'border-stone-200 bg-stone-50/30'}`}>
-                      <div className="flex flex-col md:flex-row justify-between gap-4 mb-4">
-                        <div className="flex-grow">
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <h4 className="font-black text-stone-900 text-lg">{vr.title || 'Video Review'}</h4>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${vr.contentRating === 'raw' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                              {vr.contentRating === 'raw' ? '🔥 Raw' : '✨ Clean'}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isDisapproved ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
-                              {isDisapproved ? '❌ Disapproved' : '✅ Approved'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap text-xs text-stone-400">
-                            {vr.reviewerId && (
-                              <span className="flex items-center gap-1.5">
-                                <span>Reviewer: {vr.reviewerId.slice(0, 8)}…</span>
-                                {vr.reviewerBadge && (
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${BADGE_COLORS[vr.reviewerBadge] || 'bg-stone-100 text-stone-600'}`}>
-                                    {BADGE_LABELS[vr.reviewerBadge] || vr.reviewerBadge}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                            {vr.storeName && (
-                              <span>| Store: <Link to={`/store/${vr.storeId}`} className="text-emerald-600 hover:underline font-medium">{vr.storeName}</Link></span>
-                            )}
-                            {vr.reviewRating && (
-                              <span className="flex gap-0.5 text-amber-500">
-                                {[1,2,3,4,5].map(i => <span key={i}>{i <= Math.round(vr.reviewRating!) ? '★' : '☆'}</span>)}
-                              </span>
-                            )}
-                            <span>| {new Date(vr.reviewCreatedAt || vr.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          {vr.moderationNotes && (
-                            <p className="text-xs text-stone-500 mt-1 italic">Notes: {vr.moderationNotes}</p>
-                          )}
-                        </div>
-                        {(thumb || vr.embedUrl) && (
-                          <div
-                            className="flex-shrink-0 w-32 h-20 rounded-xl overflow-hidden border border-stone-200 bg-stone-900 relative cursor-pointer"
-                            onClick={() => setPlayingVideoId(isPlaying ? null : vr.id)}
-                          >
-                            {thumb && !isPlaying && (
-                              <>
-                                <img src={thumb} alt="" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors">
-                                  <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow">
-                                    <span className="text-stone-900 text-sm ml-0.5">▶</span>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                            {(!thumb || isPlaying) && (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-white text-2xl">🎬</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {isPlaying && vr.embedUrl && (
-                        <div className="mb-4 -mx-6 md:mx-0 md:rounded-xl overflow-hidden bg-stone-900 relative" style={{ aspectRatio: '16/9' }}>
-                          <iframe
-                            src={vr.embedUrl}
-                            className="absolute inset-0 w-full h-full"
-                            allow="autoplay; fullscreen"
-                            allowFullScreen
-                          />
-                        </div>
-                      )}
-
-                      {vr.reviewText && (
-                        <div className="bg-white rounded-xl border border-stone-100 p-4 mb-4">
-                          <p className="text-sm text-stone-700 italic">"{vr.reviewText}"</p>
-                        </div>
-                      )}
-
-                      <div className="flex flex-col gap-3 pt-4 border-t border-stone-200/50">
-                        <textarea
-                          rows={2}
-                          placeholder="Admin notes (optional)"
-                          value={videoNotes[vr.id] || ''}
-                          onChange={(e) => setVideoNotes(prev => ({ ...prev, [vr.id]: e.target.value }))}
-                          className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:border-emerald-400 focus:outline-none resize-none"
-                        />
-                        <div className="flex flex-wrap gap-2">
-                          {isDisapproved ? (
-                            <button
-                              onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'approved' })}
-                              disabled={actionInProgress === `video-${vr.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition disabled:opacity-50"
-                            >
-                              Re-approve
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleVideoModerate(vr.id, { moderationStatus: 'disapproved' })}
-                              disabled={actionInProgress === `video-${vr.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition disabled:opacity-50"
-                            >
-                              Disapprove
-                            </button>
-                          )}
-                          {vr.contentRating === 'raw' ? (
-                            <button
-                              onClick={() => handleVideoModerate(vr.id, { contentRating: 'clean' })}
-                              disabled={actionInProgress === `video-${vr.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition disabled:opacity-50"
-                            >
-                              Mark Clean
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleVideoModerate(vr.id, { contentRating: 'raw' })}
-                              disabled={actionInProgress === `video-${vr.id}`}
-                              className="px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
-                            >
-                              Mark Raw
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )
+            <AdminVideoPanel reviews={videoReviews} onReviewsChange={setVideoReviews} />
           ) : null}
         </div>
       </div>

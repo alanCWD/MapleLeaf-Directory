@@ -66,6 +66,23 @@ Store owners can unlock a "Sovereign Site" — a branded microsite on a custom d
 - `components/SovereignSite.tsx` is a re-export shim pointing to `microsite/components/SovereignSite.tsx`
 - See `microsite/README.md` for full wiring guide
 
+**Video Review Engine (modular package — `video-review/`):**
+- Self-contained, drop-in module mirroring the `microsite/` adapter pattern for video upload, recording, and moderation
+- `video-review/types.ts` — shared types (`StoreMedia`, `RecorderQuestion`, `UploadCredentials`, etc.)
+- `video-review/adapter.ts` — `VideoReviewAdapter` interface (database + Bunny Stream credential contract)
+- `video-review/legacyleaf-adapter.ts` — concrete adapter wiring DB models + Bunny credentials from env
+- `video-review/server/bunnyStream.ts` — credential-parameterised Bunny Stream helpers (`StreamConfig` not env vars)
+- `video-review/server/videoStitcher.ts` — FFmpeg stitching with `uploadStitchedVideo(filePath, videoId, config)`
+- `video-review/server/media.ts` — `createVideoReviewMediaService(adapter)` factory (initUpload, handleWebhook, etc.)
+- `video-review/server/routes.ts` — `createVideoReviewRouter(adapter, deps)` factory (all video API routes)
+- `video-review/components/VideoRecorder.tsx` — guided multi-clip recorder component
+- `video-review/components/VideoUploader.tsx` — TUS resumable uploader component
+- `video-review/components/AdminVideoPanel.tsx` — self-contained admin moderation panel
+- `video-review/index.ts` — barrel export for the whole compartment
+- Mounted in `server/routes.ts` via `router.use('/', createVideoReviewRouter(legacyleafVideoAdapter, deps))`
+- Bunny webhook handled in `server/index.ts` via `createVideoReviewMediaService(legacyleafVideoAdapter).handleWebhook`
+- Old files deleted: `server/integrity/media.ts`, `server/videoStitcher.ts`, `components/VideoRecorder.tsx`, `components/VideoUploader.tsx`
+
 **Stripe integration:**
 - `microsite/server/billing.ts` — Replit-managed credentials (no hardcoded keys); exports `getUncachableStripeClient()`, `getStripeSync()`, `getStripePublishableKey()`, `WebhookHandlers`
 - `server/stripeClient.ts` / `server/webhookHandlers.ts` — re-export shims (backward compat)

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import * as tus from 'tus-js-client';
-import { MediaType } from '../types';
-import { initMediaUpload } from '../services/api';
+import { MediaType } from '../../types';
+import { initMediaUpload } from '../../services/api';
 
 type UploadState = 'selecting' | 'uploading' | 'processing' | 'ready' | 'error';
 

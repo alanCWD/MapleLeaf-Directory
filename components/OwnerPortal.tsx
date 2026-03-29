@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal } from '../services/api';
-import { VideoUploader } from './VideoUploader';
+import { VideoUploader } from '../video-review/components/VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia, ThemeConfig, FontPairing } from '../types';
 import { DEFAULT_STORE_IMAGES, getStoreHeaderImage } from '../utils/defaultStoreImages';

@@ -7,7 +7,9 @@ import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.
 import router from './routes.ts';
 import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
-import { initIntegrityEngine, handleWebhook } from './integrity/index.ts';
+import { initIntegrityEngine } from './integrity/index.ts';
+import { createVideoReviewMediaService } from '../video-review/server/media.ts';
+import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
 import { WebhookHandlers } from './webhookHandlers.ts';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.ts';
@@ -89,9 +91,10 @@ async function startServer() {
 
   app.use('/api', router);
 
+  const videoReviewMedia = createVideoReviewMediaService(legacyleafVideoAdapter);
   app.post('/webhooks/bunny', async (req, res) => {
     try {
-      const result = await handleWebhook(req.body);
+      const result = await videoReviewMedia.handleWebhook(req.body);
       res.json({ success: true, media: result });
     } catch (err: any) {
       console.error('[Webhook] Bunny error:', err.message);
