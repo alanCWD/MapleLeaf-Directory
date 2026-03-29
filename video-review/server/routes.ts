@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import {
+  BunnyApiError,
   createVideo,
   deleteVideo,
   downloadVideo,
@@ -469,9 +470,19 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
           return;
         }
 
-        const updated = await mediaService.syncVideoStatus(bunnyVideoId);
+        let updated: Awaited<ReturnType<typeof mediaService.syncVideoStatus>>;
+        try {
+          updated = await mediaService.syncVideoStatus(bunnyVideoId);
+        } catch (err: any) {
+          if (err instanceof BunnyApiError && err.statusCode === 404) {
+            res.status(404).json({ error: 'Video not found in Bunny Stream' });
+            return;
+          }
+          throw err;
+        }
+
         if (!updated) {
-          res.status(404).json({ error: 'No media record found for that bunnyVideoId' });
+          res.status(404).json({ error: 'No local media record found for that bunnyVideoId' });
           return;
         }
 
@@ -519,7 +530,11 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
                 stillPending++;
               }
             } catch (err: any) {
-              errors.push({ bunnyVideoId: record.bunnyVideoId, error: err.message });
+              const msg =
+                err instanceof BunnyApiError && err.statusCode === 404
+                  ? 'Video not found in Bunny Stream'
+                  : err.message;
+              errors.push({ bunnyVideoId: record.bunnyVideoId, error: msg });
             }
           })
         );

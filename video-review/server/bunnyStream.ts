@@ -3,6 +3,20 @@ import type { StreamConfig, VideoProcessingStatus } from '../types.ts';
 
 const BUNNY_BASE_URL = 'https://video.bunnycdn.com';
 
+/**
+ * Structured error thrown when a Bunny API call returns an HTTP error.
+ * Check `statusCode` to distinguish 404 (not found) from other failures.
+ */
+export class BunnyApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number
+  ) {
+    super(message);
+    this.name = 'BunnyApiError';
+  }
+}
+
 export interface BunnyVideo {
   videoLibraryId: number;
   guid: string;
@@ -85,7 +99,7 @@ export async function getVideo(videoId: string, config: StreamConfig): Promise<B
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Bunny getVideo failed (${res.status}): ${text}`);
+    throw new BunnyApiError(`Bunny getVideo failed (${res.status}): ${text}`, res.status);
   }
 
   return res.json();

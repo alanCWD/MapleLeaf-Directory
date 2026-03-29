@@ -1,4 +1,5 @@
 import {
+  BunnyApiError,
   createVideo,
   generateTusCredentials,
   deleteVideo,
@@ -120,19 +121,15 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
    * syncVideoStatus — queries Bunny for the real encoding status of a video
    * and delegates to handleWebhook with a synthetic payload so that all
    * status-mapping, embed/thumbnail URL population, and DB update logic live
-   * in a single place. Returns null when Bunny has no record of the video
-   * (404) or our database has no matching media record.
+   * in a single place.
+   *
+   * Throws BunnyApiError (statusCode 404) when Bunny has no record of the
+   * video — callers should differentiate this from a null return which means
+   * there is no matching media record in our own database.
    */
   async function syncVideoStatus(bunnyVideoId: string): Promise<VideoMediaRecord | null> {
     const config = streamConfig();
-
-    let bunnyVideo: Awaited<ReturnType<typeof getVideo>>;
-    try {
-      bunnyVideo = await getVideo(bunnyVideoId, config);
-    } catch (err: any) {
-      if (err.message?.includes('(404)')) return null;
-      throw err;
-    }
+    const bunnyVideo = await getVideo(bunnyVideoId, config);
 
     return handleWebhook({
       VideoGuid: bunnyVideoId,
