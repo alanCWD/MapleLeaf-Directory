@@ -523,7 +523,12 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
           stuck.map(async (record) => {
             try {
               const updated = await mediaService.syncVideoStatus(record.bunnyVideoId);
-              if (updated?.status === 'ready') {
+              if (updated === null) {
+                errors.push({
+                  bunnyVideoId: record.bunnyVideoId,
+                  error: 'No local media record found (orphaned Bunny video?)',
+                });
+              } else if (updated.status === 'ready') {
                 fixed++;
                 maybeApplyBranding(record.bunnyVideoId, adapter);
               } else {
