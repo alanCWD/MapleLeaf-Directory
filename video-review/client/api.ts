@@ -91,7 +91,7 @@ export async function submitStoreReview(
   storeId: string,
   data: SubmitReviewData
 ): Promise<VideoReviewSubmitResult> {
-  return apiFetch<VideoReviewSubmitResult>(`/stores/${storeId}/reviews`, {
+  return apiFetch<VideoReviewSubmitResult>(`/stores/${storeId}/video-reviews`, {
     method: 'POST',
     body: JSON.stringify(data),
   });

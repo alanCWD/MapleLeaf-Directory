@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchRecorderQuestions, initMediaUpload, stitchVideoClips } from '../client/api.ts';
+import { fetchRecorderQuestions, initMediaUpload, stitchVideoClips, submitStoreReview } from '../client/api.ts';
 import type {
   RecorderQuestion,
   SubmitReviewData,
@@ -11,7 +11,6 @@ interface VideoRecorderProps {
   storeId: string;
   storeName: string;
   storeType: string;
-  onSubmitReview: (storeId: string, data: SubmitReviewData) => Promise<VideoReviewSubmitResult>;
   onComplete: (result: VideoReviewSubmitResult) => void;
   onCancel: () => void;
 }
@@ -30,7 +29,6 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   storeId,
   storeName,
   storeType,
-  onSubmitReview,
   onComplete,
   onCancel,
 }) => {
@@ -357,7 +355,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
       setStitchPhase('submitting');
       setUploadProgress(90);
 
-      const review = await onSubmitReview(storeId, {
+      const review = await submitStoreReview(storeId, {
         rating,
         contentText: commentText || `Video review of ${storeName}`,
         videoAssetId: mediaId,

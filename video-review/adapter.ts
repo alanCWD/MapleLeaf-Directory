@@ -7,6 +7,8 @@ import type {
   ModerationInput,
   AdminVideoReview,
   RecorderQuestion,
+  SubmitReviewData,
+  VideoReviewSubmitResult,
 } from './types.ts';
 
 /**
@@ -71,6 +73,34 @@ export interface VideoReviewAdapter {
    * associated review metadata for the admin moderation queue.
    */
   listVideoReviews(): Promise<AdminVideoReview[]>;
+
+  /**
+   * Extract the authenticated user's ID from an Express request.
+   * Return null if no session is present.
+   */
+  extractUserId(req: any): string | null;
+
+  /**
+   * Return true when the given user holds admin privileges.
+   */
+  isAdminUser(userId: string): Promise<boolean>;
+
+  /**
+   * Return the list of subject IDs owned/claimed by the given user.
+   * Used to decide whether the user may manage a particular subject's media.
+   */
+  getSubjectsOwnedBy(userId: string): Promise<string[]>;
+
+  /**
+   * Submit a video review (rating + optional text) for a subject.
+   * The adapter implementation handles trust-weight calculation and persistence.
+   */
+  submitVideoReview(
+    subjectId: string,
+    userId: string,
+    data: SubmitReviewData,
+    requestMeta?: { lat?: number; lng?: number }
+  ): Promise<VideoReviewSubmitResult>;
 
   /**
    * Return an Express middleware that rejects unauthenticated requests (401).

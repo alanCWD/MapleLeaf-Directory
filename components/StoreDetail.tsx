@@ -1040,7 +1040,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           storeId={store.id}
           storeName={store.name}
           storeType={store.type}
-          onSubmitReview={submitReview}
           onComplete={(result) => {
             setReviewVideoMode('none');
             if (result.videoAssetId) {
@@ -1083,7 +1082,6 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
           storeId={store.id}
           storeName={store.name}
           storeType={store.type}
-          onSubmitReview={submitReview}
           onComplete={(_result) => {
             setShowVideoRecorder(false);
             loadMedia();

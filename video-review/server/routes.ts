@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import {
   createVideo,
+  deleteVideo,
   generateTusCredentials,
   getEmbedUrl,
   getThumbnailUrl,
@@ -15,23 +16,6 @@ import { createVideoReviewMediaService } from './media.ts';
 import type { VideoReviewAdapter } from '../adapter.ts';
 import type { RecorderQuestion } from '../types.ts';
 
-/**
- * Dependencies injected by the host application.
- * Auth middleware (requireAuth, requireAdminAccess) is now part of the adapter.
- */
-export interface VideoReviewRouterDeps {
-  getUserId: (req: any) => string | null;
-  getUserRole: (userId: string) => Promise<string>;
-  getClaimedStoresForOwner: (userId: string) => Promise<string[]>;
-  createAuditLog: (
-    adminId: string,
-    action: string,
-    targetType: string,
-    targetId: string,
-    details: any
-  ) => Promise<any>;
-  paramId: (params: any) => string;
-}
 
 const ALLOWED_VIDEO_MIMES = [
   'video/webm',
@@ -47,22 +31,13 @@ const ALLOWED_VIDEO_MIMES = [
  * containing all video-review API routes.
  *
  * Mount this on your main router:
- *   mainRouter.use('/', createVideoReviewRouter(adapter, deps));
+ *   mainRouter.use('/', createVideoReviewRouter(adapter));
  */
-export function createVideoReviewRouter(
-  adapter: VideoReviewAdapter,
-  deps: VideoReviewRouterDeps
-): Router {
-  const {
-    getUserId,
-    getUserRole,
-    getClaimedStoresForOwner,
-    createAuditLog,
-    paramId,
-  } = deps;
-
+export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
   const isAuthenticated = adapter.requireAuth();
   const requireAdmin = adapter.requireAdminAccess();
+
+  const paramId = (params: any): string => String(params.id);
 
   const mediaService = createVideoReviewMediaService(adapter);
 
@@ -88,7 +63,7 @@ export function createVideoReviewRouter(
     async (req: any, res) => {
       try {
         const subjectId = paramId(req.params);
-        const userId = getUserId(req)!;
+        const userId = adapter.extractUserId(req)!;
         const { title, mediaType } = req.body;
         if (!title || typeof title !== 'string') {
           res.status(400).json({ error: 'Title is required' });
@@ -130,7 +105,7 @@ export function createVideoReviewRouter(
       let jobDir: string | null = null;
       try {
         const subjectId = paramId(req.params);
-        const userId = getUserId(req)!;
+        const userId = adapter.extractUserId(req)!;
         const files = req.files as Express.Multer.File[];
 
         if (!files || files.length === 0) {
@@ -208,6 +183,12 @@ export function createVideoReviewRouter(
           await uploadStitchedVideo(stitchResult.outputPath, bunnyVideo.guid, config);
         } catch (uploadErr: any) {
           console.error('[VideoReview:stitch] Upload/DB error, cleaning up asset:', uploadErr);
+          // Delete the orphaned Bunny video so storage isn't wasted
+          try {
+            await deleteVideo(bunnyVideo.guid, config);
+          } catch (delErr: any) {
+            console.error('[VideoReview:stitch] Failed to delete orphaned Bunny video:', delErr);
+          }
           if (media) {
             try {
               await adapter.updateMediaProcessing(bunnyVideo.guid, 'failed', {});
@@ -279,8 +260,8 @@ export function createVideoReviewRouter(
           res.status(400).json({ error: 'Invalid media ID' });
           return;
         }
-        const userId = getUserId(req)!;
-        const role = await getUserRole(userId);
+        const userId = adapter.extractUserId(req)!;
+        const isAdmin = await adapter.isAdminUser(userId);
         const media = await mediaService.getSingleMedia(mediaId);
         if (!media) {
           res.status(404).json({ error: 'Media not found' });
@@ -292,10 +273,9 @@ export function createVideoReviewRouter(
         }
 
         const isMediaOwner = media.userId === userId;
-        const isAdmin = role === 'admin';
         let isStoreOwner = false;
-        if (role === 'owner' || role === 'admin') {
-          const ownedStores = await getClaimedStoresForOwner(userId);
+        if (!isAdmin) {
+          const ownedStores = await adapter.getSubjectsOwnedBy(userId);
           isStoreOwner = ownedStores.includes(paramId(req.params));
         }
 
@@ -420,15 +400,9 @@ export function createVideoReviewRouter(
           return;
         }
 
-        const adminId = getUserId(req)!;
+        const adminId = adapter.extractUserId(req)!;
         if (adapter.logAudit) {
           await adapter.logAudit(adminId, 'media_moderate', 'store_media', String(id), {
-            moderationStatus: moderationStatus ?? null,
-            contentRating: contentRating ?? null,
-            moderationNotes: moderationNotes ?? null,
-          });
-        } else {
-          await createAuditLog(adminId, 'media_moderate', 'store_media', String(id), {
             moderationStatus: moderationStatus ?? null,
             contentRating: contentRating ?? null,
             moderationNotes: moderationNotes ?? null,
@@ -443,5 +417,57 @@ export function createVideoReviewRouter(
     }
   );
 
+  // POST /stores/:id/video-reviews — submit a video review for a subject
+  router.post(
+    '/stores/:id/video-reviews',
+    isAuthenticated,
+    async (req: any, res: any) => {
+      try {
+        const subjectId = paramId(req.params);
+        const userId = adapter.extractUserId(req);
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+        const { rating, contentText, videoAssetId, lat, lng } = req.body;
+        const result = await adapter.submitVideoReview(
+          subjectId,
+          userId,
+          { rating, contentText, videoAssetId },
+          { lat, lng }
+        );
+        res.status(201).json(result);
+      } catch (error: any) {
+        console.error('[VideoReview] Error submitting video review:', error);
+        const status = error.message?.includes('Rating must be') ? 400 : 500;
+        res.status(status).json({ error: error.message || 'Failed to submit review' });
+      }
+    }
+  );
+
   return router;
+}
+
+/**
+ * mountVideoReviewWebhook — registers a Bunny.net webhook route on the given
+ * Express app instance. Call this in server/index.ts after the app is created.
+ */
+export function mountVideoReviewWebhook(
+  app: any,
+  adapter: VideoReviewAdapter,
+  webhookPath = '/webhooks/bunny'
+): void {
+  const mediaService = createVideoReviewMediaService(adapter);
+
+  app.post(webhookPath, async (req: any, res: any) => {
+    try {
+      const result = await mediaService.handleWebhook(req.body);
+      res.json({ success: true, media: result });
+    } catch (error: any) {
+      console.error('[VideoReview] Bunny webhook error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  console.log(`[VideoReview] Bunny webhook mounted at ${webhookPath}`);
 }

@@ -11,7 +11,16 @@ import {
 import { getStoreById } from '../server/db.ts';
 import { createAuditLog } from '../server/db.ts';
 import { isAuthenticated } from '../server/replit_integrations/auth/index.ts';
-import { getUserRole } from '../server/userDb.ts';
+import { getUserRole, getClaimedStoresForOwner } from '../server/userDb.ts';
+import {
+  createReview,
+  calculateTrustWeight,
+  evaluateUserBadges,
+  getUserBadges,
+  hasRecentCheckin,
+  calculateDistance,
+  getMediaById as getMediaByIdForReview,
+} from '../server/integrity/index.ts';
 import type { VideoReviewAdapter } from './adapter.ts';
 import type { StoreMedia } from '../types';
 import type {
@@ -24,6 +33,8 @@ import type {
   ModerationInput,
   AdminVideoReview,
   RecorderQuestion,
+  SubmitReviewData,
+  VideoReviewSubmitResult,
 } from './types.ts';
 
 interface StoreMediaRow extends StoreMedia {
@@ -164,6 +175,86 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
   async listVideoReviews(): Promise<AdminVideoReview[]> {
     const records = await getVideoReviews();
     return records.map(videoReviewToAdminRecord);
+  },
+
+  extractUserId(req: any): string | null {
+    return req.user?.id ?? req.user?.claims?.sub ?? null;
+  },
+
+  async isAdminUser(userId: string): Promise<boolean> {
+    const role = await getUserRole(userId);
+    return role === 'admin';
+  },
+
+  async getSubjectsOwnedBy(userId: string): Promise<string[]> {
+    return getClaimedStoresForOwner(userId);
+  },
+
+  async submitVideoReview(
+    subjectId: string,
+    userId: string,
+    data: SubmitReviewData,
+    requestMeta?: { lat?: number; lng?: number }
+  ): Promise<VideoReviewSubmitResult> {
+    if (!data.rating || typeof data.rating !== 'number' || data.rating < 1 || data.rating > 5) {
+      throw new Error('Rating must be a number between 1 and 5');
+    }
+
+    let hasVerifiedVideo = false;
+    if (data.videoAssetId) {
+      const videoMedia = await getMediaByIdForReview(data.videoAssetId);
+      if (videoMedia && videoMedia.storeId !== subjectId) {
+        throw new Error('Video does not belong to this store');
+      }
+      if (videoMedia && videoMedia.status === 'ready') {
+        hasVerifiedVideo = true;
+      }
+    }
+
+    const userBadges = await getUserBadges(userId);
+    const scoutTiers = [
+      'local_scout', 'regional_builder', 'cross_region_contributor',
+      'provincial_connector', 'bc_culture_guide', 'founding_bc_architect',
+    ];
+    const isScout = userBadges.some((b: { badgeType: string }) => scoutTiers.includes(b.badgeType));
+
+    const hasVerifiedPresenceCheckin = await hasRecentCheckin(userId, subjectId, 60);
+
+    let geoDeviationDetected = false;
+    if (!hasVerifiedPresenceCheckin && requestMeta?.lat != null && requestMeta?.lng != null) {
+      const store = await getStoreById(subjectId);
+      if (store && store.lat != null && store.lng != null) {
+        const dist = calculateDistance(requestMeta.lat, requestMeta.lng, store.lat, store.lng);
+        if (dist > 500) geoDeviationDetected = true;
+      }
+    }
+
+    const trustWeight = calculateTrustWeight({
+      hasVerifiedVideo,
+      isScout,
+      geoDeviationDetected,
+      hasVerifiedPresence: hasVerifiedPresenceCheckin,
+    });
+
+    const review = await createReview({
+      storeId: subjectId,
+      userId,
+      rating: data.rating,
+      contentText: data.contentText || '',
+      videoAssetId: data.videoAssetId,
+      trustWeight,
+      hasVerifiedVideo,
+    });
+
+    evaluateUserBadges(userId).catch((err: any) =>
+      console.error('[VideoReview] Badge evaluation error:', err)
+    );
+
+    return {
+      id: review.id,
+      videoAssetId: review.videoAssetId ?? null,
+      trustWeight: review.trustWeight ? { final: review.trustWeight.final } : null,
+    };
   },
 
   requireAuth(): RequestHandler {

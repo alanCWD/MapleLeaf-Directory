@@ -8,7 +8,7 @@ import router from './routes.ts';
 import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
-import { createVideoReviewMediaService } from '../video-review/server/media.ts';
+import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
 import { WebhookHandlers } from './webhookHandlers.ts';
 import { runMigrations } from 'stripe-replit-sync';
@@ -91,16 +91,7 @@ async function startServer() {
 
   app.use('/api', router);
 
-  const videoReviewMedia = createVideoReviewMediaService(legacyleafVideoAdapter);
-  app.post('/webhooks/bunny', async (req, res) => {
-    try {
-      const result = await videoReviewMedia.handleWebhook(req.body);
-      res.json({ success: true, media: result });
-    } catch (err: any) {
-      console.error('[Webhook] Bunny error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
+  mountVideoReviewWebhook(app, legacyleafVideoAdapter);
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

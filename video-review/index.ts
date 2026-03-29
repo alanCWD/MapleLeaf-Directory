@@ -18,9 +18,9 @@ export { legacyleafVideoAdapter } from './legacyleaf-adapter.ts';
 
 export {
   createVideoReviewRouter,
+  mountVideoReviewWebhook,
 } from './server/routes.ts';
 
-export type { VideoReviewRouterDeps } from './server/routes.ts';
 
 export {
   createVideoReviewMediaService,

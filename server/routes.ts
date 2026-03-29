@@ -167,13 +167,7 @@ router.use('/', createMicrositeRouter({
   paramId,
 }));
 
-router.use('/', createVideoReviewRouter(legacyleafVideoAdapter, {
-  getUserId,
-  getUserRole,
-  getClaimedStoresForOwner,
-  createAuditLog,
-  paramId,
-}));
+router.use('/', createVideoReviewRouter(legacyleafVideoAdapter));
 
 router.post('/search', async (req: Request, res: Response) => {
   try {
