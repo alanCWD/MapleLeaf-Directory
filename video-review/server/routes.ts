@@ -28,6 +28,9 @@ import type { RecorderQuestion, BrandingConfig } from '../types.ts';
  * skipped when the ID appears in this set.
  */
 const brandedVideoIds = new Set<string>();
+// Prevents concurrent FFmpeg jobs — production containers have limited CPU.
+// Only one video is branded at a time; the next sync click picks up the rest.
+let brandingJobInProgress = false;
 
 
 const ALLOWED_VIDEO_MIMES = [
@@ -630,7 +633,8 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
         // successfully branded (branding_applied_at IS NULL).
         const unbrandedRes = await pool.query<{ bunny_video_id: string }>(
           `SELECT bunny_video_id FROM store_media
-           WHERE status = 'ready' AND branding_applied_at IS NULL AND bunny_video_id IS NOT NULL`
+           WHERE status = 'ready' AND branding_applied_at IS NULL AND bunny_video_id IS NOT NULL
+           ORDER BY id ASC`
         );
         let brandingQueued = 0;
         for (const row of unbrandedRes.rows) {
@@ -748,11 +752,22 @@ function maybeApplyBranding(videoId: string, adapter: VideoReviewAdapter): void 
     return;
   }
 
+  // Prevent concurrent FFmpeg jobs — containers have limited CPU.
+  if (brandingJobInProgress) {
+    console.log(`[VideoReview:branding] Another brand job is in progress — skipping ${videoId.slice(0,8)} (sync again when done)`);
+    return;
+  }
+
+  brandingJobInProgress = true;
   brandedVideoIds.add(videoId);
-  applyBrandingToUploadedVideo(videoId, adapter, brandingConfig).catch((err: any) => {
-    console.error('[VideoReview:branding] Branding failed:', err.message);
-    brandedVideoIds.delete(videoId);
-  });
+  applyBrandingToUploadedVideo(videoId, adapter, brandingConfig)
+    .catch((err: any) => {
+      console.error('[VideoReview:branding] Branding failed:', err.message);
+      brandedVideoIds.delete(videoId);
+    })
+    .finally(() => {
+      brandingJobInProgress = false;
+    });
 }
 
 async function applyBrandingToUploadedVideo(
