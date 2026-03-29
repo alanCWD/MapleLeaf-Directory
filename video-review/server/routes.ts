@@ -56,7 +56,9 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
   // Eagerly generate placeholder branding assets at router creation (server start)
   // so they are ready before the first video is processed.
   const brandingConfig = adapter.getBrandingConfig?.();
-  if (brandingConfig) {
+  if (!brandingConfig) {
+    console.log('[VideoReview:branding] Adapter returned no branding config — branding disabled for this adapter.');
+  } else {
     ensureBrandingAssets(brandingConfig)
       .then((assets) => {
         if (!brandingConfig.generatePlaceholders) {
@@ -663,9 +665,25 @@ export function mountVideoReviewWebhook(
  * not already been processed. Safe to call from both the webhook handler and
  * the reconciliation routes.
  */
+function isBrandingEffectivelyDisabled(config: BrandingConfig): boolean {
+  return (
+    !config.introVideoPath &&
+    !config.outroVideoPath &&
+    !config.watermarkImagePath &&
+    !config.generatePlaceholders
+  );
+}
+
 function maybeApplyBranding(videoId: string, adapter: VideoReviewAdapter): void {
   const brandingConfig = adapter.getBrandingConfig?.();
   if (!brandingConfig) return;
+
+  // Short-circuit: avoid downloading and re-uploading when branding would
+  // immediately no-op (all three asset paths absent and no placeholder gen).
+  if (isBrandingEffectivelyDisabled(brandingConfig)) {
+    console.log(`[VideoReview:branding] Branding effectively disabled — skipping re-upload for ${videoId}`);
+    return;
+  }
 
   if (brandedVideoIds.has(videoId)) {
     brandedVideoIds.delete(videoId);
