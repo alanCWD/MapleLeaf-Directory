@@ -209,28 +209,33 @@ export async function downloadVideo(
 ): Promise<void> {
   const { default: fs } = await import('fs');
   const { Readable } = await import('stream');
+  const { pipeline } = await import('stream/promises');
   const cdn = config.cdnHostname || `vz-${config.libraryId}.b-cdn.net`;
   const url = buildCdnDownloadUrl(videoId, config);
 
   // Bunny CDN pull zone has hotlink protection enabled — requests without a
   // Referer header are rejected with 403. Setting Referer to the CDN host
   // itself satisfies the check without needing token signing.
-  const response = await fetch(url, {
-    headers: { Referer: `https://${cdn}` },
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Bunny CDN download failed (${response.status}) for ${url}`);
+  // AbortController covers the full operation (headers + body streaming).
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10-minute hard limit
+  try {
+    const response = await fetch(url, {
+      headers: { Referer: `https://${cdn}` },
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`Bunny CDN download failed (${response.status}) for ${url}`);
+    }
+
+    // Use stream/promises pipeline instead of manual pipe — it properly handles
+    // all termination cases (finish, error, premature close) without hanging.
+    const readable = Readable.fromWeb(response.body as any);
+    const writeStream = fs.createWriteStream(destPath);
+    await pipeline(readable, writeStream);
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const writeStream = fs.createWriteStream(destPath);
-  const readable = Readable.fromWeb(response.body as any);
-
-  await new Promise<void>((resolve, reject) => {
-    readable.pipe(writeStream);
-    writeStream.on('finish', resolve);
-    writeStream.on('error', reject);
-    readable.on('error', reject);
-  });
 }
 
 export function getVideoStatusLabel(status: number): VideoProcessingStatus {
