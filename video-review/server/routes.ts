@@ -16,7 +16,7 @@ import {
 } from './bunnyStream.ts';
 import { createJobDir, stitchClips, uploadStitchedVideo, cleanupJobDir } from './videoStitcher.ts';
 import { createVideoReviewMediaService } from './media.ts';
-import { applyBranding } from './branding.ts';
+import { applyBranding, ensureBrandingAssets } from './branding.ts';
 import type { VideoReviewAdapter } from '../adapter.ts';
 import type { RecorderQuestion, BrandingConfig } from '../types.ts';
 
@@ -52,6 +52,15 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
   const paramId = (params: any): string => String(params.id);
 
   const mediaService = createVideoReviewMediaService(adapter);
+
+  // Eagerly generate placeholder branding assets at router creation (server start)
+  // so they are ready before the first video is processed.
+  const brandingConfig = adapter.getBrandingConfig?.();
+  if (brandingConfig) {
+    ensureBrandingAssets(brandingConfig).catch((err: any) => {
+      console.warn('[VideoReview:branding] Startup asset generation failed:', err.message);
+    });
+  }
 
   const clipUpload = multer({
     dest: '/tmp/video-stitch/uploads',
