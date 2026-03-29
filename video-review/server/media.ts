@@ -1,5 +1,4 @@
 import {
-  BunnyApiError,
   createVideo,
   generateTusCredentials,
   deleteVideo,

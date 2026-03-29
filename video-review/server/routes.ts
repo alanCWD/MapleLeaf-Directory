@@ -464,6 +464,11 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
     requireAdmin,
     async (req: any, res: any) => {
       try {
+        if (!mediaService.isBunnyConfigured()) {
+          res.status(503).json({ error: 'Stream provider is not configured' });
+          return;
+        }
+
         const { bunnyVideoId } = req.body;
         if (!bunnyVideoId || typeof bunnyVideoId !== 'string') {
           res.status(400).json({ error: 'bunnyVideoId is required' });
@@ -510,6 +515,11 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
     requireAdmin,
     async (_req: any, res: any) => {
       try {
+        if (!mediaService.isBunnyConfigured()) {
+          res.status(503).json({ error: 'Stream provider is not configured' });
+          return;
+        }
+
         const all = await mediaService.listVideoReviews();
         const stuck = all.filter(
           (r) => r.status === 'uploading' || r.status === 'processing'
@@ -517,6 +527,7 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
 
         let fixed = 0;
         let stillPending = 0;
+        let failed = 0;
         const errors: Array<{ bunnyVideoId: string; error: string }> = [];
 
         await Promise.allSettled(
@@ -531,6 +542,8 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
               } else if (updated.status === 'ready') {
                 fixed++;
                 maybeApplyBranding(record.bunnyVideoId, adapter);
+              } else if (updated.status === 'failed') {
+                failed++;
               } else {
                 stillPending++;
               }
@@ -545,9 +558,9 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
         );
 
         console.log(
-          `[VideoReview:sync] sync-all-stuck: ${fixed} fixed, ${stillPending} still pending, ${errors.length} errors`
+          `[VideoReview:sync] sync-all-stuck: ${fixed} fixed, ${stillPending} still pending, ${failed} failed, ${errors.length} errors`
         );
-        res.json({ fixed, stillPending, errors });
+        res.json({ fixed, stillPending, failed, errors });
       } catch (error: any) {
         console.error('[VideoReview:sync] sync-all-stuck error:', error.message);
         res.status(500).json({ error: error.message });
