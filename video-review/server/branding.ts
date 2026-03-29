@@ -55,11 +55,25 @@ function resolveAssets(config: BrandingConfig): {
     config.assetsDir ||
     path.resolve(process.cwd(), 'video-review', 'assets', 'branding');
 
+  if (config.generatePlaceholders) {
+    // Opt-in adapters (LegacyLeaf): infer default paths from assetsDir
+    // when explicit paths are not provided.
+    return {
+      assetsDir,
+      introPath: config.introVideoPath || path.join(assetsDir, 'intro.mp4'),
+      outroPath: config.outroVideoPath || path.join(assetsDir, 'outro.mp4'),
+      watermarkPath: config.watermarkImagePath || path.join(assetsDir, 'watermark.png'),
+    };
+  }
+
+  // Custom/niche adapters: only use explicitly configured paths.
+  // Empty string means "not configured" — existence checks will return false
+  // and branding for that component is cleanly skipped without side-effects.
   return {
     assetsDir,
-    introPath: config.introVideoPath || path.join(assetsDir, 'intro.mp4'),
-    outroPath: config.outroVideoPath || path.join(assetsDir, 'outro.mp4'),
-    watermarkPath: config.watermarkImagePath || path.join(assetsDir, 'watermark.png'),
+    introPath: config.introVideoPath || '',
+    outroPath: config.outroVideoPath || '',
+    watermarkPath: config.watermarkImagePath || '',
   };
 }
 
@@ -163,9 +177,10 @@ export async function ensureBrandingAssets(config: BrandingConfig): Promise<{
   const { assetsDir, introPath, outroPath, watermarkPath } = resolveAssets(config);
 
   const existing = {
-    introExists: fs.existsSync(introPath),
-    outroExists: fs.existsSync(outroPath),
-    watermarkExists: fs.existsSync(watermarkPath),
+    // Guard against empty strings (non-configured paths in custom adapters)
+    introExists: !!introPath && fs.existsSync(introPath),
+    outroExists: !!outroPath && fs.existsSync(outroPath),
+    watermarkExists: !!watermarkPath && fs.existsSync(watermarkPath),
   };
 
   const needsGen =
@@ -309,6 +324,21 @@ export async function applyBranding(
   config: BrandingConfig,
   tmpDir?: string
 ): Promise<void> {
+  // Hard no-op guard: if none of the three asset paths are configured and
+  // watermarkText is also absent, there is nothing to apply. Copy input to
+  // output so callers always get a valid file at outputPath.
+  if (
+    !config.introVideoPath &&
+    !config.outroVideoPath &&
+    !config.watermarkImagePath &&
+    !config.watermarkText &&
+    !config.generatePlaceholders
+  ) {
+    console.warn('[VideoReview:branding] No asset paths configured, skipping branding');
+    fs.copyFileSync(inputPath, outputPath);
+    return;
+  }
+
   const workDir = tmpDir || path.dirname(outputPath);
   const stamp = Date.now();
 
