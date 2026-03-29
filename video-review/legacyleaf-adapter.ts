@@ -1,3 +1,4 @@
+import path from 'path';
 import type { RequestHandler } from 'express';
 import {
   createStoreMedia,
@@ -35,6 +36,7 @@ import type {
   RecorderQuestion,
   SubmitReviewData,
   VideoReviewSubmitResult,
+  BrandingConfig,
 } from './types.ts';
 
 interface StoreMediaRow extends StoreMedia {
@@ -303,5 +305,18 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
     meta: Record<string, unknown>
   ): Promise<void> {
     await createAuditLog(adminId, action, targetType, targetId, meta);
+  },
+
+  getBrandingConfig(): BrandingConfig {
+    return {
+      brandName: 'LegacyLeaf',
+      tagline: 'Authentic Cannabis Reviews',
+      brandColor: 'c8a84b',
+      bgColor: '1a2e1a',
+      watermarkText: 'LegacyLeaf',
+      watermarkPosition: 'bottom-right',
+      watermarkOpacity: 0.5,
+      assetsDir: path.resolve(process.cwd(), 'video-review', 'assets', 'branding'),
+    };
   },
 };

@@ -6,15 +6,26 @@ import fs from 'fs';
 import {
   createVideo,
   deleteVideo,
+  downloadVideo,
   generateTusCredentials,
   getEmbedUrl,
   getThumbnailUrl,
   isStreamConfigured,
+  uploadVideoBuffer,
 } from './bunnyStream.ts';
 import { createJobDir, stitchClips, uploadStitchedVideo, cleanupJobDir } from './videoStitcher.ts';
 import { createVideoReviewMediaService } from './media.ts';
+import { applyBranding } from './branding.ts';
 import type { VideoReviewAdapter } from '../adapter.ts';
-import type { RecorderQuestion } from '../types.ts';
+import type { RecorderQuestion, BrandingConfig } from '../types.ts';
+
+/**
+ * Tracks video IDs that have already had branding baked in via the
+ * webhook post-processing path (single TUS uploads). The second Bunny
+ * webhook that fires after we re-upload the branded video is safely
+ * skipped when the ID appears in this set.
+ */
+const brandedVideoIds = new Set<string>();
 
 
 const ALLOWED_VIDEO_MIMES = [
@@ -163,6 +174,23 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
           titleCardDuration: 2.5,
         });
 
+        // Apply branding (intro/outro + watermark) before uploading
+        let uploadPath = stitchResult.outputPath;
+        const brandingConfig = adapter.getBrandingConfig?.();
+        if (brandingConfig && jobDir) {
+          const brandedPath = path.join(jobDir, 'branded_output.mp4');
+          try {
+            await applyBranding(stitchResult.outputPath, brandedPath, brandingConfig, jobDir);
+            uploadPath = brandedPath;
+            console.log('[VideoReview:stitch] Branding applied successfully');
+          } catch (brandErr: any) {
+            console.warn(
+              '[VideoReview:stitch] Branding failed, uploading unbranded video:',
+              brandErr.message
+            );
+          }
+        }
+
         const config = adapter.getStreamConfig();
         const bunnyVideo = await createVideo(title, config);
 
@@ -180,7 +208,7 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
             status: 'processing',
           });
 
-          await uploadStitchedVideo(stitchResult.outputPath, bunnyVideo.guid, config);
+          await uploadStitchedVideo(uploadPath, bunnyVideo.guid, config);
         } catch (uploadErr: any) {
           console.error('[VideoReview:stitch] Upload/DB error, cleaning up asset:', uploadErr);
           // Delete the orphaned Bunny video so storage isn't wasted
@@ -451,6 +479,11 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
 /**
  * mountVideoReviewWebhook — registers a Bunny.net webhook route on the given
  * Express app instance. Call this in server/index.ts after the app is created.
+ *
+ * For single TUS uploads, when Bunny signals a video is ready, this handler
+ * transparently downloads the video, applies branding, and re-uploads it.
+ * The second webhook Bunny fires after re-upload is safely skipped via the
+ * module-level `brandedVideoIds` set.
  */
 export function mountVideoReviewWebhook(
   app: any,
@@ -463,6 +496,25 @@ export function mountVideoReviewWebhook(
     try {
       const result = await mediaService.handleWebhook(req.body);
       res.json({ success: true, media: result });
+
+      if (result?.status === 'ready') {
+        const videoId = result.bunnyVideoId;
+        const brandingConfig = adapter.getBrandingConfig?.();
+
+        if (!brandingConfig) return;
+
+        if (brandedVideoIds.has(videoId)) {
+          brandedVideoIds.delete(videoId);
+          console.log(`[VideoReview:branding] Skipping re-brand for ${videoId} (already branded)`);
+          return;
+        }
+
+        brandedVideoIds.add(videoId);
+        applyBrandingToUploadedVideo(videoId, adapter, brandingConfig).catch((err: any) => {
+          console.error('[VideoReview:branding] Single-upload branding failed:', err.message);
+          brandedVideoIds.delete(videoId);
+        });
+      }
     } catch (error: any) {
       console.error('[VideoReview] Bunny webhook error:', error.message);
       res.status(500).json({ error: error.message });
@@ -470,4 +522,26 @@ export function mountVideoReviewWebhook(
   });
 
   console.log(`[VideoReview] Bunny webhook mounted at ${webhookPath}`);
+}
+
+async function applyBrandingToUploadedVideo(
+  videoId: string,
+  adapter: VideoReviewAdapter,
+  brandingConfig: BrandingConfig
+): Promise<void> {
+  const streamConfig = adapter.getStreamConfig();
+  const tmpDir = fs.mkdtempSync(path.join('/tmp', `brand-${videoId.slice(0, 8)}-`));
+  try {
+    const downloadPath = path.join(tmpDir, 'original.mp4');
+    console.log(`[VideoReview:branding] Downloading ${videoId} for single-upload branding…`);
+    await downloadVideo(videoId, streamConfig, downloadPath);
+
+    const brandedPath = path.join(tmpDir, 'branded.mp4');
+    await applyBranding(downloadPath, brandedPath, brandingConfig, tmpDir);
+
+    await uploadVideoBuffer(brandedPath, videoId, streamConfig);
+    console.log(`[VideoReview:branding] Branded and re-uploaded ${videoId}`);
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
 }

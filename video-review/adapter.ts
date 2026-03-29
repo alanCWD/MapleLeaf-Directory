@@ -9,6 +9,7 @@ import type {
   RecorderQuestion,
   SubmitReviewData,
   VideoReviewSubmitResult,
+  BrandingConfig,
 } from './types.ts';
 
 /**
@@ -131,4 +132,11 @@ export interface VideoReviewAdapter {
     targetId: string,
     meta: Record<string, unknown>
   ): Promise<void>;
+
+  /**
+   * Optional: return branding configuration for intro/outro clips and
+   * watermark overlay applied to every processed video review.
+   * Return null (or omit) to disable all branding for this adapter.
+   */
+  getBrandingConfig?(): BrandingConfig | null;
 }

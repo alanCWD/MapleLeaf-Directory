@@ -92,3 +92,26 @@ export interface VideoReviewSubmitResult {
   videoAssetId?: number | null;
   trustWeight?: { final: number } | null;
 }
+
+/**
+ * BrandingConfig — supplied by the host adapter to control intro/outro clips
+ * and the watermark applied to every processed video review.
+ *
+ * All fields are optional; omitting a field disables that feature cleanly.
+ * Override any path to swap in niche-specific assets without code changes.
+ */
+export interface BrandingConfig {
+  brandName: string;
+  tagline?: string;
+  introDurationSeconds?: number;
+  outroDurationSeconds?: number;
+  brandColor?: string;
+  bgColor?: string;
+  introVideoPath?: string;
+  outroVideoPath?: string;
+  watermarkImagePath?: string;
+  watermarkText?: string;
+  watermarkPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  watermarkOpacity?: number;
+  assetsDir?: string;
+}

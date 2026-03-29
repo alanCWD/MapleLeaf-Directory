@@ -149,6 +149,37 @@ export async function uploadVideoBuffer(
   }
 }
 
+/**
+ * Download a processed video from the Bunny CDN to a local file.
+ * Requires the library's "Direct Play / MP4 Fallback" option to be enabled
+ * in Bunny Stream settings so the 720p MP4 is available at the CDN URL.
+ */
+export async function downloadVideo(
+  videoId: string,
+  config: StreamConfig,
+  destPath: string
+): Promise<void> {
+  const { default: fs } = await import('fs');
+  const { Readable } = await import('stream');
+  const cdn = config.cdnHostname || `vz-${config.libraryId}.b-cdn.net`;
+  const url = `https://${cdn}/${videoId}/play_720p.mp4`;
+
+  const response = await fetch(url);
+  if (!response.ok || !response.body) {
+    throw new Error(`Bunny CDN download failed (${response.status}) for ${url}`);
+  }
+
+  const writeStream = fs.createWriteStream(destPath);
+  const readable = Readable.fromWeb(response.body as any);
+
+  await new Promise<void>((resolve, reject) => {
+    readable.pipe(writeStream);
+    writeStream.on('finish', resolve);
+    writeStream.on('error', reject);
+    readable.on('error', reject);
+  });
+}
+
 export function getVideoStatusLabel(status: number): VideoProcessingStatus {
   switch (status) {
     case 0: return 'processing';

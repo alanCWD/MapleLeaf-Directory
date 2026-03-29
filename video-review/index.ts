@@ -1,6 +1,7 @@
 export type { VideoReviewAdapter } from './adapter.ts';
 
 export type {
+  BrandingConfig,
   StreamConfig,
   VideoMediaRecord,
   VideoProcessingStatus,
