@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, CreatorPost } from '../types';
 import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost, adminDeletePostAPI } from '../services/api';
+import { fetchAdminVideoReviews } from '../video-review/client/api';
 import { AdminVideoPanel } from '../video-review/components/AdminVideoPanel';
 import type { AdminVideoReview } from '../video-review/components/AdminVideoPanel';
 import { VerificationBadge } from './VerificationBadge';
@@ -44,14 +45,16 @@ export const AdminReviewQueue: React.FC = () => {
   const loadQueue = async () => {
     setIsLoading(true);
     try {
-      const [storeData, claimData, postsData] = await Promise.all([
+      const [storeData, claimData, postsData, videoData] = await Promise.all([
         fetchReviewQueue(),
         getAdminClaimsAPI(),
         fetchAllAdminPosts(),
+        fetchAdminVideoReviews(),
       ]);
       setStores(storeData);
       setClaims(claimData);
       setAllPosts(postsData);
+      setVideoReviews(videoData);
     } catch (err: any) {
       console.error('Failed to load review queue:', err);
     } finally {
@@ -503,7 +506,7 @@ export const AdminReviewQueue: React.FC = () => {
               </div>
             )
           ) : activeTab === 'videos' ? (
-            <AdminVideoPanel onReviewsChange={setVideoReviews} />
+            <AdminVideoPanel reviews={videoReviews} onReviewsChange={setVideoReviews} />
           ) : null}
         </div>
       </div>

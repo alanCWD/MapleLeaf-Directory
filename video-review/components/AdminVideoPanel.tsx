@@ -199,7 +199,7 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
                     <span>
                       | Store:{' '}
                       <Link
-                        to={`/store/${vr.storeId}`}
+                        to={`/store/${vr.subjectId}`}
                         className="text-emerald-600 hover:underline font-medium"
                       >
                         {vr.storeName}
