@@ -183,9 +183,10 @@ function buildCdnDownloadUrl(videoId: string, config: StreamConfig): string {
   }
 
   const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+  // Bunny CDN Token Auth: SHA256( authKey + expiresTimestamp + filePath ) → base64url
   const token = crypto
     .createHash('sha256')
-    .update(config.cdnAuthToken + filePath + expiry)
+    .update(config.cdnAuthToken + expiry + filePath)
     .digest('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')

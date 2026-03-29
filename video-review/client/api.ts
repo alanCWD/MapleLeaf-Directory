@@ -91,6 +91,16 @@ export async function deleteAdminVideo(id: number): Promise<void> {
   await apiFetch<{ success: boolean }>(`/admin/media/${id}`, { method: 'DELETE' });
 }
 
+export async function syncAllStuckVideos(): Promise<{
+  checked: number;
+  fixed: number;
+  stillPending: number;
+  failed: number;
+  errors: Array<{ bunnyVideoId: string; error: string }>;
+}> {
+  return apiFetch('/admin/video-reviews/sync-all-stuck', { method: 'POST' });
+}
+
 export async function submitStoreReview(
   storeId: string,
   data: SubmitReviewData

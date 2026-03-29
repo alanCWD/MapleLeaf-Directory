@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchAdminVideoReviews, moderateVideoReview, deleteAdminVideo } from '../client/api.ts';
+import { fetchAdminVideoReviews, moderateVideoReview, deleteAdminVideo, syncAllStuckVideos } from '../client/api.ts';
 import type { AdminVideoReview } from '../types.ts';
 
 export type { AdminVideoReview };
@@ -47,6 +47,8 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
   const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [syncBrandingState, setSyncBrandingState] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
+  const [syncBrandingResult, setSyncBrandingResult] = useState<string | null>(null);
 
   const videoReviews = externalReviews ?? internalReviews;
 
@@ -105,6 +107,24 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
     }
   };
 
+  const handleSyncBranding = async () => {
+    setSyncBrandingState('running');
+    setSyncBrandingResult(null);
+    try {
+      const result = await syncAllStuckVideos();
+      const msg = `Checked ${result.checked ?? '?'} videos — ${result.fixed} updated & branding queued, ${result.stillPending} still processing, ${result.failed} failed${result.errors?.length ? `, ${result.errors.length} error(s)` : ''}.`;
+      setSyncBrandingResult(msg);
+      setSyncBrandingState('done');
+      if ((result.fixed ?? 0) > 0) {
+        const fresh = await fetchAdminVideoReviews();
+        setVideoReviews(() => fresh);
+      }
+    } catch (err: any) {
+      setSyncBrandingResult(err.message || 'Sync failed');
+      setSyncBrandingState('error');
+    }
+  };
+
   const handleVideoDelete = async (id: number) => {
     setActionInProgress(`video-delete-${id}`);
     try {
@@ -140,6 +160,24 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-stone-100">
+        <p className="text-sm text-stone-500">{videoReviews.length} video{videoReviews.length !== 1 ? 's' : ''}</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {syncBrandingResult && (
+            <span className={`text-xs font-medium ${syncBrandingState === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+              {syncBrandingResult}
+            </span>
+          )}
+          <button
+            onClick={handleSyncBranding}
+            disabled={syncBrandingState === 'running'}
+            className="px-4 py-2 rounded-xl text-sm font-bold bg-stone-800 text-white hover:bg-stone-700 transition disabled:opacity-50"
+          >
+            {syncBrandingState === 'running' ? 'Syncing…' : 'Sync & Brand Stuck Videos'}
+          </button>
+        </div>
+      </div>
+
       {videoReviews.map((vr) => {
         const isDisapproved = vr.moderationStatus === 'disapproved';
         const isPlaying = playingVideoId === vr.id;
