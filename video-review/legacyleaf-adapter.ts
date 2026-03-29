@@ -10,15 +10,34 @@ import {
 import { getStoreById } from '../server/db.ts';
 import { createAuditLog } from '../server/db.ts';
 import type { VideoReviewAdapter } from './adapter.ts';
+import type { StoreMedia } from '../types';
 import type {
   StreamConfig,
   VideoMediaRecord,
+  VideoProcessingStatus,
+  VideoModerationStatus,
+  VideoContentRating,
   CreateMediaInput,
   ModerationInput,
   AdminVideoReview,
 } from './types.ts';
 
-function storeMediaToVideoRecord(m: any): VideoMediaRecord {
+interface StoreMediaRow extends StoreMedia {
+  moderationStatus?: string;
+  contentRating?: string;
+  moderationNotes?: string | null;
+}
+
+interface VideoReviewRow extends StoreMediaRow {
+  storeName?: string | null;
+  reviewText?: string | null;
+  reviewRating?: number | null;
+  reviewerId?: string | null;
+  reviewerBadge?: string | null;
+  reviewCreatedAt?: string | null;
+}
+
+function storeMediaToVideoRecord(m: StoreMediaRow): VideoMediaRecord {
   return {
     id: m.id,
     subjectId: m.storeId,
@@ -32,15 +51,15 @@ function storeMediaToVideoRecord(m: any): VideoMediaRecord {
     embedUrl: m.embedUrl ?? null,
     mediaType: m.mediaType,
     durationSeconds: m.durationSeconds ?? null,
-    moderationStatus: m.moderationStatus,
-    contentRating: m.contentRating,
+    moderationStatus: m.moderationStatus as VideoModerationStatus | undefined,
+    contentRating: m.contentRating as VideoContentRating | undefined,
     moderationNotes: m.moderationNotes ?? null,
     createdAt: m.createdAt,
     updatedAt: m.updatedAt,
   };
 }
 
-function videoReviewToAdminRecord(r: any): AdminVideoReview {
+function videoReviewToAdminRecord(r: VideoReviewRow): AdminVideoReview {
   return {
     ...storeMediaToVideoRecord({
       id: r.id,
@@ -102,7 +121,7 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
       bunnyLibraryId: data.bunnyLibraryId,
       title: data.title,
       description: data.description,
-      status: (data.status as any) || 'uploading',
+      status: data.status ?? 'uploading',
       thumbnailUrl: data.thumbnailUrl,
       embedUrl: data.embedUrl,
       mediaType: data.mediaType || 'video',
@@ -122,15 +141,15 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
 
   async updateMediaProcessing(
     bunnyVideoId: string,
-    status: string,
+    status: VideoProcessingStatus,
     extras?: { thumbnailUrl?: string; embedUrl?: string; durationSeconds?: number }
   ): Promise<VideoMediaRecord | null> {
-    const record = await updateMediaStatus(bunnyVideoId, status as any, extras);
+    const record = await updateMediaStatus(bunnyVideoId, status, extras);
     return record ? storeMediaToVideoRecord(record) : null;
   },
 
   async updateMediaModeration(id: number, data: ModerationInput): Promise<VideoMediaRecord | null> {
-    const record = await modelUpdateMediaModeration(id, data as any);
+    const record = await modelUpdateMediaModeration(id, data);
     return record ? storeMediaToVideoRecord(record) : null;
   },
 

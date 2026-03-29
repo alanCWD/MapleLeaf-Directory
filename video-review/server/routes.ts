@@ -286,7 +286,7 @@ export function createVideoReviewRouter(
           res.status(404).json({ error: 'Media not found' });
           return;
         }
-        if ((media as any).storeId !== paramId(req.params)) {
+        if (media.subjectId !== paramId(req.params)) {
           res.status(404).json({ error: 'Media not found for this store' });
           return;
         }
@@ -400,7 +400,7 @@ export function createVideoReviewRouter(
           res.status(404).json({ error: 'Media not found' });
           return;
         }
-        if ((existing as any).mediaType !== 'review') {
+        if (existing.mediaType !== 'review') {
           res.status(400).json({
             error: 'Only video reviews can be moderated via this endpoint',
           });

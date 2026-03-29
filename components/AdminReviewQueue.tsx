@@ -463,7 +463,7 @@ export const AdminReviewQueue: React.FC = () => {
               </div>
             )
           ) : activeTab === 'videos' ? (
-            <AdminVideoPanel reviews={videoReviews} onReviewsChange={setVideoReviews} />
+            <AdminVideoPanel onReviewsChange={setVideoReviews} />
           ) : null}
         </div>
       </div>

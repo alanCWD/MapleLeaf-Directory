@@ -1,6 +1,7 @@
 import type {
   StreamConfig,
   VideoMediaRecord,
+  VideoProcessingStatus,
   CreateMediaInput,
   ModerationInput,
   AdminVideoReview,
@@ -48,7 +49,7 @@ export interface VideoReviewAdapter {
    */
   updateMediaProcessing(
     bunnyVideoId: string,
-    status: string,
+    status: VideoProcessingStatus,
     extras?: { thumbnailUrl?: string; embedUrl?: string; durationSeconds?: number }
   ): Promise<VideoMediaRecord | null>;
 

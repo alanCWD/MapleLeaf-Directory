@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { StreamConfig } from '../types.ts';
+import type { StreamConfig, VideoProcessingStatus } from '../types.ts';
 
 const BUNNY_BASE_URL = 'https://video.bunnycdn.com';
 
@@ -125,18 +125,22 @@ export async function uploadVideoBuffer(
   const stats = fs.statSync(filePath);
   const fileStream = fs.createReadStream(filePath);
 
+  interface StreamRequestInit extends RequestInit {
+    duplex?: string;
+  }
+  const fetchInit: StreamRequestInit = {
+    method: 'PUT',
+    headers: {
+      AccessKey: config.apiKey,
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(stats.size),
+    },
+    body: fileStream as unknown as BodyInit,
+    duplex: 'half',
+  };
   const res = await fetch(
     `${BUNNY_BASE_URL}/library/${config.libraryId}/videos/${videoId}`,
-    {
-      method: 'PUT',
-      headers: {
-        AccessKey: config.apiKey,
-        'Content-Type': 'application/octet-stream',
-        'Content-Length': String(stats.size),
-      },
-      body: fileStream as any,
-      duplex: 'half' as any,
-    }
+    fetchInit
   );
 
   if (!res.ok) {
@@ -145,9 +149,9 @@ export async function uploadVideoBuffer(
   }
 }
 
-export function getVideoStatusLabel(status: number): string {
+export function getVideoStatusLabel(status: number): VideoProcessingStatus {
   switch (status) {
-    case 0: return 'queued';
+    case 0: return 'processing';
     case 1: return 'processing';
     case 2: return 'encoding';
     case 3: return 'ready';
@@ -156,6 +160,6 @@ export function getVideoStatusLabel(status: number): string {
     case 6: return 'uploading';
     case 7: return 'uploading';
     case 8: return 'failed';
-    default: return 'unknown';
+    default: return 'processing';
   }
 }

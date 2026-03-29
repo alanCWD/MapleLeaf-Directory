@@ -8,6 +8,7 @@ import {
   isStreamConfigured,
 } from './bunnyStream.ts';
 import type { VideoReviewAdapter } from '../adapter.ts';
+import type { VideoMediaType } from '../types.ts';
 import type {
   VideoMediaRecord,
   UploadCredentials,
@@ -35,7 +36,7 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
     subjectId: string,
     userId: string,
     title: string,
-    mediaType: string = 'video'
+    mediaType: VideoMediaType = 'video'
   ): Promise<UploadCredentials> {
     const config = streamConfig();
 
@@ -55,7 +56,7 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
       title,
       embedUrl,
       thumbnailUrl: getThumbnailUrl(bunnyVideo.guid, config),
-      mediaType: mediaType as any,
+      mediaType,
       status: 'uploading',
     });
 
