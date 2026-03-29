@@ -666,6 +666,10 @@ export async function moderatePost(id: number, action: 'approve' | 'reject' | 'm
   });
 }
 
+export async function adminDeletePostAPI(id: number): Promise<void> {
+  await apiFetch<{ success: boolean }>(`/posts/${id}`, { method: 'DELETE' });
+}
+
 export async function updateCreatorPost(id: number, data: {
   title?: string;
   subtitle?: string;

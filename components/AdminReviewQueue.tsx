@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Store, CreatorPost } from '../types';
-import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost } from '../services/api';
+import { fetchReviewQueue, adminReviewStore, verifyStore as apiVerifyStore, getAdminClaimsAPI, reviewClaimAPI, fetchAllAdminPosts, moderatePost, adminDeletePostAPI } from '../services/api';
 import { AdminVideoPanel } from '../video-review/components/AdminVideoPanel';
 import type { AdminVideoReview } from '../video-review/components/AdminVideoPanel';
 import { VerificationBadge } from './VerificationBadge';
@@ -19,6 +19,7 @@ export const AdminReviewQueue: React.FC = () => {
   const [postNotes, setPostNotes] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<'stores' | 'claims' | 'posts' | 'videos'>('stores');
   const [playingPostId, setPlayingPostId] = useState<number | null>(null);
+  const [confirmDeletePostId, setConfirmDeletePostId] = useState<number | null>(null);
   const { isAuthenticated, isLoading: authLoading, isAdmin } = useAuth();
 
   const BADGE_LABELS: Record<string, string> = {
@@ -135,6 +136,19 @@ export const AdminReviewQueue: React.FC = () => {
       setAllPosts(prev => prev.map(p => p.id === postId ? { ...p, status: updated.status, contentTier: updated.contentTier } : p));
     } catch (err) {
       console.error('Post moderation failed:', err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handlePostDelete = async (postId: number) => {
+    setActionInProgress(`post-delete-${postId}`);
+    try {
+      await adminDeletePostAPI(postId);
+      setAllPosts(prev => prev.filter(p => p.id !== postId));
+      setConfirmDeletePostId(null);
+    } catch (err) {
+      console.error('Post delete failed:', err);
     } finally {
       setActionInProgress(null);
     }
@@ -453,6 +467,32 @@ export const AdminReviewQueue: React.FC = () => {
                               className="px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
                             >
                               Mark Raw
+                            </button>
+                          )}
+                          {confirmDeletePostId === post.id ? (
+                            <div className="flex items-center gap-2 ml-auto">
+                              <span className="text-xs text-stone-500 font-medium">Permanently delete?</span>
+                              <button
+                                onClick={() => handlePostDelete(post.id)}
+                                disabled={actionInProgress === `post-delete-${post.id}`}
+                                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-red-700 text-white hover:bg-red-600 transition disabled:opacity-50"
+                              >
+                                Confirm Delete
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeletePostId(null)}
+                                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-stone-100 text-stone-600 hover:bg-stone-200 transition"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeletePostId(post.id)}
+                              disabled={!!actionInProgress}
+                              className="px-4 py-2.5 rounded-xl text-sm font-bold bg-stone-100 text-stone-500 hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50 ml-auto"
+                            >
+                              Delete
                             </button>
                           )}
                         </div>

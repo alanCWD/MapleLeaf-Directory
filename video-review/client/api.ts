@@ -87,6 +87,10 @@ export async function moderateVideoReview(
   });
 }
 
+export async function deleteAdminVideo(id: number): Promise<void> {
+  await apiFetch<{ success: boolean }>(`/admin/media/${id}`, { method: 'DELETE' });
+}
+
 export async function submitStoreReview(
   storeId: string,
   data: SubmitReviewData

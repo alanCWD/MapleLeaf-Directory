@@ -186,7 +186,10 @@ function buildCdnDownloadUrl(videoId: string, config: StreamConfig): string {
   const token = crypto
     .createHash('sha256')
     .update(config.cdnAuthToken + filePath + expiry)
-    .digest('hex');
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
   return `https://${cdn}${filePath}?token=${token}&expires=${expiry}`;
 }
 

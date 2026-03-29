@@ -473,6 +473,47 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
     }
   );
 
+  router.delete(
+    '/admin/media/:id',
+    isAuthenticated,
+    requireAdmin,
+    async (req: any, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          res.status(400).json({ error: 'Invalid media ID' });
+          return;
+        }
+
+        const existing = await mediaService.getSingleMedia(id);
+        if (!existing) {
+          res.status(404).json({ error: 'Media not found' });
+          return;
+        }
+
+        const deleted = await adapter.deleteMedia(id);
+        if (!deleted) {
+          res.status(404).json({ error: 'Media not found' });
+          return;
+        }
+
+        const adminId = adapter.extractUserId(req)!;
+        if (adapter.logAudit) {
+          await adapter.logAudit(adminId, 'media_delete', 'store_media', String(id), {
+            title: existing.title ?? null,
+            storeId: existing.storeId ?? null,
+            mediaType: existing.mediaType ?? null,
+          });
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        console.error('[VideoReview] Error deleting media:', error);
+        res.status(500).json({ error: 'Failed to delete media' });
+      }
+    }
+  );
+
   // ---------------------------------------------------------------------------
   // Reconciliation routes — fix videos stuck in uploading/processing status
   // when Bunny webhooks were missed (e.g. server restart, unconfigured URL).

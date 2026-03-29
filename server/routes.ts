@@ -57,6 +57,7 @@ import {
   getUserCheckins,
   hasRecentCheckin,
   calculateDistance,
+  deleteStoreMedia,
 } from './integrity/index.ts';
 import multer from 'multer';
 import { createVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
@@ -1686,9 +1687,20 @@ router.delete('/posts/:id', isAuthenticated as RequestHandler, async (req: any, 
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid post ID' }); return; }
     const userId = getUserId(req)!;
     const role = await getUserRole(userId);
+    const existing = await getPostById(id);
     let deleted: boolean;
     if (role === 'admin') {
       deleted = await adminDeletePost(id);
+      if (deleted) {
+        try {
+          await createAuditLog(userId, 'post_delete', 'post', String(id), {
+            postTitle: existing?.title ?? null,
+            storeId: existing?.storeId ?? null,
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log:', auditErr);
+        }
+      }
     } else {
       deleted = await deletePost(id, userId);
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchAdminVideoReviews, moderateVideoReview } from '../client/api.ts';
+import { fetchAdminVideoReviews, moderateVideoReview, deleteAdminVideo } from '../client/api.ts';
 import type { AdminVideoReview } from '../types.ts';
 
 export type { AdminVideoReview };
@@ -46,6 +46,7 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [videoNotes, setVideoNotes] = useState<Record<number, string>>({});
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const videoReviews = externalReviews ?? internalReviews;
 
@@ -99,6 +100,19 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
       setVideoReviews(prev => prev.map(v => (v.id === id ? { ...v, ...updated } : v)));
     } catch (err) {
       console.error('[AdminVideoPanel] Video moderation failed:', err);
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleVideoDelete = async (id: number) => {
+    setActionInProgress(`video-delete-${id}`);
+    try {
+      await deleteAdminVideo(id);
+      setVideoReviews(prev => prev.filter(v => v.id !== id));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error('[AdminVideoPanel] Video delete failed:', err);
     } finally {
       setActionInProgress(null);
     }
@@ -298,6 +312,32 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
                     className="px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 text-white hover:bg-amber-400 transition disabled:opacity-50"
                   >
                     Mark Raw
+                  </button>
+                )}
+                {confirmDeleteId === vr.id ? (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-xs text-stone-500 font-medium">Permanently delete?</span>
+                    <button
+                      onClick={() => handleVideoDelete(vr.id)}
+                      disabled={actionInProgress === `video-delete-${vr.id}`}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-red-700 text-white hover:bg-red-600 transition disabled:opacity-50"
+                    >
+                      Confirm Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-stone-100 text-stone-600 hover:bg-stone-200 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(vr.id)}
+                    disabled={!!actionInProgress}
+                    className="px-4 py-2.5 rounded-xl text-sm font-bold bg-stone-100 text-stone-500 hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50 ml-auto"
+                  >
+                    Delete
                   </button>
                 )}
               </div>
