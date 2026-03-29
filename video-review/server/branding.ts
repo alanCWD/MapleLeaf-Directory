@@ -17,7 +17,9 @@ import type { BrandingConfig } from '../types.ts';
 
 export type { BrandingConfig };
 
-const BRANDING_RES = '1280x720';
+const BRANDING_RES = '1280x720'; // WxH format for lavfi color source / -s option
+const BRANDING_W = 1280;         // separate dims for scale/pad filter expressions
+const BRANDING_H = 720;          // (FFmpeg filter parser treats 'x' as multiply, not separator)
 const BRANDING_FPS = 30;
 const BRANDING_INTRO_DUR = 4;
 const BRANDING_OUTRO_DUR = 4;
@@ -227,7 +229,7 @@ async function normalizeForBranding(inputPath: string, outputPath: string): Prom
   await runFFmpeg([
     '-y',
     '-i', inputPath,
-    '-vf', `scale=${BRANDING_RES}:force_original_aspect_ratio=decrease,pad=${BRANDING_RES}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${BRANDING_FPS},format=yuv420p`,
+    '-vf', `scale=${BRANDING_W}:${BRANDING_H}:force_original_aspect_ratio=decrease,pad=${BRANDING_W}:${BRANDING_H}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${BRANDING_FPS},format=yuv420p`,
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
     '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
     '-movflags', '+faststart',
