@@ -308,15 +308,20 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
   },
 
   getBrandingConfig(): BrandingConfig {
+    const assetsDir = path.resolve(process.cwd(), 'video-review', 'assets', 'branding');
     return {
       brandName: 'LegacyLeaf',
       tagline: 'Authentic Cannabis Reviews',
       brandColor: 'c8a84b',
       bgColor: '1a2e1a',
+      introVideoPath: path.join(assetsDir, 'intro.mp4'),
+      outroVideoPath: path.join(assetsDir, 'outro.mp4'),
+      watermarkImagePath: path.join(assetsDir, 'watermark.png'),
       watermarkText: 'LegacyLeaf',
       watermarkPosition: 'bottom-right',
       watermarkOpacity: 0.5,
-      assetsDir: path.resolve(process.cwd(), 'video-review', 'assets', 'branding'),
+      assetsDir,
+      generatePlaceholders: true,
     };
   },
 };

@@ -144,9 +144,13 @@ async function generateWatermarkPng(
 const assetGenLocks = new Map<string, Promise<void>>();
 
 /**
- * Ensure all branding assets exist in `assetsDir`, generating them via
- * FFmpeg if they are missing. Safe to call concurrently — generation of
- * the same directory is serialised via an in-process lock.
+ * Check whether branding assets exist in `assetsDir`. When `config.generatePlaceholders`
+ * is true, any missing assets are generated via FFmpeg before returning.
+ * Otherwise (the default for custom/niche adapters), this is a read-only check —
+ * no files are created and missing assets will simply report `exists: false`.
+ *
+ * Safe to call concurrently — generation of the same directory is serialised
+ * via an in-process lock so parallel requests don't race.
  */
 export async function ensureBrandingAssets(config: BrandingConfig): Promise<{
   introPath: string;
@@ -165,9 +169,8 @@ export async function ensureBrandingAssets(config: BrandingConfig): Promise<{
   };
 
   const needsGen =
-    !existing.introExists ||
-    !existing.outroExists ||
-    !existing.watermarkExists;
+    config.generatePlaceholders === true &&
+    (!existing.introExists || !existing.outroExists || !existing.watermarkExists);
 
   if (needsGen) {
     if (!assetGenLocks.has(assetsDir)) {
@@ -309,7 +312,23 @@ export async function applyBranding(
   const workDir = tmpDir || path.dirname(outputPath);
   const stamp = Date.now();
 
+  // ensureBrandingAssets will generate placeholders only when
+  // config.generatePlaceholders === true (LegacyLeaf default adapter).
+  // For custom adapters it is a read-only existence check.
   const assets = await ensureBrandingAssets(config);
+
+  // Warn when explicitly configured asset paths don't exist so operators
+  // know they need to supply the files. We only warn for explicit paths —
+  // if the adapter relies purely on assetsDir inference, startup logs cover it.
+  if (config.introVideoPath && !assets.introExists) {
+    console.warn(`[VideoReview:branding] Configured introVideoPath not found, skipping intro: ${config.introVideoPath}`);
+  }
+  if (config.outroVideoPath && !assets.outroExists) {
+    console.warn(`[VideoReview:branding] Configured outroVideoPath not found, skipping outro: ${config.outroVideoPath}`);
+  }
+  if (config.watermarkImagePath && !assets.watermarkExists) {
+    console.warn(`[VideoReview:branding] Configured watermarkImagePath not found, skipping image watermark: ${config.watermarkImagePath}`);
+  }
 
   const normalizedPath = path.join(workDir, `branding_norm_${stamp}.mp4`);
   await normalizeForBranding(inputPath, normalizedPath);

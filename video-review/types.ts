@@ -98,7 +98,13 @@ export interface VideoReviewSubmitResult {
  * and the watermark applied to every processed video review.
  *
  * All fields are optional; omitting a field disables that feature cleanly.
- * Override any path to swap in niche-specific assets without code changes.
+ * Set `introVideoPath`, `outroVideoPath`, and `watermarkImagePath` to explicit
+ * file paths for your niche assets. If the files are absent at runtime,
+ * branding for that component is silently skipped (no placeholder is generated).
+ *
+ * Set `generatePlaceholders: true` to opt in to automatic placeholder generation
+ * via FFmpeg when the asset files are missing. Only the LegacyLeaf default
+ * adapter enables this; custom adapters should supply their own assets.
  */
 export interface BrandingConfig {
   brandName: string;
@@ -113,5 +119,16 @@ export interface BrandingConfig {
   watermarkText?: string;
   watermarkPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   watermarkOpacity?: number;
+  /**
+   * Directory used to infer default intro/outro/watermark paths when explicit
+   * paths are not set. Also used as the target for placeholder generation when
+   * `generatePlaceholders` is true.
+   */
   assetsDir?: string;
+  /**
+   * When true, FFmpeg-generated placeholder intro/outro clips and watermark are
+   * created in `assetsDir` if the files are missing. Defaults to false.
+   * Only set this in adapters that intentionally rely on auto-generated assets.
+   */
+  generatePlaceholders?: boolean;
 }
