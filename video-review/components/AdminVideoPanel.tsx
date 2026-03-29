@@ -51,10 +51,9 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
 
   const setVideoReviews = (updater: (prev: AdminVideoReview[]) => AdminVideoReview[]) => {
     const next = updater(videoReviews);
+    setInternalReviews(next);
     if (onReviewsChange) {
       onReviewsChange(next);
-    } else {
-      setInternalReviews(next);
     }
   };
 
@@ -62,10 +61,9 @@ export const AdminVideoPanel: React.FC<AdminVideoPanelProps> = ({
     setIsLoading(true);
     try {
       const data = await fetchAdminVideoReviews();
+      setInternalReviews(data);
       if (onReviewsChange) {
         onReviewsChange(data);
-      } else {
-        setInternalReviews(data);
       }
       const preloaded: Record<number, string> = {};
       for (const vr of data) {
