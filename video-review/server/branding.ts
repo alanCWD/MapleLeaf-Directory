@@ -324,14 +324,15 @@ export async function applyBranding(
   config: BrandingConfig,
   tmpDir?: string
 ): Promise<void> {
-  // Hard no-op guard: if none of the three asset paths are configured and
-  // watermarkText is also absent, there is nothing to apply. Copy input to
-  // output so callers always get a valid file at outputPath.
+  // Hard no-op guard: "no branding when all three paths are absent" — if none of
+  // introVideoPath, outroVideoPath, or watermarkImagePath are configured and
+  // placeholder generation is not enabled, skip the entire branding pipeline.
+  // This is true even when watermarkText is set: the requirement treats the three
+  // asset paths as the authoritative signal for whether branding is active.
   if (
     !config.introVideoPath &&
     !config.outroVideoPath &&
     !config.watermarkImagePath &&
-    !config.watermarkText &&
     !config.generatePlaceholders
   ) {
     console.warn('[VideoReview:branding] No asset paths configured, skipping branding');
