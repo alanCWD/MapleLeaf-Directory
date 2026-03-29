@@ -379,7 +379,16 @@ export const AdminReviewQueue: React.FC = () => {
                                 {BADGE_LABELS[post.authorBadge] || post.authorBadge}
                               </span>
                             )}
-                            {post.storeName && <span>| Store: {post.storeName}</span>}
+                            {post.storeName && (
+                              <span>
+                                | Store:{' '}
+                                {post.storeId ? (
+                                  <Link to={`/store/${post.storeId}`} className="text-emerald-600 hover:underline font-medium">
+                                    {post.storeName}
+                                  </Link>
+                                ) : post.storeName}
+                              </span>
+                            )}
                             <span>| {new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
                           {post.moderationNotes && (
