@@ -445,6 +445,96 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
     }
   );
 
+  // ---------------------------------------------------------------------------
+  // Reconciliation routes — fix videos stuck in uploading/processing status
+  // when Bunny webhooks were missed (e.g. server restart, unconfigured URL).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * POST /admin/video-reviews/sync-status
+   * Body: { bunnyVideoId: string }
+   * Queries Bunny for the real status of a single video and updates our DB.
+   * Also fires the branding background job if the video is now ready and
+   * has not yet been branded.
+   */
+  router.post(
+    '/admin/video-reviews/sync-status',
+    isAuthenticated,
+    requireAdmin,
+    async (req: any, res: any) => {
+      try {
+        const { bunnyVideoId } = req.body;
+        if (!bunnyVideoId || typeof bunnyVideoId !== 'string') {
+          res.status(400).json({ error: 'bunnyVideoId is required' });
+          return;
+        }
+
+        const updated = await mediaService.syncVideoStatus(bunnyVideoId);
+        if (!updated) {
+          res.status(404).json({ error: 'No media record found for that bunnyVideoId' });
+          return;
+        }
+
+        if (updated.status === 'ready') {
+          maybeApplyBranding(bunnyVideoId, adapter);
+        }
+
+        res.json({ synced: true, media: updated });
+      } catch (error: any) {
+        console.error('[VideoReview:sync] sync-status error:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    }
+  );
+
+  /**
+   * POST /admin/video-reviews/sync-all-stuck
+   * No body required.
+   * Finds every media record in uploading/processing status, queries Bunny
+   * for each, and updates any that are now ready. Returns a summary.
+   */
+  router.post(
+    '/admin/video-reviews/sync-all-stuck',
+    isAuthenticated,
+    requireAdmin,
+    async (_req: any, res: any) => {
+      try {
+        const all = await mediaService.listVideoReviews();
+        const stuck = all.filter(
+          (r) => r.status === 'uploading' || r.status === 'processing'
+        );
+
+        let fixed = 0;
+        let stillPending = 0;
+        const errors: Array<{ bunnyVideoId: string; error: string }> = [];
+
+        await Promise.allSettled(
+          stuck.map(async (record) => {
+            try {
+              const updated = await mediaService.syncVideoStatus(record.bunnyVideoId);
+              if (updated?.status === 'ready') {
+                fixed++;
+                maybeApplyBranding(record.bunnyVideoId, adapter);
+              } else {
+                stillPending++;
+              }
+            } catch (err: any) {
+              errors.push({ bunnyVideoId: record.bunnyVideoId, error: err.message });
+            }
+          })
+        );
+
+        console.log(
+          `[VideoReview:sync] sync-all-stuck: ${fixed} fixed, ${stillPending} still pending, ${errors.length} errors`
+        );
+        res.json({ fixed, stillPending, errors });
+      } catch (error: any) {
+        console.error('[VideoReview:sync] sync-all-stuck error:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    }
+  );
+
   // POST /stores/:id/video-reviews — submit a video review for a subject
   router.post(
     '/stores/:id/video-reviews',
@@ -498,22 +588,7 @@ export function mountVideoReviewWebhook(
       res.json({ success: true, media: result });
 
       if (result?.status === 'ready') {
-        const videoId = result.bunnyVideoId;
-        const brandingConfig = adapter.getBrandingConfig?.();
-
-        if (!brandingConfig) return;
-
-        if (brandedVideoIds.has(videoId)) {
-          brandedVideoIds.delete(videoId);
-          console.log(`[VideoReview:branding] Skipping re-brand for ${videoId} (already branded)`);
-          return;
-        }
-
-        brandedVideoIds.add(videoId);
-        applyBrandingToUploadedVideo(videoId, adapter, brandingConfig).catch((err: any) => {
-          console.error('[VideoReview:branding] Single-upload branding failed:', err.message);
-          brandedVideoIds.delete(videoId);
-        });
+        maybeApplyBranding(result.bunnyVideoId, adapter);
       }
     } catch (error: any) {
       console.error('[VideoReview] Bunny webhook error:', error.message);
@@ -522,6 +597,29 @@ export function mountVideoReviewWebhook(
   });
 
   console.log(`[VideoReview] Bunny webhook mounted at ${webhookPath}`);
+}
+
+/**
+ * maybeApplyBranding — fires the branding background job for a video that
+ * just became ready, if the adapter has a branding config and the video has
+ * not already been processed. Safe to call from both the webhook handler and
+ * the reconciliation routes.
+ */
+function maybeApplyBranding(videoId: string, adapter: VideoReviewAdapter): void {
+  const brandingConfig = adapter.getBrandingConfig?.();
+  if (!brandingConfig) return;
+
+  if (brandedVideoIds.has(videoId)) {
+    brandedVideoIds.delete(videoId);
+    console.log(`[VideoReview:branding] Skipping re-brand for ${videoId} (already branded)`);
+    return;
+  }
+
+  brandedVideoIds.add(videoId);
+  applyBrandingToUploadedVideo(videoId, adapter, brandingConfig).catch((err: any) => {
+    console.error('[VideoReview:branding] Branding failed:', err.message);
+    brandedVideoIds.delete(videoId);
+  });
 }
 
 async function applyBrandingToUploadedVideo(

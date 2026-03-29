@@ -4,6 +4,7 @@ import {
   deleteVideo,
   getEmbedUrl,
   getThumbnailUrl,
+  getVideo,
   getVideoStatusLabel,
   isStreamConfigured,
 } from './bunnyStream.ts';
@@ -115,6 +116,26 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
     return adapter.listVideoReviews();
   }
 
+  /**
+   * syncVideoStatus — queries Bunny for the real encoding status of a video
+   * and updates our database to match. Reuses the same `updateMediaProcessing`
+   * path as handleWebhook so embedUrl / thumbnailUrl are set on the ready
+   * transition. Returns null if Bunny has no record of the video.
+   */
+  async function syncVideoStatus(bunnyVideoId: string): Promise<VideoMediaRecord | null> {
+    const config = streamConfig();
+    const bunnyVideo = await getVideo(bunnyVideoId, config);
+    const statusLabel = getVideoStatusLabel(bunnyVideo.status);
+
+    const extras: { thumbnailUrl?: string; embedUrl?: string } = {};
+    if (statusLabel === 'ready') {
+      extras.thumbnailUrl = getThumbnailUrl(bunnyVideoId, config);
+      extras.embedUrl = getEmbedUrl(bunnyVideoId, config);
+    }
+
+    return adapter.updateMediaProcessing(bunnyVideoId, statusLabel, extras);
+  }
+
   return {
     isBunnyConfigured,
     initUpload,
@@ -123,5 +144,6 @@ export function createVideoReviewMediaService(adapter: VideoReviewAdapter) {
     getSubjectMedia,
     getSingleMedia,
     listVideoReviews,
+    syncVideoStatus,
   };
 }
