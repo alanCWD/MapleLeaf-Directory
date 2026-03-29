@@ -86,6 +86,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import heicConvert from 'heic-convert';
+import { fileURLToPath } from 'url';
 
 const HEIC_MIMETYPES = new Set(['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']);
 
@@ -118,6 +119,43 @@ const imageUpload = multer({
     }
   },
 });
+
+const brandingImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, WebP, and SVG images are allowed'));
+    }
+  },
+});
+
+const brandingVideoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['video/mp4', 'video/quicktime', 'video/webm'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only MP4, MOV, and WebM video files are allowed'));
+    }
+  },
+});
+
+const __dirnameRoutes = path.dirname(fileURLToPath(import.meta.url));
+const BRANDING_DIR = path.resolve(__dirnameRoutes, '..', 'video-review', 'assets', 'branding');
+
+const BRANDING_ASSET_MAP: Record<string, { filename: string; type: 'image' | 'video' }> = {
+  'logo-light': { filename: 'logo-light.png', type: 'image' },
+  'logo-dark':  { filename: 'logo-dark.png',  type: 'image' },
+  'watermark':  { filename: 'watermark.png',  type: 'image' },
+  'intro-video': { filename: 'intro.mp4',     type: 'video' },
+  'outro-video': { filename: 'outro.mp4',     type: 'video' },
+};
 
 const router = Router();
 
@@ -983,6 +1021,71 @@ router.get('/admin/audit-logs', isAuthenticated as RequestHandler, requireAdmin,
   } catch (error) {
     console.error('Error fetching audit logs:', error);
     res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+router.get('/admin/branding', isAuthenticated as RequestHandler, requireAdmin, (_req, res) => {
+  try {
+    fs.mkdirSync(BRANDING_DIR, { recursive: true });
+    const assets: Record<string, { exists: boolean; url: string | null; filename: string }> = {};
+    for (const [key, { filename }] of Object.entries(BRANDING_ASSET_MAP)) {
+      const filepath = path.join(BRANDING_DIR, filename);
+      const exists = fs.existsSync(filepath);
+      assets[key] = { exists, url: exists ? `/branding-assets/${filename}` : null, filename };
+    }
+    res.json({ assets });
+  } catch (error) {
+    console.error('[AdminBranding] GET error:', error);
+    res.status(500).json({ error: 'Failed to retrieve branding status' });
+  }
+});
+
+router.post('/admin/branding/:asset', isAuthenticated as RequestHandler, requireAdmin, (req, res, next) => {
+  const assetKey = req.params.asset;
+  const assetDef = BRANDING_ASSET_MAP[assetKey];
+  if (!assetDef) {
+    res.status(400).json({ error: `Unknown branding asset: ${assetKey}` });
+    return;
+  }
+  const upload = assetDef.type === 'video' ? brandingVideoUpload : brandingImageUpload;
+  upload.single('file')(req, res, next);
+}, async (req: any, res) => {
+  try {
+    const assetKey = req.params.asset;
+    const assetDef = BRANDING_ASSET_MAP[assetKey];
+    if (!req.file) {
+      res.status(400).json({ error: 'No file provided' });
+      return;
+    }
+    fs.mkdirSync(BRANDING_DIR, { recursive: true });
+    const destPath = path.join(BRANDING_DIR, assetDef.filename);
+    fs.writeFileSync(destPath, req.file.buffer);
+    const url = `/branding-assets/${assetDef.filename}`;
+    console.log(`[AdminBranding] Uploaded ${assetKey} → ${destPath}`);
+    res.json({ success: true, asset: assetKey, url, filename: assetDef.filename });
+  } catch (error: any) {
+    console.error('[AdminBranding] Upload error:', error);
+    res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
+
+router.delete('/admin/branding/:asset', isAuthenticated as RequestHandler, requireAdmin, (req, res) => {
+  try {
+    const assetKey = req.params.asset;
+    const assetDef = BRANDING_ASSET_MAP[assetKey];
+    if (!assetDef) {
+      res.status(400).json({ error: `Unknown branding asset: ${assetKey}` });
+      return;
+    }
+    const destPath = path.join(BRANDING_DIR, assetDef.filename);
+    if (fs.existsSync(destPath)) {
+      fs.unlinkSync(destPath);
+      console.log(`[AdminBranding] Deleted ${assetKey} from ${destPath}`);
+    }
+    res.json({ success: true, asset: assetKey });
+  } catch (error: any) {
+    console.error('[AdminBranding] Delete error:', error);
+    res.status(500).json({ error: error.message || 'Delete failed' });
   }
 });
 

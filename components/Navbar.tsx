@@ -181,6 +181,9 @@ export const Navbar: React.FC = () => {
                 <a href="#/admin/sync" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
                   Database Engine
                 </a>
+                <a href="#/admin/branding" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                  Branding Assets
+                </a>
               </>
             )}
             <a href="#/settings/profile" onClick={() => setShowUserMenu(false)} className="block px-3 py-2 rounded-xl text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition">

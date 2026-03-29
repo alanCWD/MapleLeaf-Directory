@@ -832,3 +832,43 @@ export async function adminSetSovereignPlan(
     body: JSON.stringify({ sovereignPlanStatus, sovereignPlanExpiresAt }),
   });
 }
+
+export interface BrandingAssetInfo {
+  exists: boolean;
+  url: string | null;
+  filename: string;
+}
+
+export interface BrandingAssetsStatus {
+  assets: Record<string, BrandingAssetInfo>;
+}
+
+export async function adminGetBrandingAssets(): Promise<BrandingAssetsStatus> {
+  return apiFetch<BrandingAssetsStatus>('/admin/branding');
+}
+
+export async function adminUploadBrandingAsset(
+  assetKey: string,
+  file: File
+): Promise<{ success: boolean; asset: string; url: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`/api/admin/branding/${assetKey}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Upload failed');
+  }
+  return res.json();
+}
+
+export async function adminDeleteBrandingAsset(
+  assetKey: string
+): Promise<{ success: boolean; asset: string }> {
+  return apiFetch<{ success: boolean; asset: string }>(`/admin/branding/${assetKey}`, {
+    method: 'DELETE',
+  });
+}

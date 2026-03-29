@@ -25,6 +25,10 @@ const uploadsDir = path.resolve(__dirnameLocal, '..', 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
 
+const brandingAssetsDir = path.resolve(__dirnameLocal, '..', 'video-review', 'assets', 'branding');
+fs.mkdirSync(brandingAssetsDir, { recursive: true });
+app.use('/branding-assets', express.static(brandingAssetsDir));
+
 app.use(cors());
 
 app.post(
