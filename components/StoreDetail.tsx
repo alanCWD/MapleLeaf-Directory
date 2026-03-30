@@ -719,8 +719,7 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   )}
                   {brandingNotification === 'branding' && (
                     <>
-                      <span className="font-bold">Applying branding to your video…</span>{' '}
-                      Intro, outro, and watermark are being added. This usually takes under a minute.
+                      Processing your review...
                     </>
                   )}
                 </div>
