@@ -856,15 +856,42 @@ async function applyBrandingToUploadedVideo(
     const brandSize = Math.round(fs.statSync(brandedPath).size / 1024);
     console.log(`[VideoReview:branding] [${short}] Step 2-4/4 — branding done in ${Date.now() - t1}ms, ${brandSize} KB`);
 
-    console.log(`[VideoReview:branding] [${short}] Uploading branded video back to Bunny…`);
-    const t2 = Date.now();
-    await uploadVideoBuffer(brandedPath, videoId, streamConfig);
-    console.log(`[VideoReview:branding] [${short}] Upload done in ${Date.now() - t2}ms`);
-
-    await pool.query(
-      `UPDATE store_media SET branding_applied_at = NOW() WHERE bunny_video_id = $1`,
+    // Bunny refuses to re-upload to a video that has already been processed.
+    // Strategy: create a new video object, upload the branded file there,
+    // then update our DB row to point at the new ID, and delete the old one.
+    const titleRow = await pool.query<{ title: string }>(
+      'SELECT title FROM store_media WHERE bunny_video_id = $1',
       [videoId]
     );
+    const title = titleRow.rows[0]?.title || 'Branded Video';
+
+    console.log(`[VideoReview:branding] [${short}] Creating new Bunny video for branded upload…`);
+    const newVideo = await createVideo(title, streamConfig);
+    const newId = newVideo.guid;
+    // Pre-register the new ID so the webhook it triggers does not re-brand.
+    brandedVideoIds.add(newId);
+
+    console.log(`[VideoReview:branding] [${short}] Uploading branded video to new ID ${newId.slice(0,8)}…`);
+    const t2 = Date.now();
+    await uploadVideoBuffer(brandedPath, newId, streamConfig);
+    console.log(`[VideoReview:branding] [${short}] Upload done in ${Date.now() - t2}ms`);
+
+    const newEmbedUrl = getEmbedUrl(newId, streamConfig);
+    const newThumbUrl = getThumbnailUrl(newId, streamConfig);
+    await pool.query(
+      `UPDATE store_media
+       SET bunny_video_id = $1, embed_url = $2, thumbnail_url = $3, branding_applied_at = NOW()
+       WHERE bunny_video_id = $4`,
+      [newId, newEmbedUrl, newThumbUrl, videoId]
+    );
+
+    try {
+      await deleteVideo(videoId, streamConfig);
+      console.log(`[VideoReview:branding] [${short}] Deleted original video ${short}`);
+    } catch (e: any) {
+      console.warn(`[VideoReview:branding] [${short}] Could not delete original video (non-fatal): ${e.message}`);
+    }
+
     console.log(`[VideoReview:branding] [${short}] ✓ Branded and re-uploaded in ${Date.now() - t0}ms total`);
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
