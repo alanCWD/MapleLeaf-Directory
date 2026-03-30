@@ -11,6 +11,7 @@ import { FlagButton } from './FlagButton';
 import { MediaGallery } from './MediaGallery';
 import { VideoRecorder } from '../video-review/components/VideoRecorder';
 import { VideoUploader } from '../video-review/components/VideoUploader';
+import { fetchBrandingStatus } from '../video-review/client/api';
 import { IntegrityCard } from './IntegrityCard';
 import { BadgeIcon } from './BadgeIcon';
 import { PresenceCheckin } from './PresenceCheckin';
@@ -121,6 +122,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
   const [activeTab, setActiveTab] = useState<'reviews' | 'posts'>('reviews');
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; index: number } | null>(null);
+  const [pendingBrandingMediaId, setPendingBrandingMediaId] = useState<number | null>(null);
+  const [brandingNotification, setBrandingNotification] = useState<'queued' | 'branding' | 'done' | null>(null);
 
   const hasCachedInsights = (s: Store | null): boolean => {
     if (!s?.storeInsights) return false;
@@ -257,6 +260,38 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     };
   }, [store, insights, detailHeaderUrl, storeMedia]);
 
+  useEffect(() => {
+    if (!pendingBrandingMediaId || !store) return;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const poll = async () => {
+      try {
+        const { brandingStatus } = await fetchBrandingStatus(store.id, pendingBrandingMediaId);
+        if (cancelled) return;
+        if (brandingStatus === 'done') {
+          setBrandingNotification('done');
+          setPendingBrandingMediaId(null);
+          setTimeout(() => setBrandingNotification(null), 8000);
+        } else if (brandingStatus === 'queued') {
+          setBrandingNotification('queued');
+          timeoutId = setTimeout(poll, 6000);
+        } else {
+          setBrandingNotification('branding');
+          timeoutId = setTimeout(poll, 5000);
+        }
+      } catch {
+        if (!cancelled) timeoutId = setTimeout(poll, 10000);
+      }
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [pendingBrandingMediaId, store]);
+
   const fetchInsights = async () => {
     if (!store) return;
     setIsLoadingInsights(true);
@@ -292,11 +327,12 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
     if (!store || !newReview.comment) return;
 
     setIsSubmittingReview(true);
+    const submittedVideoAssetId = reviewVideoAssetId;
     try {
       const weightedReview = await submitReview(store.id, {
         rating: newReview.rating,
         contentText: newReview.comment,
-        videoAssetId: reviewVideoAssetId,
+        videoAssetId: submittedVideoAssetId,
       });
       setWeightedReviews(prev => [weightedReview, ...prev]);
 
@@ -304,6 +340,11 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
         fetchIntegrityScore(id)
           .then(setIntegrityScore)
           .catch(() => {});
+      }
+
+      if (submittedVideoAssetId) {
+        setPendingBrandingMediaId(submittedVideoAssetId);
+        setBrandingNotification('branding');
       }
 
       setNewReview({ userName: '', rating: 5, comment: '' });
@@ -648,6 +689,52 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
 
           {activeTab === 'reviews' && (
           <section id="reviews">
+            {brandingNotification && (
+              <div className={`mb-6 flex items-start gap-3 rounded-2xl px-5 py-4 text-sm font-medium shadow-sm ${
+                brandingNotification === 'done'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border border-amber-200 text-amber-800'
+              }`}>
+                {brandingNotification === 'done' ? (
+                  <svg className="w-5 h-5 mt-0.5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 mt-0.5 shrink-0 text-amber-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+                <div>
+                  {brandingNotification === 'done' && (
+                    <>
+                      <span className="font-bold">Your video review is ready!</span>{' '}
+                      The intro, outro, and watermark have been applied.
+                    </>
+                  )}
+                  {brandingNotification === 'queued' && (
+                    <>
+                      <span className="font-bold">Your video is in the branding queue.</span>{' '}
+                      The system is currently processing another review — yours will be branded automatically once it completes. No action needed.
+                    </>
+                  )}
+                  {brandingNotification === 'branding' && (
+                    <>
+                      <span className="font-bold">Applying branding to your video…</span>{' '}
+                      Intro, outro, and watermark are being added. This usually takes under a minute.
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setBrandingNotification(null); setPendingBrandingMediaId(null); }}
+                  className="ml-auto shrink-0 opacity-60 hover:opacity-100 transition"
+                  aria-label="Dismiss"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
               <h2 className="text-2xl font-extrabold text-stone-900 flex items-center gap-2">
                 <span className="w-2 h-8 bg-purple-500 rounded-full"></span>

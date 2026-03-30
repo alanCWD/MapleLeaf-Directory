@@ -28,9 +28,11 @@ import type { RecorderQuestion, BrandingConfig } from '../types.ts';
  * skipped when the ID appears in this set.
  */
 const brandedVideoIds = new Set<string>();
-// Prevents concurrent FFmpeg jobs — production containers have limited CPU.
-// Only one video is branded at a time; the next sync click picks up the rest.
-let brandingJobInProgress = false;
+// Branding queue — only one FFmpeg job runs at a time (CPU-limited containers).
+// When a job is already running the next video's Bunny ID is pushed here and
+// automatically dequeued when the current job finishes.
+let currentBrandingVideoId: string | null = null;
+const brandingQueue: string[] = [];
 
 
 const ALLOWED_VIDEO_MIMES = [
@@ -519,6 +521,57 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
   );
 
   // ---------------------------------------------------------------------------
+  // Branding status — lets the client poll for progress after a video upload
+  // so it can show a toast when a video is queued or branding is complete.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * GET /stores/:storeId/media/:mediaId/branding-status
+   * Returns the branding status of a specific media record.
+   * brandingStatus: 'pending_encoding' | 'queued' | 'branding' | 'done'
+   */
+  router.get(
+    '/stores/:storeId/media/:mediaId/branding-status',
+    isAuthenticated,
+    async (req: any, res: any) => {
+      try {
+        const mediaId = parseInt(req.params.mediaId, 10);
+        if (isNaN(mediaId)) {
+          res.status(400).json({ error: 'Invalid mediaId' });
+          return;
+        }
+        const result = await pool.query<{
+          bunny_video_id: string;
+          status: string;
+          branding_applied_at: Date | null;
+        }>(
+          'SELECT bunny_video_id, status, branding_applied_at FROM store_media WHERE id = $1',
+          [mediaId]
+        );
+        const row = result.rows[0];
+        if (!row) {
+          res.status(404).json({ error: 'Media not found' });
+          return;
+        }
+        let brandingStatus: 'pending_encoding' | 'queued' | 'branding' | 'done';
+        if (row.branding_applied_at) {
+          brandingStatus = 'done';
+        } else if (currentBrandingVideoId === row.bunny_video_id) {
+          brandingStatus = 'branding';
+        } else if (brandingQueue.includes(row.bunny_video_id)) {
+          brandingStatus = 'queued';
+        } else {
+          brandingStatus = 'pending_encoding';
+        }
+        res.json({ brandingStatus, bunnyStatus: row.status });
+      } catch (err: any) {
+        console.error('[VideoReview] branding-status error:', err.message);
+        res.status(500).json({ error: 'Internal error' });
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
   // Reconciliation routes — fix videos stuck in uploading/processing status
   // when Bunny webhooks were missed (e.g. server restart, unconfigured URL).
   // ---------------------------------------------------------------------------
@@ -753,12 +806,16 @@ function maybeApplyBranding(videoId: string, adapter: VideoReviewAdapter): void 
   }
 
   // Prevent concurrent FFmpeg jobs — containers have limited CPU.
-  if (brandingJobInProgress) {
-    console.log(`[VideoReview:branding] Another brand job is in progress — skipping ${videoId.slice(0,8)} (sync again when done)`);
+  // Push to queue so the job starts automatically when the current one finishes.
+  if (currentBrandingVideoId !== null) {
+    if (!brandingQueue.includes(videoId)) {
+      brandingQueue.push(videoId);
+      console.log(`[VideoReview:branding] Queued ${videoId.slice(0,8)} — current job: ${currentBrandingVideoId.slice(0,8)} (will start automatically when done)`);
+    }
     return;
   }
 
-  brandingJobInProgress = true;
+  currentBrandingVideoId = videoId;
   brandedVideoIds.add(videoId);
   applyBrandingToUploadedVideo(videoId, adapter, brandingConfig)
     .catch((err: any) => {
@@ -766,7 +823,13 @@ function maybeApplyBranding(videoId: string, adapter: VideoReviewAdapter): void 
       brandedVideoIds.delete(videoId);
     })
     .finally(() => {
-      brandingJobInProgress = false;
+      currentBrandingVideoId = null;
+      // Drain queue — start the next waiting video automatically.
+      const next = brandingQueue.shift();
+      if (next) {
+        console.log(`[VideoReview:branding] Dequeuing next job: ${next.slice(0,8)}`);
+        maybeApplyBranding(next, adapter);
+      }
     });
 }
 

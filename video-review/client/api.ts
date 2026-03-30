@@ -101,6 +101,13 @@ export async function syncAllStuckVideos(): Promise<{
   return apiFetch('/admin/video-reviews/sync-all-stuck', { method: 'POST' });
 }
 
+export async function fetchBrandingStatus(
+  storeId: string,
+  mediaId: number
+): Promise<{ brandingStatus: 'pending_encoding' | 'queued' | 'branding' | 'done'; bunnyStatus: string }> {
+  return apiFetch(`/stores/${storeId}/media/${mediaId}/branding-status`);
+}
+
 export async function submitStoreReview(
   storeId: string,
   data: SubmitReviewData
