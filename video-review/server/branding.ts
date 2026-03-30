@@ -427,7 +427,10 @@ export async function applyBranding(
   }
 
   // Watermark step disabled — skipped to improve pipeline speed.
-  // Re-enable by removing the if(false) guard when watermarking is needed again.
+  // TODO: Re-enable by removing the `if (false)` guards below when watermarking
+  // is needed again. Before doing so, confirm that incoming source videos are
+  // always Bunny-processed (AAC 48k stereo) so the normalize fast path stays
+  // compatible; non-Bunny sources may need the full audio re-encode path.
   if (false && assets.watermarkExists) {
     const wmPath = path.join(workDir, `branding_wm_${stamp}.mp4`);
     console.log('[VideoReview:branding] FFmpeg step: watermark overlay…');
