@@ -10,7 +10,7 @@
  * no code changes required to use a different niche.
  */
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import type { BrandingConfig } from '../types.ts';
@@ -225,7 +225,48 @@ export async function ensureBrandingAssets(config: BrandingConfig): Promise<{
   };
 }
 
+function probeVideo(inputPath: string): { width: number; height: number; fps: number; pixFmt: string } {
+  try {
+    const raw = execSync(
+      `ffprobe -v quiet -print_format json -show_streams "${inputPath}"`,
+      { encoding: 'utf8', timeout: 15000 }
+    );
+    const data = JSON.parse(raw);
+    const vs = data.streams?.find((s: any) => s.codec_type === 'video');
+    if (!vs) return { width: 0, height: 0, fps: 0, pixFmt: '' };
+    const [num, den] = (vs.r_frame_rate || '30/1').split('/').map(Number);
+    return {
+      width: vs.width || 0,
+      height: vs.height || 0,
+      fps: Math.round((num / (den || 1)) * 10) / 10,
+      pixFmt: vs.pix_fmt || '',
+    };
+  } catch {
+    return { width: 0, height: 0, fps: 0, pixFmt: '' };
+  }
+}
+
 async function normalizeForBranding(inputPath: string, outputPath: string): Promise<void> {
+  const info = probeVideo(inputPath);
+  const videoCompatible =
+    info.width === BRANDING_W &&
+    info.height === BRANDING_H &&
+    Math.abs(info.fps - BRANDING_FPS) < 0.5 &&
+    (info.pixFmt === 'yuv420p' || info.pixFmt === 'yuvj420p');
+
+  if (videoCompatible) {
+    console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps — copying video stream (skipping re-encode)`);
+    await runFFmpeg([
+      '-y', '-i', inputPath,
+      '-c:v', 'copy',
+      '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+      '-movflags', '+faststart',
+      outputPath,
+    ]);
+    return;
+  }
+
+  console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps → ${BRANDING_W}x${BRANDING_H} ${BRANDING_FPS}fps (re-encoding)`);
   await runFFmpeg([
     '-y',
     '-i', inputPath,
