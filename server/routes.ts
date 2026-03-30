@@ -61,7 +61,7 @@ import {
   deleteReview,
 } from './integrity/index.ts';
 import multer from 'multer';
-import { createVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
+import { createVideo, deleteVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
 import { createVideoReviewRouter } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
 import {
@@ -909,10 +909,27 @@ router.delete('/admin/reviews/:id', isAuthenticated as RequestHandler, requireAd
       res.status(400).json({ error: 'Invalid review ID' });
       return;
     }
-    const deleted = await deleteReview(id);
-    if (!deleted) {
+    const { found, videoAssetId } = await deleteReview(id);
+    if (!found) {
       res.status(404).json({ error: 'Review not found' });
       return;
+    }
+    if (videoAssetId) {
+      const media = await getMediaById(videoAssetId);
+      if (media) {
+        if (media.bunnyVideoId && isBunnyConfigured()) {
+          try {
+            await deleteVideo(media.bunnyVideoId);
+          } catch (e: any) {
+            console.warn(`[Admin] Could not delete Bunny video ${media.bunnyVideoId} (non-fatal): ${e.message}`);
+          }
+        }
+        try {
+          await deleteStoreMedia(videoAssetId);
+        } catch (e: any) {
+          console.warn(`[Admin] Could not delete store_media ${videoAssetId} (non-fatal): ${e.message}`);
+        }
+      }
     }
     res.json({ success: true });
   } catch (error) {

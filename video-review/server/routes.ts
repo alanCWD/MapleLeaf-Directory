@@ -497,6 +497,16 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
           return;
         }
 
+        // Cascade: remove any integrity_reviews that reference this media so
+        // they don't linger as ghost reviews on the store page.
+        const cascadeResult = await pool.query(
+          `DELETE FROM integrity_reviews WHERE video_asset_id = $1`,
+          [id]
+        );
+        if ((cascadeResult.rowCount ?? 0) > 0) {
+          console.log(`[VideoReview] Cascade-deleted ${cascadeResult.rowCount} review(s) for media ${id}`);
+        }
+
         const deleted = await adapter.deleteMedia(id);
         if (!deleted) {
           res.status(404).json({ error: 'Media not found' });

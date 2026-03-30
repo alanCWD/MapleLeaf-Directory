@@ -9,6 +9,7 @@ import {
   updateMediaModeration as modelUpdateMediaModeration,
   getVideoReviews,
 } from '../server/integrity/models.ts';
+import { deleteVideo } from './server/bunnyStream.ts';
 import { getStoreById } from '../server/db.ts';
 import { createAuditLog } from '../server/db.ts';
 import { isAuthenticated } from '../server/replit_integrations/auth/index.ts';
@@ -172,6 +173,20 @@ export const legacyleafVideoAdapter: VideoReviewAdapter = {
   },
 
   async deleteMedia(id: number): Promise<boolean> {
+    const record = await getMediaById(id);
+    if (record?.bunnyVideoId) {
+      try {
+        const config = {
+          apiKey: process.env.BUNNY_STREAM_API_KEY || '',
+          libraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '',
+          cdnHostname: process.env.BUNNY_CDN_HOSTNAME || `vz-${process.env.BUNNY_STREAM_LIBRARY_ID || ''}.b-cdn.net`,
+          cdnAuthToken: process.env.BUNNY_CDN_AUTH_TOKEN || undefined,
+        };
+        await deleteVideo(record.bunnyVideoId, config);
+      } catch (e: any) {
+        console.warn(`[VideoReview:adapter] Could not delete Bunny video ${record.bunnyVideoId} (non-fatal): ${e.message}`);
+      }
+    }
     return deleteStoreMedia(id);
   },
 

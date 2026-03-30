@@ -290,9 +290,21 @@ export async function deleteStoreMedia(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function deleteReview(id: number): Promise<boolean> {
-  const result = await pool.query(`DELETE FROM integrity_reviews WHERE id = $1`, [id]);
-  return (result.rowCount ?? 0) > 0;
+export async function deleteReview(id: number): Promise<{ found: boolean; videoAssetId: number | null }> {
+  const result = await pool.query(
+    `DELETE FROM integrity_reviews WHERE id = $1 RETURNING video_asset_id`,
+    [id]
+  );
+  if ((result.rowCount ?? 0) === 0) return { found: false, videoAssetId: null };
+  return { found: true, videoAssetId: result.rows[0].video_asset_id ?? null };
+}
+
+export async function deleteReviewsByMediaId(mediaId: number): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM integrity_reviews WHERE video_asset_id = $1`,
+    [mediaId]
+  );
+  return result.rowCount ?? 0;
 }
 
 export async function createReview(data: {
