@@ -259,7 +259,7 @@ async function normalizeForBranding(inputPath: string, outputPath: string): Prom
     await runFFmpeg([
       '-y', '-i', inputPath,
       '-c:v', 'copy',
-      '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+      '-c:a', 'copy',
       '-movflags', '+faststart',
       outputPath,
     ]);
@@ -426,7 +426,9 @@ export async function applyBranding(
     workPath = concatPath;
   }
 
-  if (assets.watermarkExists) {
+  // Watermark step disabled — skipped to improve pipeline speed.
+  // Re-enable by removing the if(false) guard when watermarking is needed again.
+  if (false && assets.watermarkExists) {
     const wmPath = path.join(workDir, `branding_wm_${stamp}.mp4`);
     console.log('[VideoReview:branding] FFmpeg step: watermark overlay…');
     const tWm = Date.now();
@@ -436,7 +438,7 @@ export async function applyBranding(
       try { fs.unlinkSync(workPath); } catch {}
     }
     workPath = wmPath;
-  } else if (config.watermarkText && !config.watermarkImagePath) {
+  } else if (false && config.watermarkText && !config.watermarkImagePath) {
     // Apply text watermark only when:
     //  - watermarkText is explicitly configured (intent to watermark), AND
     //  - no watermarkImagePath was configured (pure text-only setup).
