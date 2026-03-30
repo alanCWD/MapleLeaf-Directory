@@ -771,6 +771,27 @@ export function mountVideoReviewWebhook(
   });
 
   console.log(`[VideoReview] Bunny webhook mounted at ${webhookPath}`);
+
+  // Startup recovery: re-queue any videos that were interrupted mid-branding
+  // (e.g. server restarted while FFmpeg was running). Runs after a short delay
+  // to let the rest of the server finish initializing.
+  setTimeout(async () => {
+    try {
+      const res = await pool.query<{ bunny_video_id: string }>(
+        `SELECT bunny_video_id FROM store_media
+         WHERE status = 'ready' AND branding_applied_at IS NULL AND bunny_video_id IS NOT NULL
+         ORDER BY id ASC`
+      );
+      if (res.rows.length > 0) {
+        console.log(`[VideoReview:branding] Startup recovery: ${res.rows.length} unbranded video(s) queued`);
+        for (const row of res.rows) {
+          maybeApplyBranding(row.bunny_video_id, adapter);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[VideoReview:branding] Startup recovery failed:', err.message);
+    }
+  }, 5000);
 }
 
 /**
@@ -859,10 +880,18 @@ async function applyBrandingToUploadedVideo(
     // Bunny refuses to re-upload to a video that has already been processed.
     // Strategy: create a new video object, upload the branded file there,
     // then update our DB row to point at the new ID, and delete the old one.
-    const titleRow = await pool.query<{ title: string }>(
-      'SELECT title FROM store_media WHERE bunny_video_id = $1',
+    const titleRow = await pool.query<{ title: string; branding_applied_at: Date | null }>(
+      'SELECT title, branding_applied_at FROM store_media WHERE bunny_video_id = $1',
       [videoId]
     );
+
+    // Guard: if the video was already branded (e.g. server restarted between
+    // re-upload and Bunny's second webhook), skip the pipeline entirely.
+    if (titleRow.rows[0]?.branding_applied_at) {
+      console.log(`[VideoReview:branding] [${short}] Already branded — skipping`);
+      return;
+    }
+
     const title = titleRow.rows[0]?.title || 'Branded Video';
 
     console.log(`[VideoReview:branding] [${short}] Creating new Bunny video for branded upload…`);
