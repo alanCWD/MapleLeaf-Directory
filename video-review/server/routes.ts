@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { pool } from '../../server/db.ts';
+import { deleteReviewsByMediaId } from '../../server/integrity/models.ts';
 import {
   BunnyApiError,
   createVideo,
@@ -499,12 +500,9 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
 
         // Cascade: remove any integrity_reviews that reference this media so
         // they don't linger as ghost reviews on the store page.
-        const cascadeResult = await pool.query(
-          `DELETE FROM integrity_reviews WHERE video_asset_id = $1`,
-          [id]
-        );
-        if ((cascadeResult.rowCount ?? 0) > 0) {
-          console.log(`[VideoReview] Cascade-deleted ${cascadeResult.rowCount} review(s) for media ${id}`);
+        const cascadeCount = await deleteReviewsByMediaId(id);
+        if (cascadeCount > 0) {
+          console.log(`[VideoReview] Cascade-deleted ${cascadeCount} review(s) for media ${id}`);
         }
 
         const deleted = await adapter.deleteMedia(id);

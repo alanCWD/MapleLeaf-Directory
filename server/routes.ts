@@ -58,6 +58,7 @@ import {
   hasRecentCheckin,
   calculateDistance,
   deleteStoreMedia,
+  getReviewById,
   deleteReview,
 } from './integrity/index.ts';
 import multer from 'multer';
@@ -909,13 +910,15 @@ router.delete('/admin/reviews/:id', isAuthenticated as RequestHandler, requireAd
       res.status(400).json({ error: 'Invalid review ID' });
       return;
     }
-    const { found, videoAssetId } = await deleteReview(id);
-    if (!found) {
+    // Fetch first so we know the video_asset_id before removing anything.
+    const review = await getReviewById(id);
+    if (!review) {
       res.status(404).json({ error: 'Review not found' });
       return;
     }
-    if (videoAssetId) {
-      const media = await getMediaById(videoAssetId);
+    // Cascade: clean up Bunny CDN video and store_media row (non-fatal).
+    if (review.videoAssetId) {
+      const media = await getMediaById(review.videoAssetId);
       if (media) {
         if (media.bunnyVideoId && isBunnyConfigured()) {
           try {
@@ -925,12 +928,14 @@ router.delete('/admin/reviews/:id', isAuthenticated as RequestHandler, requireAd
           }
         }
         try {
-          await deleteStoreMedia(videoAssetId);
+          await deleteStoreMedia(review.videoAssetId);
         } catch (e: any) {
-          console.warn(`[Admin] Could not delete store_media ${videoAssetId} (non-fatal): ${e.message}`);
+          console.warn(`[Admin] Could not delete store_media ${review.videoAssetId} (non-fatal): ${e.message}`);
         }
       }
     }
+    // Delete the review after media cleanup so it only disappears once everything is gone.
+    await deleteReview(id);
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting review:', error);

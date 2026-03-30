@@ -290,6 +290,15 @@ export async function deleteStoreMedia(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function getReviewById(id: number): Promise<{ id: number; videoAssetId: number | null } | null> {
+  const result = await pool.query(
+    `SELECT id, video_asset_id FROM integrity_reviews WHERE id = $1`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+  return { id: result.rows[0].id, videoAssetId: result.rows[0].video_asset_id ?? null };
+}
+
 export async function deleteReview(id: number): Promise<{ found: boolean; videoAssetId: number | null }> {
   const result = await pool.query(
     `DELETE FROM integrity_reviews WHERE id = $1 RETURNING video_asset_id`,
