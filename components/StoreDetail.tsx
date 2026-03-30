@@ -713,8 +713,8 @@ export const StoreDetail: React.FC<StoreDetailProps> = ({ stores, onUpdateStore 
                   )}
                   {brandingNotification === 'queued' && (
                     <>
-                      <span className="font-bold">Your video is in the branding queue.</span>{' '}
-                      The system is currently processing another review — yours will be branded automatically once it completes. No action needed.
+                      <span className="font-bold">Your video is in queue.</span>{' '}
+                      The system is currently processing another review
                     </>
                   )}
                   {brandingNotification === 'branding' && (
