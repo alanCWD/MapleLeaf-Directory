@@ -7,6 +7,7 @@ export {
   getMediaById,
   updateMediaStatus,
   deleteStoreMedia,
+  deleteReview,
   createReview,
   getReviewsByStore,
   getReviewsByUser,

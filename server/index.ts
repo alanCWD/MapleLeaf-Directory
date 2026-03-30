@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
 import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
@@ -89,6 +89,7 @@ async function startServer() {
   await ensureUserProfileColumns();
   await ensureCustomDomainColumns();
   await ensureSovereignPlanColumns();
+  await cleanupTestReviews();
 
   const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
   app.use(createTenantMiddleware(legacyleafAdapter, MAIN_DOMAIN));

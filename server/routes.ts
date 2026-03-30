@@ -58,6 +58,7 @@ import {
   hasRecentCheckin,
   calculateDistance,
   deleteStoreMedia,
+  deleteReview,
 } from './integrity/index.ts';
 import multer from 'multer';
 import { createVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
@@ -898,6 +899,25 @@ router.get('/admin/review-queue', isAuthenticated as RequestHandler, requireAdmi
   } catch (error) {
     console.error('Error fetching review queue:', error);
     res.status(500).json({ error: 'Failed to fetch review queue' });
+  }
+});
+
+router.delete('/admin/reviews/:id', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Invalid review ID' });
+      return;
+    }
+    const deleted = await deleteReview(id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Review not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting review:', error);
+    res.status(500).json({ error: 'Failed to delete review' });
   }
 });
 

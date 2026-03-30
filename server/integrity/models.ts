@@ -290,6 +290,11 @@ export async function deleteStoreMedia(id: number): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+export async function deleteReview(id: number): Promise<boolean> {
+  const result = await pool.query(`DELETE FROM integrity_reviews WHERE id = $1`, [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function createReview(data: {
   storeId: string;
   userId: string;

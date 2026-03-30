@@ -855,3 +855,22 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
   return Array.from(seen.values());
 }
 
+export async function cleanupTestReviews(): Promise<void> {
+  try {
+    const reviews = await pool.query(
+      `DELETE FROM integrity_reviews WHERE id IN (2, 3, 4, 5) AND store_id = 'store-Rml2ZSBTdGFy' RETURNING id`
+    );
+    if ((reviews.rowCount ?? 0) > 0) {
+      console.log(`[Cleanup] Removed ${reviews.rowCount} test review(s) from Five Star Smoke Shop`);
+    }
+    const media = await pool.query(
+      `DELETE FROM store_media WHERE id = 11 AND store_id = 'store-Rml2ZSBTdGFy' RETURNING id`
+    );
+    if ((media.rowCount ?? 0) > 0) {
+      console.log(`[Cleanup] Removed ${media.rowCount} test media record(s) from Five Star Smoke Shop`);
+    }
+  } catch (err) {
+    console.error('[Cleanup] Failed to remove test reviews:', err);
+  }
+}
+
