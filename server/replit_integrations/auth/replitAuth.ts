@@ -163,8 +163,10 @@ export async function setupAuth(app: Express) {
       res.status(400).send('Google sign-in not configured');
       return;
     }
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const rawProto = req.headers['x-forwarded-proto'];
+    const protocol = (Array.isArray(rawProto) ? rawProto[0] : (rawProto || '')).split(',')[0].trim() || req.protocol || 'https';
     const redirectUri = `${protocol}://${req.hostname}/api/auth/google/callback`;
+    console.log('[Auth] Google redirect URI:', redirectUri);
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
@@ -183,8 +185,10 @@ export async function setupAuth(app: Express) {
         res.redirect('/#/auth?error=google_failed');
         return;
       }
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const rawProto2 = req.headers['x-forwarded-proto'];
+      const protocol = (Array.isArray(rawProto2) ? rawProto2[0] : (rawProto2 || '')).split(',')[0].trim() || req.protocol || 'https';
       const redirectUri = `${protocol}://${req.hostname}/api/auth/google/callback`;
+      console.log('[Auth] Google callback redirect URI:', redirectUri);
       const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri);
       const { tokens } = await googleClient.getToken(code as string);
       if (!tokens.id_token) {
