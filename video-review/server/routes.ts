@@ -515,7 +515,7 @@ export function createVideoReviewRouter(adapter: VideoReviewAdapter): Router {
         if (adapter.logAudit) {
           await adapter.logAudit(adminId, 'media_delete', 'store_media', String(id), {
             title: existing.title ?? null,
-            storeId: existing.storeId ?? null,
+            storeId: existing.subjectId ?? null,
             mediaType: existing.mediaType ?? null,
           });
         }

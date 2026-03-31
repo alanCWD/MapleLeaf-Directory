@@ -1084,7 +1084,7 @@ router.get('/admin/branding', isAuthenticated as RequestHandler, requireAdmin, (
 });
 
 router.post('/admin/branding/:asset', isAuthenticated as RequestHandler, requireAdmin, (req, res, next) => {
-  const assetKey = req.params.asset;
+  const assetKey = req.params.asset as string;
   const assetDef = BRANDING_ASSET_MAP[assetKey];
   if (!assetDef) {
     res.status(400).json({ error: `Unknown branding asset: ${assetKey}` });
@@ -1114,7 +1114,7 @@ router.post('/admin/branding/:asset', isAuthenticated as RequestHandler, require
 
 router.delete('/admin/branding/:asset', isAuthenticated as RequestHandler, requireAdmin, (req, res) => {
   try {
-    const assetKey = req.params.asset;
+    const assetKey = req.params.asset as string;
     const assetDef = BRANDING_ASSET_MAP[assetKey];
     if (!assetDef) {
       res.status(400).json({ error: `Unknown branding asset: ${assetKey}` });

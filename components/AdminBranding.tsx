@@ -293,7 +293,7 @@ export const AdminBranding: React.FC = () => {
     },
   ];
 
-  const uploadedCount = Object.values(assets).filter((a) => a.exists).length;
+  const uploadedCount = (Object.values(assets) as BrandingAssetInfo[]).filter((a) => a.exists).length;
   const totalCount = 5;
 
   return (

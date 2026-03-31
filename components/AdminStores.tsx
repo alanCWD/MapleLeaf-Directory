@@ -363,7 +363,7 @@ export const AdminStores: React.FC = () => {
     );
   }
 
-  const totalStores = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const totalStores = (Object.values(statusCounts) as number[]).reduce((a, b) => a + b, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
