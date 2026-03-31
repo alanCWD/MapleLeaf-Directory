@@ -69,7 +69,7 @@ build = ["npm", "run", "build"]
 [userenv.shared]
 GEMINI_API_KEY = "AIzaSyArpf2ktQGdeUfDFY_xLXNFMsQOuVfFhNE"
 BUNNY_CDN_HOSTNAME = "vz-6c3ea743-33a.b-cdn.net"
-SENDGRID_FROM_EMAIL = "noreply@legacyleaf.ca"
+SENDGRID_FROM_EMAIL = "noreply@legacyleafdirectory.ca"
 
 [postMerge]
 path = "scripts/post-merge.sh"
