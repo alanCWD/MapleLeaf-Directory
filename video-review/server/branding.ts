@@ -254,11 +254,18 @@ async function normalizeForBranding(inputPath: string, outputPath: string): Prom
     Math.abs(info.fps - BRANDING_FPS) < 0.5 &&
     (info.pixFmt === 'yuv420p' || info.pixFmt === 'yuvj420p');
 
+  // The video track timescale must match the intro/outro files (1/15360) so
+  // that the concat demuxer's -c copy path interprets PTS values correctly.
+  // Without this, Bunny's 1/30000 timebase produces a 2:1 PTS mismatch that
+  // makes the main video play at half speed in the branded output.
+  const CONCAT_TIMESCALE = 15360; // matches intro.mp4 / outro.mp4
+
   if (videoCompatible) {
-    console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps — copying video stream (skipping re-encode)`);
+    console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps — stream copy, forcing timescale ${CONCAT_TIMESCALE}`);
     await runFFmpeg([
       '-y', '-i', inputPath,
       '-c:v', 'copy',
+      '-video_track_timescale', String(CONCAT_TIMESCALE),
       '-c:a', 'copy',
       '-movflags', '+faststart',
       outputPath,
@@ -266,12 +273,13 @@ async function normalizeForBranding(inputPath: string, outputPath: string): Prom
     return;
   }
 
-  console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps → ${BRANDING_W}x${BRANDING_H} ${BRANDING_FPS}fps (re-encoding)`);
+  console.log(`[VideoReview:branding] Normalize: ${info.width}x${info.height} ${info.fps}fps → ${BRANDING_W}x${BRANDING_H} ${BRANDING_FPS}fps (re-encoding, timescale ${CONCAT_TIMESCALE})`);
   await runFFmpeg([
     '-y',
     '-i', inputPath,
     '-vf', `scale=${BRANDING_W}:${BRANDING_H}:force_original_aspect_ratio=decrease,pad=${BRANDING_W}:${BRANDING_H}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${BRANDING_FPS},format=yuv420p`,
     '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+    '-video_track_timescale', String(CONCAT_TIMESCALE),
     '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
     '-movflags', '+faststart',
     outputPath,
