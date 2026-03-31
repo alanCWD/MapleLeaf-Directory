@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.35.0",
+    "@sendgrid/mail": "^8.1.6",
     "@types/bcryptjs": "^2.4.6",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/cors": "^2.8.19",
