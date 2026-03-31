@@ -876,3 +876,15 @@ export async function adminDeleteBrandingAsset(
     method: 'DELETE',
   });
 }
+
+export async function joinWaitlistAPI(email: string): Promise<{ success: boolean; alreadySubscribed: boolean }> {
+  return apiFetch<{ success: boolean; alreadySubscribed: boolean }>('/waitlist', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function getAdminWaitlistAPI(): Promise<{ id: number; email: string; createdAt: string }[]> {
+  const result = await apiFetch<{ emails: { id: number; email: string; createdAt: string }[]; total: number }>('/admin/waitlist');
+  return result.emails;
+}

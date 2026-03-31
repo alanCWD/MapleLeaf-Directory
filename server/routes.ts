@@ -65,6 +65,8 @@ import multer from 'multer';
 import { createVideo, deleteVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
 import { createVideoReviewRouter } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
+import { addWaitlistEmail, getWaitlistEmails } from './db.ts';
+import { sendWaitlistConfirmation } from './mailer.ts';
 import {
   createPost,
   getPostById,
@@ -1765,6 +1767,36 @@ router.patch('/admin/users/:id/creator', isAuthenticated as RequestHandler, requ
   } catch (error) {
     console.error('Error updating creator status:', error);
     res.status(500).json({ error: 'Failed to update creator status' });
+  }
+});
+
+router.post('/waitlist', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      res.status(400).json({ error: 'A valid email address is required' });
+      return;
+    }
+    const record = await addWaitlistEmail(email);
+    if (record.isNew) {
+      sendWaitlistConfirmation(record.email).catch((err: any) => {
+        console.error('[Mailer] Failed to send waitlist confirmation:', err?.message || err);
+      });
+    }
+    res.json({ success: true, alreadySubscribed: !record.isNew });
+  } catch (error: any) {
+    console.error('[Waitlist] Error adding email:', error?.message || error);
+    res.status(500).json({ error: 'Failed to join waitlist' });
+  }
+});
+
+router.get('/admin/waitlist', isAuthenticated as RequestHandler, requireAdmin, async (_req: any, res: Response) => {
+  try {
+    const emails = await getWaitlistEmails();
+    res.json({ emails, total: emails.length });
+  } catch (error: any) {
+    console.error('[Waitlist] Error fetching emails:', error?.message || error);
+    res.status(500).json({ error: 'Failed to fetch waitlist' });
   }
 });
 

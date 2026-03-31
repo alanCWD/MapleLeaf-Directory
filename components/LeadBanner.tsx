@@ -1,14 +1,25 @@
 
 import React, { useState } from 'react';
+import { joinWaitlistAPI } from '../services/api';
 
 export const LeadBanner: React.FC = () => {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Newsletter Lead:", email);
-    setIsSubmitted(true);
+    setError(null);
+    setIsLoading(true);
+    try {
+      await joinWaitlistAPI(email);
+      setIsSubmitted(true);
+    } catch (err: any) {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -22,7 +33,6 @@ export const LeadBanner: React.FC = () => {
 
   return (
     <div className="bg-gradient-to-br from-emerald-900 via-[#0a2e1f] to-purple-900 rounded-[32px] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center justify-between gap-8 border border-emerald-800/50 shadow-2xl overflow-hidden relative">
-      {/* Decorative Orbs */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl -ml-24 -mb-24"></div>
       
@@ -32,19 +42,24 @@ export const LeadBanner: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="relative z-10 w-full md:w-auto flex flex-col sm:flex-row gap-3">
-        <input 
-          type="email" 
-          required
-          placeholder="Enter your email" 
-          className="bg-white/10 border border-white/20 text-white placeholder-stone-400 px-6 py-4 rounded-2xl focus:outline-none focus:border-emerald-400 focus:bg-white/20 w-full sm:min-w-[280px] backdrop-blur-md transition-all font-medium"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
+          <input 
+            type="email" 
+            required
+            placeholder="Enter your email" 
+            className="bg-white/10 border border-white/20 text-white placeholder-stone-400 px-6 py-4 rounded-2xl focus:outline-none focus:border-emerald-400 focus:bg-white/20 w-full sm:min-w-[280px] backdrop-blur-md transition-all font-medium"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }}
+            disabled={isLoading}
+          />
+          {error && <p className="text-red-400 text-sm font-medium px-2">{error}</p>}
+        </div>
         <button 
           type="submit"
-          className="bg-emerald-500 hover:bg-emerald-400 text-white px-8 py-4 rounded-2xl font-black transition shadow-lg shadow-emerald-900/40 whitespace-nowrap active:scale-95"
+          disabled={isLoading}
+          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-black transition shadow-lg shadow-emerald-900/40 whitespace-nowrap active:scale-95"
         >
-          Join List
+          {isLoading ? 'Joining…' : 'Join List'}
         </button>
       </form>
     </div>

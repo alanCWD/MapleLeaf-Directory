@@ -410,6 +410,45 @@ export async function getStoreByCustomDomain(domain: string): Promise<Store | nu
   return snakeToCamel(result.rows[0]);
 }
 
+export async function initWaitlistTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS waitlist_emails (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMP DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_waitlist_emails_created ON waitlist_emails(created_at DESC)`);
+  console.log('[DB] waitlist_emails table initialized');
+}
+
+export async function addWaitlistEmail(email: string): Promise<{ id: number; email: string; created_at: string; isNew: boolean }> {
+  const result = await pool.query(
+    `INSERT INTO waitlist_emails (email) VALUES ($1)
+     ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+     RETURNING *, (xmax = 0) as is_new`,
+    [email.toLowerCase().trim()]
+  );
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    created_at: row.created_at?.toISOString() || new Date().toISOString(),
+    isNew: row.is_new,
+  };
+}
+
+export async function getWaitlistEmails(): Promise<{ id: number; email: string; createdAt: string }[]> {
+  const result = await pool.query(
+    `SELECT id, email, created_at FROM waitlist_emails ORDER BY created_at DESC`
+  );
+  return result.rows.map(row => ({
+    id: row.id,
+    email: row.email,
+    createdAt: row.created_at?.toISOString() || new Date().toISOString(),
+  }));
+}
+
 export async function ensureUserProfileColumns(): Promise<void> {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS handle TEXT UNIQUE`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_profile_image_url TEXT`);
