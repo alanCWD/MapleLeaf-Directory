@@ -886,6 +886,7 @@ export interface Drop {
   body: string;
   autoLink: string;
   customLink: string | null;
+  coverImageUrl: string | null;
   status: 'pending_approval' | 'approved' | 'scheduled' | 'sent' | 'rejected' | 'cancelled';
   adminNotes: string | null;
   scheduledAt: string | null;
@@ -914,6 +915,21 @@ export async function ownerGetDrops(storeId: string): Promise<Drop[]> {
 
 export async function ownerCancelDrop(storeId: string, dropId: number): Promise<void> {
   await apiFetch(`/owner/stores/${storeId}/drops/${dropId}`, { method: 'DELETE' });
+}
+
+export async function ownerUploadDropCoverImage(storeId: string, dropId: number, file: File): Promise<{ url: string; drop: Drop }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`/api/owner/stores/${storeId}/drops/${dropId}/cover-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Failed to upload cover image');
+  }
+  return res.json();
 }
 
 export async function adminGetDrops(filters?: {

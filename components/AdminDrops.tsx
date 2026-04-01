@@ -97,12 +97,21 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ drop, onClose, onDone }) => {
           {TYPE_ICONS[drop.type] || '📢'} {drop.type.charAt(0).toUpperCase() + drop.type.slice(1)} · {drop.storeName || drop.storeId}
         </p>
 
-        <div className="bg-stone-50 rounded-2xl p-4 mb-6 border border-stone-200">
-          <p className="font-bold text-stone-800 mb-1">{drop.title}</p>
-          <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap line-clamp-4">{drop.body}</p>
-          <p className="text-xs text-emerald-600 font-medium mt-2 truncate">
-            Link: {drop.customLink || drop.autoLink}
-          </p>
+        <div className="bg-stone-50 rounded-2xl overflow-hidden mb-6 border border-stone-200">
+          {drop.coverImageUrl && (
+            <img
+              src={drop.coverImageUrl}
+              alt="Cover"
+              className="w-full h-40 object-cover"
+            />
+          )}
+          <div className="p-4">
+            <p className="font-bold text-stone-800 mb-1">{drop.title}</p>
+            <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap line-clamp-4">{drop.body}</p>
+            <p className="text-xs text-emerald-600 font-medium mt-2 truncate">
+              Link: {drop.customLink || drop.autoLink}
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -286,7 +295,11 @@ export const AdminDrops: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {drops.map(drop => (
-            <div key={drop.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
+            <div key={drop.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+              {drop.coverImageUrl && (
+                <img src={drop.coverImageUrl} alt="Cover" className="w-full h-36 object-cover" />
+              )}
+              <div className="p-6">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -336,6 +349,7 @@ export const AdminDrops: React.FC = () => {
                   <span className="font-bold">Admin notes: </span>{drop.adminNotes}
                 </div>
               )}
+              </div>
             </div>
           ))}
         </div>

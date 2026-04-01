@@ -185,7 +185,7 @@ function startDropScheduler(): void {
         }
         try {
           const result = await sendDrop(
-            { title: drop.title, body: drop.body, type: drop.type, autoLink: drop.autoLink, customLink: drop.customLink },
+            { title: drop.title, body: drop.body, type: drop.type, autoLink: drop.autoLink, customLink: drop.customLink, coverImageUrl: drop.coverImageUrl },
             { name: drop.storeName || drop.storeId, address: drop.storeAddress },
             emails
           );

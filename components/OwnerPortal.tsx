@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal, ownerCreateDrop, ownerGetDrops, ownerCancelDrop } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal, ownerCreateDrop, ownerGetDrops, ownerCancelDrop, ownerUploadDropCoverImage } from '../services/api';
 import type { Drop } from '../services/api';
 import { VideoUploader } from '../video-review/components/VideoUploader';
 import { PresenceQR } from './PresenceQR';
@@ -285,6 +285,7 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [coverUploadingForDrop, setCoverUploadingForDrop] = useState<number | null>(null);
 
   const loadDrops = async () => {
     setLoading(true);
@@ -303,7 +304,19 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
 
   const autoLink = (store.customDomain && store.domainVerified && store.sovereignPlanStatus === 'active')
     ? `https://${store.customDomain}`
-    : `https://legacyleaf.ca/#/store/${store.id}`;
+    : `https://legacyleafdirectory.ca/#/store/${store.id}`;
+
+  const handleCoverImageUpload = async (dropId: number, file: File) => {
+    setCoverUploadingForDrop(dropId);
+    try {
+      const { drop: updated } = await ownerUploadDropCoverImage(store.id, dropId, file);
+      setDrops(prev => prev.map(d => d.id === updated.id ? updated : d));
+    } catch (err: any) {
+      alert(err.message || 'Failed to upload cover image');
+    } finally {
+      setCoverUploadingForDrop(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -420,7 +433,7 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-stone-500 mb-1">Auto-generated Link</label>
+            <label className="block text-xs font-bold text-stone-500 mb-1">Store Link</label>
             <div className="bg-white border border-stone-200 rounded-xl p-3 text-sm text-emerald-700 font-medium truncate">
               {autoLink}
             </div>
@@ -477,6 +490,15 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
         <div className="space-y-3">
           {drops.map(drop => (
             <div key={drop.id} className="bg-white border border-stone-200 rounded-xl p-4">
+              {drop.coverImageUrl && (
+                <div className="mb-3 rounded-lg overflow-hidden border border-stone-200 -mx-1">
+                  <img
+                    src={drop.coverImageUrl}
+                    alt="Cover"
+                    className="w-full h-32 object-cover"
+                  />
+                </div>
+              )}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -506,6 +528,45 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
                   </button>
                 )}
               </div>
+              {drop.status === 'pending_approval' && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id={`cover-upload-${drop.id}`}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleCoverImageUpload(drop.id, file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <label
+                    htmlFor={`cover-upload-${drop.id}`}
+                    className={`inline-flex items-center gap-1.5 text-xs font-bold cursor-pointer rounded-lg px-3 py-1.5 border transition ${
+                      coverUploadingForDrop === drop.id
+                        ? 'border-stone-200 text-stone-400 bg-stone-50 cursor-not-allowed'
+                        : drop.coverImageUrl
+                        ? 'border-stone-200 text-stone-600 hover:border-emerald-400 hover:text-emerald-600'
+                        : 'border-dashed border-stone-300 text-stone-500 hover:border-emerald-400 hover:text-emerald-600'
+                    }`}
+                  >
+                    {coverUploadingForDrop === drop.id ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
+                        Uploading…
+                      </>
+                    ) : drop.coverImageUrl ? (
+                      <>🖼 Replace Cover Image</>
+                    ) : (
+                      <>📷 Add Cover Image</>
+                    )}
+                  </label>
+                  {drop.coverImageUrl && (
+                    <span className="ml-2 text-xs text-emerald-600 font-medium">Cover image added ✓</span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

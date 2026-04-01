@@ -903,6 +903,7 @@ export interface Drop {
   body: string;
   autoLink: string;
   customLink: string | null;
+  coverImageUrl: string | null;
   status: 'pending_approval' | 'approved' | 'scheduled' | 'sent' | 'rejected' | 'cancelled';
   adminNotes: string | null;
   scheduledAt: string | null;
@@ -923,6 +924,7 @@ function dropSnakeToCamel(row: Record<string, any>): Drop {
     body: row.body,
     autoLink: row.auto_link,
     customLink: row.custom_link || null,
+    coverImageUrl: row.cover_image_url || null,
     status: row.status,
     adminNotes: row.admin_notes || null,
     scheduledAt: row.scheduled_at ? row.scheduled_at.toISOString() : null,
@@ -945,6 +947,7 @@ export async function initDropsTable(): Promise<void> {
       body TEXT NOT NULL,
       auto_link TEXT NOT NULL,
       custom_link TEXT,
+      cover_image_url TEXT,
       status VARCHAR(30) NOT NULL DEFAULT 'pending_approval',
       admin_notes TEXT,
       scheduled_at TIMESTAMP,
@@ -953,6 +956,7 @@ export async function initDropsTable(): Promise<void> {
       updated_at TIMESTAMP DEFAULT now()
     )
   `);
+  await pool.query(`ALTER TABLE drops ADD COLUMN IF NOT EXISTS cover_image_url TEXT`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_store ON drops(store_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_status ON drops(status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_scheduled ON drops(scheduled_at) WHERE status = 'scheduled'`);
@@ -974,6 +978,17 @@ export async function createDrop(data: {
      RETURNING *`,
     [data.storeId, data.userId, data.type, data.title, data.body, data.autoLink, data.customLink || null]
   );
+  return dropSnakeToCamel(result.rows[0]);
+}
+
+export async function updateDropCoverImage(dropId: number, storeId: string, coverImageUrl: string): Promise<Drop | null> {
+  const result = await pool.query(
+    `UPDATE drops SET cover_image_url = $1, updated_at = now()
+     WHERE id = $2 AND store_id = $3 AND status = 'pending_approval'
+     RETURNING *`,
+    [coverImageUrl, dropId, storeId]
+  );
+  if (result.rowCount === 0) return null;
   return dropSnakeToCamel(result.rows[0]);
 }
 

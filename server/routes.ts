@@ -65,7 +65,7 @@ import multer from 'multer';
 import { createVideo, deleteVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
 import { createVideoReviewRouter } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
-import { addWaitlistEmail, getWaitlistEmails, createDrop, getDropsByStore, cancelDrop, adminGetDrops, adminReviewDrop } from './db.ts';
+import { addWaitlistEmail, getWaitlistEmails, createDrop, getDropsByStore, cancelDrop, adminGetDrops, adminReviewDrop, updateDropCoverImage } from './db.ts';
 import { sendWaitlistConfirmation } from './mailer.ts';
 import {
   createPost,
@@ -1800,7 +1800,7 @@ router.get('/admin/waitlist', isAuthenticated as RequestHandler, requireAdmin, a
   }
 });
 
-const MAIN_DOMAIN_FOR_DROPS = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || 'legacyleaf.ca';
+const MAIN_DOMAIN_FOR_DROPS = 'legacyleafdirectory.ca';
 
 function buildAutoLink(store: { id: string; customDomain?: string; domainVerified?: boolean; sovereignPlanStatus?: string }): string {
   if (store.customDomain && store.domainVerified && store.sovereignPlanStatus === 'active') {
@@ -1902,6 +1902,44 @@ router.delete('/owner/stores/:id/drops/:dropId', isAuthenticated as RequestHandl
   } catch (err: any) {
     console.error('[Drops] Error cancelling drop:', err?.message || err);
     res.status(500).json({ error: 'Failed to cancel drop' });
+  }
+});
+
+router.post('/owner/stores/:id/drops/:dropId/cover-image', isAuthenticated as RequestHandler, requireOwnerOrAdmin, imageUpload.single('image'), async (req: any, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const dropId = parseInt(req.params.dropId);
+    const userId = getUserId(req);
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (isNaN(dropId)) { res.status(400).json({ error: 'Invalid drop ID' }); return; }
+    if (!req.file) { res.status(400).json({ error: 'No image file provided' }); return; }
+
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const claimed = await getClaimedStoresForOwner(userId);
+      const owns = claimed.some((s: any) => s.id === storeId);
+      if (!owns) { res.status(403).json({ error: 'You do not own this store' }); return; }
+    }
+
+    let buffer: Buffer = req.file.buffer;
+    if (isHeicBuffer(buffer, req.file.mimetype)) {
+      buffer = await convertHeicToJpegBuffer(buffer);
+    }
+    const processed = await sharp(buffer).resize(1200, 630, { fit: 'cover' }).jpeg({ quality: 88 }).toBuffer();
+    const filename = `drop-cover-${dropId}-${Date.now()}.jpg`;
+    let url: string;
+    if (isBunnyStorageConfigured()) {
+      url = await uploadImageToStorage(processed, filename, 'drop-covers');
+    } else {
+      url = await uploadImageLocal(processed, filename, 'drop-covers');
+    }
+
+    const drop = await updateDropCoverImage(dropId, storeId, url);
+    if (!drop) { res.status(404).json({ error: 'Drop not found or cannot be updated' }); return; }
+    res.json({ url, drop });
+  } catch (err: any) {
+    console.error('[Drops] Error uploading cover image:', err?.message || err);
+    res.status(500).json({ error: 'Failed to upload cover image' });
   }
 });
 

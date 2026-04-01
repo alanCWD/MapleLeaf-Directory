@@ -87,6 +87,7 @@ export async function sendDrop(drop: {
   type: string;
   autoLink: string;
   customLink: string | null;
+  coverImageUrl?: string | null;
 }, store: {
   name: string;
   address?: string;
@@ -102,6 +103,10 @@ export async function sendDrop(drop: {
 
   const ctaUrl = drop.customLink || drop.autoLink;
   const typeLabel = drop.type === 'event' ? 'Event' : drop.type === 'announcement' ? 'Announcement' : 'Product Drop';
+
+  const coverImageBlock = drop.coverImageUrl
+    ? `<tr><td style="padding:0;line-height:0;"><img src="${drop.coverImageUrl}" alt="${escapeHtml(drop.title)}" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:none;" /></td></tr>`
+    : '';
 
   const html = `
 <!DOCTYPE html>
@@ -122,6 +127,7 @@ export async function sendDrop(drop: {
               <p style="margin:8px 0 0;font-size:14px;color:#6ee7a0;font-weight:600;">${escapeHtml(store.name)}</p>
             </td>
           </tr>
+          ${coverImageBlock}
           <tr>
             <td style="padding:36px 40px;">
               <p style="margin:0 0 28px;font-size:16px;color:#a7f3c0;line-height:1.7;white-space:pre-wrap;">${escapeHtml(drop.body)}</p>
