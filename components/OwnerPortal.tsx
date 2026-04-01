@@ -285,6 +285,8 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [formCoverImage, setFormCoverImage] = useState<File | null>(null);
+  const [formCoverPreview, setFormCoverPreview] = useState<string | null>(null);
   const [coverUploadingForDrop, setCoverUploadingForDrop] = useState<number | null>(null);
 
   const loadDrops = async () => {
@@ -326,18 +328,26 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
     if (!formBody.trim()) { setError('Body text is required'); return; }
     setSubmitting(true);
     try {
-      await ownerCreateDrop(store.id, {
+      const newDrop = await ownerCreateDrop(store.id, {
         type: formType,
         title: formTitle.trim(),
         body: formBody.trim(),
         customLink: formCustomLink.trim() || undefined,
       });
+      if (formCoverImage) {
+        try {
+          await ownerUploadDropCoverImage(store.id, newDrop.id, formCoverImage);
+        } catch {
+        }
+      }
       setSuccess('Drop submitted for admin review!');
       setShowForm(false);
       setFormTitle('');
       setFormBody('');
       setFormCustomLink('');
       setFormType('product');
+      setFormCoverImage(null);
+      setFormCoverPreview(null);
       await loadDrops();
     } catch (err: any) {
       setError(err.message || 'Failed to submit drop');
@@ -383,7 +393,7 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
         <form onSubmit={handleSubmit} className="bg-stone-50 border border-stone-200 rounded-2xl p-5 mb-5 space-y-4">
           <div className="flex items-center justify-between">
             <h6 className="font-black text-stone-800 text-sm uppercase tracking-widest">New Drop</h6>
-            <button type="button" onClick={() => { setShowForm(false); setError(''); }} className="text-stone-400 hover:text-stone-600 text-lg leading-none">×</button>
+            <button type="button" onClick={() => { setShowForm(false); setError(''); setFormCoverImage(null); setFormCoverPreview(null); }} className="text-stone-400 hover:text-stone-600 text-lg leading-none">×</button>
           </div>
 
           <div>
@@ -450,6 +460,41 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
               className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
             />
             <p className="text-xs text-stone-400 mt-1">If set, this URL overrides the auto-generated link in the email.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-2">Cover Image <span className="font-normal text-stone-400">(optional · 1200×630 recommended)</span></label>
+            {formCoverPreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-stone-200 mb-2">
+                <img src={formCoverPreview} alt="Cover preview" className="w-full h-36 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { setFormCoverImage(null); setFormCoverPreview(null); }}
+                  className="absolute top-2 right-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-lg hover:bg-black/80 transition"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-stone-300 hover:border-emerald-400 rounded-xl p-6 cursor-pointer transition group">
+                <span className="text-2xl">🖼</span>
+                <span className="text-xs font-bold text-stone-500 group-hover:text-emerald-600 transition">Click to add a cover image</span>
+                <span className="text-xs text-stone-400">JPG, PNG, WebP — shown at the top of the email</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setFormCoverImage(file);
+                      setFormCoverPreview(URL.createObjectURL(file));
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           {error && (
