@@ -1989,6 +1989,9 @@ router.patch('/admin/drops/:id/review', isAuthenticated as RequestHandler, requi
         res.status(400).json({ error: 'scheduledAt must be a future date-time' }); return;
       }
     }
+    if (action === 'reject' && (!adminNotes || !adminNotes.trim())) {
+      res.status(400).json({ error: 'adminNotes (rejection reason) is required when rejecting a drop' }); return;
+    }
 
     const drop = await adminReviewDrop(dropId, action, { scheduledAt, adminNotes });
     if (!drop) { res.status(404).json({ error: 'Drop not found or already reviewed' }); return; }

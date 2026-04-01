@@ -65,6 +65,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ drop, onClose, onDone }) => {
       setError('Please pick a date and time to schedule the send.');
       return;
     }
+    if (action === 'reject' && !adminNotes.trim()) {
+      setError('Please provide a rejection reason to show the store owner.');
+      return;
+    }
     setSubmitting(true);
     try {
       const updated = await adminReviewDrop(drop.id, action, {
