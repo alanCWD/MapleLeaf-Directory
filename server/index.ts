@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, getWaitlistEmails } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, revertDropToScheduled, getWaitlistEmails } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
 import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
@@ -193,6 +193,8 @@ function startDropScheduler(): void {
           console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" sent — ${result.sent} delivered, ${result.failed} failed`);
         } catch (err: any) {
           console.error(`[DropScheduler] Failed to send drop #${drop.id}:`, err?.message || err);
+          await revertDropToScheduled(drop.id);
+          console.log(`[DropScheduler] Drop #${drop.id} reverted to scheduled for retry`);
         }
       }
     } catch (err: any) {

@@ -101,7 +101,9 @@ export async function sendDrop(drop: {
     return { sent: 0, failed: 0 };
   }
 
-  const ctaUrl = drop.customLink || drop.autoLink;
+  const rawUrl = drop.customLink || drop.autoLink;
+  const ctaUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : drop.autoLink;
+  const ctaUrlAttr = ctaUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const typeLabel = drop.type === 'event' ? 'Event' : drop.type === 'announcement' ? 'Announcement' : 'Product Drop';
 
   const coverImageBlock = drop.coverImageUrl
@@ -134,7 +136,7 @@ export async function sendDrop(drop: {
               <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
                 <tr>
                   <td style="background:#16a34a;border-radius:10px;padding:14px 36px;">
-                    <a href="${ctaUrl}" style="color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;letter-spacing:0.5px;">Visit ${escapeHtml(store.name)} →</a>
+                    <a href="${ctaUrlAttr}" style="color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;letter-spacing:0.5px;">Visit ${escapeHtml(store.name)} →</a>
                   </td>
                 </tr>
               </table>

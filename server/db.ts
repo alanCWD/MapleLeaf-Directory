@@ -1079,7 +1079,8 @@ export async function getScheduledDropsDue(): Promise<Drop[]> {
     `SELECT d.*, s.name as store_name, s.address as store_address
      FROM drops d
      LEFT JOIN stores s ON d.store_id = s.id
-     WHERE d.status = 'scheduled' AND d.scheduled_at <= now()
+     WHERE (d.status = 'scheduled' AND d.scheduled_at <= now())
+        OR (d.status = 'sending' AND d.updated_at < now() - interval '10 minutes')
      ORDER BY d.scheduled_at ASC`
   );
   return result.rows.map(dropSnakeToCamel);
@@ -1087,8 +1088,8 @@ export async function getScheduledDropsDue(): Promise<Drop[]> {
 
 export async function markDropSending(dropId: number): Promise<boolean> {
   const result = await pool.query(
-    `UPDATE drops SET status = 'sent', updated_at = now()
-     WHERE id = $1 AND status = 'scheduled'
+    `UPDATE drops SET status = 'sending', updated_at = now()
+     WHERE id = $1 AND status IN ('scheduled', 'sending')
      RETURNING id`,
     [dropId]
   );
@@ -1097,7 +1098,16 @@ export async function markDropSending(dropId: number): Promise<boolean> {
 
 export async function markDropSent(dropId: number): Promise<void> {
   await pool.query(
-    `UPDATE drops SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+    `UPDATE drops SET status = 'sent', sent_at = now(), updated_at = now()
+     WHERE id = $1 AND status = 'sending'`,
+    [dropId]
+  );
+}
+
+export async function revertDropToScheduled(dropId: number): Promise<void> {
+  await pool.query(
+    `UPDATE drops SET status = 'scheduled', updated_at = now()
+     WHERE id = $1 AND status = 'sending'`,
     [dropId]
   );
 }

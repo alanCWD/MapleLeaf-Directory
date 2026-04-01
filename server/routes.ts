@@ -1841,6 +1841,16 @@ router.post('/owner/stores/:id/drops', isAuthenticated as RequestHandler, requir
     if (body.trim().length > 2000) {
       res.status(400).json({ error: 'body must be 2000 characters or fewer' }); return;
     }
+    if (customLink && typeof customLink === 'string' && customLink.trim().length > 0) {
+      try {
+        const parsed = new URL(customLink.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          res.status(400).json({ error: 'customLink must be a valid http or https URL' }); return;
+        }
+      } catch {
+        res.status(400).json({ error: 'customLink must be a valid http or https URL' }); return;
+      }
+    }
 
     const autoLink = buildAutoLink(store);
     const drop = await createDrop({
