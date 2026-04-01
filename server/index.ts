@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, revertDropToScheduled, getWaitlistEmails } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, revertDropToScheduled, resetStuckSendingDrops, getWaitlistEmails } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
 import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
@@ -170,6 +170,11 @@ function startDropScheduler(): void {
     if (running) return;
     running = true;
     try {
+      const stuck = await resetStuckSendingDrops();
+      if (stuck > 0) {
+        console.log(`[DropScheduler] Reset ${stuck} stuck sending drop(s) back to scheduled`);
+      }
+
       const dueDrop = await getScheduledDropsDue();
       if (dueDrop.length === 0) { running = false; return; }
 
@@ -180,21 +185,32 @@ function startDropScheduler(): void {
       for (const drop of dueDrop) {
         const claimed = await markDropSending(drop.id);
         if (!claimed) {
-          console.log(`[DropScheduler] Drop #${drop.id} already processed, skipping`);
+          console.log(`[DropScheduler] Drop #${drop.id} already claimed by another process, skipping`);
           continue;
         }
+
+        let sendSucceeded = false;
         try {
           const result = await sendDrop(
             { title: drop.title, body: drop.body, type: drop.type, autoLink: drop.autoLink, customLink: drop.customLink, coverImageUrl: drop.coverImageUrl },
             { name: drop.storeName || drop.storeId, address: drop.storeAddress },
             emails
           );
-          await markDropSent(drop.id);
-          console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" sent — ${result.sent} delivered, ${result.failed} failed`);
-        } catch (err: any) {
-          console.error(`[DropScheduler] Failed to send drop #${drop.id}:`, err?.message || err);
+          sendSucceeded = true;
+          console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" delivered — ${result.sent} sent, ${result.failed} failed`);
+        } catch (sendErr: any) {
+          console.error(`[DropScheduler] Send failed for drop #${drop.id}:`, sendErr?.message || sendErr);
           await revertDropToScheduled(drop.id);
           console.log(`[DropScheduler] Drop #${drop.id} reverted to scheduled for retry`);
+          continue;
+        }
+
+        if (sendSucceeded) {
+          try {
+            await markDropSent(drop.id);
+          } catch (dbErr: any) {
+            console.error(`[DropScheduler] WARN: drop #${drop.id} was sent but markDropSent failed — manual review needed:`, dbErr?.message || dbErr);
+          }
         }
       }
     } catch (err: any) {
