@@ -93,8 +93,7 @@ export async function sendDrop(drop: {
   address?: string;
 }, recipients: string[]): Promise<{ sent: number; failed: number }> {
   if (!SENDGRID_API_KEY) {
-    console.warn('[Mailer] SENDGRID_API_KEY not set — skipping drop email');
-    return { sent: 0, failed: 0 };
+    throw new Error('[Mailer] SENDGRID_API_KEY not configured — cannot send drop email');
   }
   if (recipients.length === 0) {
     console.warn('[Mailer] No recipients for drop — skipping');
@@ -185,6 +184,10 @@ export async function sendDrop(drop: {
       console.error(`[Mailer] Drop batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`, err?.message || err);
       failed += batch.length;
     }
+  }
+
+  if (failed > 0) {
+    throw new Error(`[Mailer] Drop send incomplete — ${sent} delivered, ${failed} failed. Drop will be retried.`);
   }
 
   return { sent, failed };
