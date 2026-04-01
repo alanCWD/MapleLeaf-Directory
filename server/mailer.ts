@@ -91,13 +91,21 @@ export async function sendDrop(drop: {
 }, store: {
   name: string;
   address?: string;
-}, recipients: string[]): Promise<{ sent: number; failed: number }> {
+}, recipients: string[], options?: {
+  alreadySentEmails?: string[];
+  onBatchSent?: (emails: string[]) => Promise<void>;
+}): Promise<{ sent: number; failed: number; skipped: number }> {
   if (!SENDGRID_API_KEY) {
     throw new Error('[Mailer] SENDGRID_API_KEY not configured — cannot send drop email');
   }
-  if (recipients.length === 0) {
-    console.warn('[Mailer] No recipients for drop — skipping');
-    return { sent: 0, failed: 0 };
+
+  const sentSet = new Set((options?.alreadySentEmails ?? []).map(e => e.toLowerCase()));
+  const remaining = recipients.filter(e => !sentSet.has(e.toLowerCase()));
+  const skipped = recipients.length - remaining.length;
+
+  if (remaining.length === 0) {
+    console.log(`[Mailer] All ${skipped} recipients already received this drop — skipping`);
+    return { sent: 0, failed: 0, skipped };
   }
 
   const rawUrl = drop.customLink || drop.autoLink;
@@ -168,8 +176,9 @@ export async function sendDrop(drop: {
   let sent = 0;
   let failed = 0;
 
-  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-    const batch = recipients.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+    const batch = remaining.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
     try {
       await sgMail.sendMultiple({
         to: batch,
@@ -179,18 +188,21 @@ export async function sendDrop(drop: {
         html,
       });
       sent += batch.length;
-      console.log(`[Mailer] Drop batch ${Math.floor(i / BATCH_SIZE) + 1}: sent to ${batch.length} recipients`);
+      console.log(`[Mailer] Drop batch ${batchNum}: sent to ${batch.length} recipients`);
+      if (options?.onBatchSent) {
+        await options.onBatchSent(batch);
+      }
     } catch (err: any) {
-      console.error(`[Mailer] Drop batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`, err?.message || err);
+      console.error(`[Mailer] Drop batch ${batchNum} failed:`, err?.message || err);
       failed += batch.length;
     }
   }
 
   if (failed > 0) {
-    throw new Error(`[Mailer] Drop send incomplete — ${sent} delivered, ${failed} failed. Drop will be retried.`);
+    throw new Error(`[Mailer] Drop send incomplete — ${sent} delivered, ${failed} failed (${skipped} already sent). Drop will be retried for remaining recipients.`);
   }
 
-  return { sent, failed };
+  return { sent, failed, skipped };
 }
 
 function escapeHtml(str: string): string {

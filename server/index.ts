@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, revertDropToScheduled, resetStuckSendingDrops, getWaitlistEmails } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, revertDropToScheduled, resetStuckSendingDrops, getWaitlistEmails, getDropSentEmails, recordDropSends } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
 import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
@@ -191,13 +191,18 @@ function startDropScheduler(): void {
 
         let sendSucceeded = false;
         try {
+          const alreadySent = await getDropSentEmails(drop.id);
           const result = await sendDrop(
             { title: drop.title, body: drop.body, type: drop.type, autoLink: drop.autoLink, customLink: drop.customLink, coverImageUrl: drop.coverImageUrl },
             { name: drop.storeName || drop.storeId, address: drop.storeAddress },
-            emails
+            emails,
+            {
+              alreadySentEmails: alreadySent,
+              onBatchSent: (batch) => recordDropSends(drop.id, batch),
+            }
           );
           sendSucceeded = true;
-          console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" delivered — ${result.sent} sent, ${result.failed} failed`);
+          console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" — ${result.sent} sent, ${result.skipped} already sent, ${result.failed} failed`);
         } catch (sendErr: any) {
           console.error(`[DropScheduler] Send failed for drop #${drop.id}:`, sendErr?.message || sendErr);
           await revertDropToScheduled(drop.id);

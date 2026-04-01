@@ -960,7 +960,33 @@ export async function initDropsTable(): Promise<void> {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_store ON drops(store_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_status ON drops(status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_scheduled ON drops(scheduled_at) WHERE status = 'scheduled'`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS drop_sends (
+      drop_id INTEGER NOT NULL REFERENCES drops(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      sent_at TIMESTAMP DEFAULT now(),
+      PRIMARY KEY (drop_id, email)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_drop_sends_drop ON drop_sends(drop_id)`);
   console.log('[DB] drops table initialized');
+}
+
+export async function getDropSentEmails(dropId: number): Promise<string[]> {
+  const result = await pool.query(
+    `SELECT email FROM drop_sends WHERE drop_id = $1`,
+    [dropId]
+  );
+  return result.rows.map((r: { email: string }) => r.email);
+}
+
+export async function recordDropSends(dropId: number, emails: string[]): Promise<void> {
+  if (emails.length === 0) return;
+  const placeholders = emails.map((_, i) => `($1, $${i + 2})`).join(', ');
+  await pool.query(
+    `INSERT INTO drop_sends (drop_id, email) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    [dropId, ...emails]
+  );
 }
 
 export async function createDrop(data: {
