@@ -1977,8 +1977,17 @@ router.patch('/admin/drops/:id/review', isAuthenticated as RequestHandler, requi
     if (!action || !['approve', 'reject'].includes(action)) {
       res.status(400).json({ error: 'action must be approve or reject' }); return;
     }
-    if (action === 'approve' && !scheduledAt) {
-      res.status(400).json({ error: 'scheduledAt is required when approving' }); return;
+    if (action === 'approve') {
+      if (!scheduledAt) {
+        res.status(400).json({ error: 'scheduledAt is required when approving' }); return;
+      }
+      const schedDate = new Date(scheduledAt);
+      if (isNaN(schedDate.getTime())) {
+        res.status(400).json({ error: 'scheduledAt must be a valid ISO date-time string' }); return;
+      }
+      if (schedDate.getTime() <= Date.now()) {
+        res.status(400).json({ error: 'scheduledAt must be a future date-time' }); return;
+      }
     }
 
     const drop = await adminReviewDrop(dropId, action, { scheduledAt, adminNotes });

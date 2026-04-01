@@ -904,7 +904,7 @@ export interface Drop {
   autoLink: string;
   customLink: string | null;
   coverImageUrl: string | null;
-  status: 'pending_approval' | 'approved' | 'scheduled' | 'sent' | 'rejected' | 'cancelled';
+  status: 'pending_approval' | 'scheduled' | 'sending' | 'sent' | 'rejected' | 'cancelled';
   adminNotes: string | null;
   scheduledAt: string | null;
   sentAt: string | null;
