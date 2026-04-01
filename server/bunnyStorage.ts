@@ -1,11 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const BUNNY_STORAGE_ZONE = () => process.env.BUNNY_STORAGE_ZONE || '';
 const BUNNY_STORAGE_API_KEY = () => process.env.BUNNY_STORAGE_API_KEY || '';
 const BUNNY_STORAGE_CDN_URL = () => process.env.BUNNY_STORAGE_CDN_URL || '';
 const BUNNY_STORAGE_HOSTNAME = () => process.env.BUNNY_STORAGE_HOSTNAME || 'storage.bunnycdn.com';
+const BUNNY_CDN_AUTH_TOKEN = () => process.env.BUNNY_CDN_AUTH_TOKEN || '';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCAL_UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
@@ -82,4 +84,34 @@ export async function deleteImageFromStorage(
     const text = await res.text();
     console.error(`Bunny Storage delete failed (${res.status}): ${text}`);
   }
+}
+
+export function signBunnyCdnUrl(url: string, expiresInSeconds: number = 7200): string {
+  const authToken = BUNNY_CDN_AUTH_TOKEN();
+  if (!authToken) return url;
+  try {
+    const parsed = new URL(url);
+    const urlPath = decodeURIComponent(parsed.pathname);
+    const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
+    const hashInput = authToken + urlPath + expires;
+    const token = crypto.createHash('sha256')
+      .update(hashInput)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    parsed.searchParams.set('token', token);
+    parsed.searchParams.set('expires', String(expires));
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+export function isBunnyCdnUrl(url: string): boolean {
+  const cdnBase = BUNNY_STORAGE_CDN_URL();
+  if (cdnBase && url.startsWith(cdnBase)) return true;
+  const zone = BUNNY_STORAGE_ZONE();
+  if (zone && url.includes(`${zone}.b-cdn.net`)) return true;
+  return false;
 }

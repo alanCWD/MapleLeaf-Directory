@@ -85,7 +85,7 @@ import {
   moderateCleanContent,
 } from './posts.ts';
 import type { PostStatus, ContentTier, CreatorPost } from '../types';
-import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal } from './bunnyStorage.ts';
+import { uploadImageToStorage, isBunnyStorageConfigured, uploadImageLocal, signBunnyCdnUrl, isBunnyCdnUrl } from './bunnyStorage.ts';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -211,6 +211,13 @@ router.use('/', createMicrositeRouter({
 }));
 
 router.use('/', createVideoReviewRouter(legacyleafVideoAdapter));
+
+function signDropCover<T extends { coverImageUrl?: string | null }>(drop: T): T {
+  if (drop.coverImageUrl && isBunnyCdnUrl(drop.coverImageUrl)) {
+    return { ...drop, coverImageUrl: signBunnyCdnUrl(drop.coverImageUrl, 7200) };
+  }
+  return drop;
+}
 
 router.post('/search', async (req: Request, res: Response) => {
   try {
@@ -1884,7 +1891,7 @@ router.get('/owner/stores/:id/drops', isAuthenticated as RequestHandler, require
     }
 
     const drops = await getDropsByStore(storeId);
-    res.json(drops);
+    res.json(drops.map(signDropCover));
   } catch (err: any) {
     console.error('[Drops] Error fetching drops:', err?.message || err);
     res.status(500).json({ error: 'Failed to fetch drops' });
@@ -1963,7 +1970,7 @@ router.get('/admin/drops', isAuthenticated as RequestHandler, requireAdmin, asyn
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
     });
-    res.json(result);
+    res.json({ ...result, drops: result.drops.map(signDropCover) });
   } catch (err: any) {
     console.error('[Drops] Error fetching admin drops:', err?.message || err);
     res.status(500).json({ error: 'Failed to fetch drops' });

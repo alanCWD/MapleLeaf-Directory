@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { signBunnyCdnUrl, isBunnyCdnUrl } from './bunnyStorage.ts';
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@legacyleaf.ca';
@@ -113,8 +114,13 @@ export async function sendDrop(drop: {
   const ctaUrlAttr = ctaUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const typeLabel = drop.type === 'event' ? 'Event' : drop.type === 'announcement' ? 'Announcement' : 'Product Drop';
 
-  const coverImageBlock = drop.coverImageUrl
-    ? `<tr><td style="padding:0;line-height:0;"><img src="${drop.coverImageUrl}" alt="${escapeHtml(drop.title)}" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:none;" /></td></tr>`
+  const ONE_YEAR_S = 365 * 24 * 3600;
+  const signedCoverUrl = drop.coverImageUrl && isBunnyCdnUrl(drop.coverImageUrl)
+    ? signBunnyCdnUrl(drop.coverImageUrl, ONE_YEAR_S)
+    : drop.coverImageUrl;
+
+  const coverImageBlock = signedCoverUrl
+    ? `<tr><td style="padding:0;line-height:0;"><img src="${signedCoverUrl}" alt="${escapeHtml(drop.title)}" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:none;" /></td></tr>`
     : '';
 
   const html = `
