@@ -16,6 +16,7 @@ import { AdminUsers } from './components/AdminUsers';
 import { AdminStores } from './components/AdminStores';
 import { AdminBranding } from './components/AdminBranding';
 import { AdminWaitlist } from './components/AdminWaitlist';
+import { AdminDrops } from './components/AdminDrops';
 import { CommunitySubmit } from './components/CommunitySubmit';
 import { AuthPage } from './components/AuthPage';
 import { BadgeProgress } from './components/BadgeProgress';
@@ -545,6 +546,7 @@ const DirectoryApp: React.FC = () => {
             <Route path="/admin/stores" element={<AdminStores />} />
             <Route path="/admin/branding" element={<AdminBranding />} />
             <Route path="/admin/waitlist" element={<AdminWaitlist />} />
+            <Route path="/admin/drops" element={<AdminDrops />} />
             <Route path="/posts" element={<PostFeed />} />
             <Route path="/posts/create" element={<CreatePost />} />
             <Route path="/posts/:id" element={<PostDetailPage />} />

@@ -894,6 +894,199 @@ export async function searchStoresInDb(query: string): Promise<Store[]> {
   return Array.from(seen.values());
 }
 
+export interface Drop {
+  id: number;
+  storeId: string;
+  userId: string;
+  type: 'product' | 'event' | 'announcement';
+  title: string;
+  body: string;
+  autoLink: string;
+  customLink: string | null;
+  status: 'pending_approval' | 'approved' | 'scheduled' | 'sent' | 'rejected' | 'cancelled';
+  adminNotes: string | null;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  storeName?: string;
+  storeAddress?: string;
+}
+
+function dropSnakeToCamel(row: Record<string, any>): Drop {
+  return {
+    id: row.id,
+    storeId: row.store_id,
+    userId: row.user_id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    autoLink: row.auto_link,
+    customLink: row.custom_link || null,
+    status: row.status,
+    adminNotes: row.admin_notes || null,
+    scheduledAt: row.scheduled_at ? row.scheduled_at.toISOString() : null,
+    sentAt: row.sent_at ? row.sent_at.toISOString() : null,
+    createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
+    updatedAt: row.updated_at ? row.updated_at.toISOString() : new Date().toISOString(),
+    storeName: row.store_name || undefined,
+    storeAddress: row.store_address || undefined,
+  };
+}
+
+export async function initDropsTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS drops (
+      id SERIAL PRIMARY KEY,
+      store_id VARCHAR(500) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+      user_id VARCHAR(500) NOT NULL,
+      type VARCHAR(30) NOT NULL DEFAULT 'product',
+      title VARCHAR(500) NOT NULL,
+      body TEXT NOT NULL,
+      auto_link TEXT NOT NULL,
+      custom_link TEXT,
+      status VARCHAR(30) NOT NULL DEFAULT 'pending_approval',
+      admin_notes TEXT,
+      scheduled_at TIMESTAMP,
+      sent_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT now(),
+      updated_at TIMESTAMP DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_store ON drops(store_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_status ON drops(status)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_drops_scheduled ON drops(scheduled_at) WHERE status = 'scheduled'`);
+  console.log('[DB] drops table initialized');
+}
+
+export async function createDrop(data: {
+  storeId: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  autoLink: string;
+  customLink?: string;
+}): Promise<Drop> {
+  const result = await pool.query(
+    `INSERT INTO drops (store_id, user_id, type, title, body, auto_link, custom_link, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending_approval')
+     RETURNING *`,
+    [data.storeId, data.userId, data.type, data.title, data.body, data.autoLink, data.customLink || null]
+  );
+  return dropSnakeToCamel(result.rows[0]);
+}
+
+export async function getDropsByStore(storeId: string): Promise<Drop[]> {
+  const result = await pool.query(
+    `SELECT * FROM drops WHERE store_id = $1 ORDER BY created_at DESC`,
+    [storeId]
+  );
+  return result.rows.map(dropSnakeToCamel);
+}
+
+export async function cancelDrop(dropId: number, storeId: string): Promise<boolean> {
+  const result = await pool.query(
+    `UPDATE drops SET status = 'cancelled', updated_at = now()
+     WHERE id = $1 AND store_id = $2 AND status = 'pending_approval'
+     RETURNING id`,
+    [dropId, storeId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function adminGetDrops(filters: {
+  status?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<{ drops: Drop[]; total: number }> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 1;
+
+  if (filters.status) {
+    conditions.push(`d.status = $${idx++}`);
+    params.push(filters.status);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = filters.limit || 50;
+  const offset = ((filters.page || 1) - 1) * limit;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM drops d ${where}`, params
+  );
+  const total = parseInt(countResult.rows[0].count);
+
+  const result = await pool.query(
+    `SELECT d.*, s.name as store_name, s.address as store_address
+     FROM drops d
+     LEFT JOIN stores s ON d.store_id = s.id
+     ${where}
+     ORDER BY d.created_at DESC
+     LIMIT $${idx++} OFFSET $${idx++}`,
+    [...params, limit, offset]
+  );
+
+  return { drops: result.rows.map(dropSnakeToCamel), total };
+}
+
+export async function adminReviewDrop(
+  dropId: number,
+  action: 'approve' | 'reject',
+  data: { scheduledAt?: string; adminNotes?: string }
+): Promise<Drop | null> {
+  if (action === 'approve') {
+    const result = await pool.query(
+      `UPDATE drops
+       SET status = 'scheduled', scheduled_at = $2, admin_notes = $3, updated_at = now()
+       WHERE id = $1 AND status = 'pending_approval'
+       RETURNING *`,
+      [dropId, data.scheduledAt || null, data.adminNotes || null]
+    );
+    if (result.rows.length === 0) return null;
+    return dropSnakeToCamel(result.rows[0]);
+  } else {
+    const result = await pool.query(
+      `UPDATE drops
+       SET status = 'rejected', admin_notes = $2, updated_at = now()
+       WHERE id = $1 AND status = 'pending_approval'
+       RETURNING *`,
+      [dropId, data.adminNotes || null]
+    );
+    if (result.rows.length === 0) return null;
+    return dropSnakeToCamel(result.rows[0]);
+  }
+}
+
+export async function getScheduledDropsDue(): Promise<Drop[]> {
+  const result = await pool.query(
+    `SELECT d.*, s.name as store_name, s.address as store_address
+     FROM drops d
+     LEFT JOIN stores s ON d.store_id = s.id
+     WHERE d.status = 'scheduled' AND d.scheduled_at <= now()
+     ORDER BY d.scheduled_at ASC`
+  );
+  return result.rows.map(dropSnakeToCamel);
+}
+
+export async function markDropSending(dropId: number): Promise<boolean> {
+  const result = await pool.query(
+    `UPDATE drops SET status = 'sent', updated_at = now()
+     WHERE id = $1 AND status = 'scheduled'
+     RETURNING id`,
+    [dropId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function markDropSent(dropId: number): Promise<void> {
+  await pool.query(
+    `UPDATE drops SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+    [dropId]
+  );
+}
+
 export async function cleanupTestReviews(): Promise<void> {
   try {
     const reviews = await pool.query(

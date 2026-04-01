@@ -5,12 +5,13 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupAuth, registerAuthRoutes } from './replit_integrations/auth/index.ts';
 import router from './routes.ts';
-import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable } from './db.ts';
+import { seedStoresFromFile, initAuditLogTable, ensureHeaderImageColumn, ensureUserProfileColumns, ensureStorePhotosColumn, cleanupTestReviews, initWaitlistTable, initDropsTable, getScheduledDropsDue, markDropSending, markDropSent, getWaitlistEmails } from './db.ts';
 import { ensureCustomDomainColumns, ensureSovereignPlanColumns } from '../microsite/server/db.ts';
 import { initIntegrityEngine } from './integrity/index.ts';
 import { mountVideoReviewWebhook } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
 import { WebhookHandlers } from './webhookHandlers.ts';
+import { sendDrop } from './mailer.ts';
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.ts';
 import { createTenantMiddleware } from '../microsite/server/middleware.ts';
@@ -91,6 +92,7 @@ async function startServer() {
   await ensureSovereignPlanColumns();
   await cleanupTestReviews();
   await initWaitlistTable();
+  await initDropsTable();
 
   const MAIN_DOMAIN = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || '';
   app.use(createTenantMiddleware(legacyleafAdapter, MAIN_DOMAIN));
@@ -156,7 +158,52 @@ async function startServer() {
       console.error('[Seed] Error during store seeding:', err);
     }
     initStripe().catch((err: any) => console.error('[Stripe] Background init error:', err.message));
+    startDropScheduler();
   });
+}
+
+function startDropScheduler(): void {
+  const INTERVAL_MS = 60 * 1000;
+  let running = false;
+
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const dueDrop = await getScheduledDropsDue();
+      if (dueDrop.length === 0) { running = false; return; }
+
+      console.log(`[DropScheduler] ${dueDrop.length} drop(s) due for sending`);
+      const recipients = await getWaitlistEmails();
+      const emails = recipients.map((r: { email: string }) => r.email);
+
+      for (const drop of dueDrop) {
+        const claimed = await markDropSending(drop.id);
+        if (!claimed) {
+          console.log(`[DropScheduler] Drop #${drop.id} already processed, skipping`);
+          continue;
+        }
+        try {
+          const result = await sendDrop(
+            { title: drop.title, body: drop.body, type: drop.type, autoLink: drop.autoLink, customLink: drop.customLink },
+            { name: drop.storeName || drop.storeId, address: drop.storeAddress },
+            emails
+          );
+          await markDropSent(drop.id);
+          console.log(`[DropScheduler] Drop #${drop.id} "${drop.title}" sent — ${result.sent} delivered, ${result.failed} failed`);
+        } catch (err: any) {
+          console.error(`[DropScheduler] Failed to send drop #${drop.id}:`, err?.message || err);
+        }
+      }
+    } catch (err: any) {
+      console.error('[DropScheduler] Tick error:', err?.message || err);
+    } finally {
+      running = false;
+    }
+  };
+
+  setInterval(tick, INTERVAL_MS);
+  console.log(`[DropScheduler] Started — polling every ${INTERVAL_MS / 1000}s`);
 }
 
 startServer().catch((err) => {

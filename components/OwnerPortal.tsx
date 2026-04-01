@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal } from '../services/api';
+import { createClaimAPI, getUserClaimsAPI, getOwnedStoresAPI, updateOwnedStoreAPI, fetchStoreMedia, deleteMedia, fetchStores, ownerUploadStoreHeaderImage, ownerUploadStorePhoto, ownerDeleteStorePhoto, ownerSaveStoreDomain, ownerVerifyStoreDomain, ownerUploadStoreLogo, ownerCreateCheckout, ownerGetBillingPortal, ownerCreateDrop, ownerGetDrops, ownerCancelDrop } from '../services/api';
+import type { Drop } from '../services/api';
 import { VideoUploader } from '../video-review/components/VideoUploader';
 import { PresenceQR } from './PresenceQR';
 import type { Store, StoreMedia, ThemeConfig, FontPairing } from '../types';
@@ -242,6 +243,276 @@ const ClaimStoreSection: React.FC = () => {
 };
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const DROP_TYPE_OPTIONS = [
+  { value: 'product', label: '📦 Product Drop', description: 'Showcase a new or featured product' },
+  { value: 'event', label: '📅 Event', description: 'Promote an upcoming event at your store' },
+  { value: 'announcement', label: '📢 Announcement', description: 'Share a general announcement or news' },
+];
+
+const DROP_STATUS_COLORS: Record<string, string> = {
+  pending_approval: 'bg-amber-100 text-amber-800',
+  scheduled: 'bg-blue-100 text-blue-800',
+  sent: 'bg-emerald-100 text-emerald-800',
+  rejected: 'bg-red-100 text-red-800',
+  cancelled: 'bg-stone-200 text-stone-600',
+};
+
+const DROP_STATUS_LABELS: Record<string, string> = {
+  pending_approval: 'Pending Review',
+  scheduled: 'Scheduled',
+  sent: 'Sent',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+};
+
+const formatDropDate = (iso: string | null) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-CA', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+};
+
+const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
+  const [drops, setDrops] = useState<Drop[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formType, setFormType] = useState('product');
+  const [formTitle, setFormTitle] = useState('');
+  const [formBody, setFormBody] = useState('');
+  const [formCustomLink, setFormCustomLink] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const loadDrops = async () => {
+    setLoading(true);
+    try {
+      const data = await ownerGetDrops(store.id);
+      setDrops(data);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDrops();
+  }, [store.id]);
+
+  const autoLink = (store.customDomain && store.domainVerified && store.sovereignPlanStatus === 'active')
+    ? `https://${store.customDomain}`
+    : `https://legacyleaf.ca/#/store/${store.id}`;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!formTitle.trim()) { setError('Title is required'); return; }
+    if (!formBody.trim()) { setError('Body text is required'); return; }
+    setSubmitting(true);
+    try {
+      await ownerCreateDrop(store.id, {
+        type: formType,
+        title: formTitle.trim(),
+        body: formBody.trim(),
+        customLink: formCustomLink.trim() || undefined,
+      });
+      setSuccess('Drop submitted for admin review!');
+      setShowForm(false);
+      setFormTitle('');
+      setFormBody('');
+      setFormCustomLink('');
+      setFormType('product');
+      await loadDrops();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit drop');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = async (dropId: number) => {
+    if (!confirm('Cancel this drop submission?')) return;
+    try {
+      await ownerCancelDrop(store.id, dropId);
+      setDrops(prev => prev.map(d => d.id === dropId ? { ...d, status: 'cancelled' as const } : d));
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel drop');
+    }
+  };
+
+  return (
+    <div className="border-t border-stone-100 mt-6 pt-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h5 className="font-black text-stone-800 text-base">Email Drops</h5>
+          <p className="text-xs text-stone-400 font-medium">Promote products & events to the Legacy Leaf mailing list</p>
+        </div>
+        {!showForm && (
+          <button
+            onClick={() => { setShowForm(true); setError(''); setSuccess(''); }}
+            className="flex items-center gap-1.5 bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-400 transition"
+          >
+            <span>+</span> New Drop
+          </button>
+        )}
+      </div>
+
+      {success && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl text-sm font-medium mb-4">
+          {success}
+        </div>
+      )}
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-stone-50 border border-stone-200 rounded-2xl p-5 mb-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h6 className="font-black text-stone-800 text-sm uppercase tracking-widest">New Drop</h6>
+            <button type="button" onClick={() => { setShowForm(false); setError(''); }} className="text-stone-400 hover:text-stone-600 text-lg leading-none">×</button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-2">Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {DROP_TYPE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFormType(opt.value)}
+                  className={`p-3 rounded-xl text-xs font-bold border-2 text-left transition ${
+                    formType === opt.value ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-stone-200 text-stone-600 hover:border-stone-300'
+                  }`}
+                >
+                  <div>{opt.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-1">
+              Title <span className="text-stone-400 font-normal">({formTitle.length}/200)</span>
+            </label>
+            <input
+              type="text"
+              value={formTitle}
+              onChange={e => setFormTitle(e.target.value)}
+              maxLength={200}
+              placeholder="e.g. Harvest Special — 20% Off All Flower"
+              className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-1">
+              Body <span className="text-stone-400 font-normal">({formBody.length}/2000)</span>
+            </label>
+            <textarea
+              value={formBody}
+              onChange={e => setFormBody(e.target.value)}
+              maxLength={2000}
+              rows={4}
+              placeholder="Describe your product, event, or announcement…"
+              className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-1">Auto-generated Link</label>
+            <div className="bg-white border border-stone-200 rounded-xl p-3 text-sm text-emerald-700 font-medium truncate">
+              {autoLink}
+            </div>
+            <p className="text-xs text-stone-400 mt-1">This link points to your store page and will appear in the email as the call-to-action.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-500 mb-1">Custom Link Override <span className="font-normal text-stone-400">(optional)</span></label>
+            <input
+              type="url"
+              value={formCustomLink}
+              onChange={e => setFormCustomLink(e.target.value)}
+              placeholder="https://your-store.com/special-offer"
+              className="w-full bg-white border border-stone-200 rounded-xl p-3 text-sm focus:border-emerald-400 outline-none"
+            />
+            <p className="text-xs text-stone-400 mt-1">If set, this URL overrides the auto-generated link in the email.</p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-medium">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-400 transition disabled:opacity-40"
+            >
+              {submitting ? 'Submitting…' : 'Submit for Review'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); setError(''); }}
+              className="px-4 py-3 rounded-xl border border-stone-200 text-sm font-bold text-stone-500 hover:bg-stone-50 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {loading ? (
+        <div className="py-6 flex justify-center">
+          <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : drops.length === 0 ? (
+        <div className="text-center py-6 text-stone-400">
+          <div className="text-3xl mb-2">📬</div>
+          <p className="text-sm font-medium">No drops yet. Create one to promote your store to the mailing list.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {drops.map(drop => (
+            <div key={drop.id} className="bg-white border border-stone-200 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${DROP_STATUS_COLORS[drop.status] || 'bg-stone-100 text-stone-600'}`}>
+                      {DROP_STATUS_LABELS[drop.status] || drop.status}
+                    </span>
+                    <span className="text-xs text-stone-400 font-medium capitalize">{drop.type}</span>
+                  </div>
+                  <p className="font-bold text-stone-800 text-sm truncate">{drop.title}</p>
+                  <p className="text-xs text-stone-400 mt-0.5">{formatDropDate(drop.createdAt)}</p>
+                  {drop.scheduledAt && (
+                    <p className="text-xs text-blue-600 font-medium mt-0.5">Scheduled: {formatDropDate(drop.scheduledAt)}</p>
+                  )}
+                  {drop.sentAt && (
+                    <p className="text-xs text-emerald-600 font-medium mt-0.5">Sent: {formatDropDate(drop.sentAt)}</p>
+                  )}
+                  {drop.adminNotes && drop.status === 'rejected' && (
+                    <p className="text-xs text-red-600 mt-1 italic">"{drop.adminNotes}"</p>
+                  )}
+                </div>
+                {drop.status === 'pending_approval' && (
+                  <button
+                    onClick={() => handleCancel(drop.id)}
+                    className="text-xs text-stone-400 hover:text-red-500 font-bold transition flex-shrink-0 px-2 py-1 rounded-lg hover:bg-red-50"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const OwnedStoresSection: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
@@ -645,6 +916,7 @@ const OwnedStoresSection: React.FC = () => {
               onUpdate={updated => setStores(prev => prev.map(s => s.id === updated.id ? updated : s))}
               showUpgradeSuccess={showUpgradeSuccess}
             />
+            <StoreDropsSection store={store} />
           </div>
         ))}
       </div>

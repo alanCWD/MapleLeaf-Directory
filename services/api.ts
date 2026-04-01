@@ -877,6 +877,68 @@ export async function adminDeleteBrandingAsset(
   });
 }
 
+export interface Drop {
+  id: number;
+  storeId: string;
+  userId: string;
+  type: 'product' | 'event' | 'announcement';
+  title: string;
+  body: string;
+  autoLink: string;
+  customLink: string | null;
+  status: 'pending_approval' | 'approved' | 'scheduled' | 'sent' | 'rejected' | 'cancelled';
+  adminNotes: string | null;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  storeName?: string;
+  storeAddress?: string;
+}
+
+export async function ownerCreateDrop(storeId: string, data: {
+  type: string;
+  title: string;
+  body: string;
+  customLink?: string;
+}): Promise<Drop> {
+  return apiFetch<Drop>(`/owner/stores/${storeId}/drops`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function ownerGetDrops(storeId: string): Promise<Drop[]> {
+  return apiFetch<Drop[]>(`/owner/stores/${storeId}/drops`);
+}
+
+export async function ownerCancelDrop(storeId: string, dropId: number): Promise<void> {
+  await apiFetch(`/owner/stores/${storeId}/drops/${dropId}`, { method: 'DELETE' });
+}
+
+export async function adminGetDrops(filters?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ drops: Drop[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.page) params.set('page', String(filters.page));
+  if (filters?.limit) params.set('limit', String(filters.limit));
+  const qs = params.toString();
+  return apiFetch<{ drops: Drop[]; total: number }>(`/admin/drops${qs ? `?${qs}` : ''}`);
+}
+
+export async function adminReviewDrop(dropId: number, action: 'approve' | 'reject', data: {
+  scheduledAt?: string;
+  adminNotes?: string;
+}): Promise<Drop> {
+  return apiFetch<Drop>(`/admin/drops/${dropId}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action, ...data }),
+  });
+}
+
 export async function joinWaitlistAPI(email: string): Promise<{ success: boolean; alreadySubscribed: boolean }> {
   return apiFetch<{ success: boolean; alreadySubscribed: boolean }>('/waitlist', {
     method: 'POST',

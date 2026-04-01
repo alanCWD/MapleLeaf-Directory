@@ -65,7 +65,7 @@ import multer from 'multer';
 import { createVideo, deleteVideo, generateTusCredentials, getEmbedUrl, isBunnyConfigured } from './bunnyStream.ts';
 import { createVideoReviewRouter } from '../video-review/server/routes.ts';
 import { legacyleafVideoAdapter } from '../video-review/legacyleaf-adapter.ts';
-import { addWaitlistEmail, getWaitlistEmails } from './db.ts';
+import { addWaitlistEmail, getWaitlistEmails, createDrop, getDropsByStore, cancelDrop, adminGetDrops, adminReviewDrop } from './db.ts';
 import { sendWaitlistConfirmation } from './mailer.ts';
 import {
   createPost,
@@ -1797,6 +1797,157 @@ router.get('/admin/waitlist', isAuthenticated as RequestHandler, requireAdmin, a
   } catch (error: any) {
     console.error('[Waitlist] Error fetching emails:', error?.message || error);
     res.status(500).json({ error: 'Failed to fetch waitlist' });
+  }
+});
+
+const MAIN_DOMAIN_FOR_DROPS = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim() || 'legacyleaf.ca';
+
+function buildAutoLink(store: { id: string; customDomain?: string; domainVerified?: boolean; sovereignPlanStatus?: string }): string {
+  if (store.customDomain && store.domainVerified && store.sovereignPlanStatus === 'active') {
+    return `https://${store.customDomain}`;
+  }
+  return `https://${MAIN_DOMAIN_FOR_DROPS}/#/store/${store.id}`;
+}
+
+router.post('/owner/stores/:id/drops', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req);
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const claimed = await getClaimedStoresForOwner(userId);
+      const owns = claimed.some((s: any) => s.id === storeId);
+      if (!owns) { res.status(403).json({ error: 'You do not own this store' }); return; }
+    }
+
+    const store = await getStoreById(storeId);
+    if (!store) { res.status(404).json({ error: 'Store not found' }); return; }
+
+    const { type, title, body, customLink } = req.body;
+    if (!type || !['product', 'event', 'announcement'].includes(type)) {
+      res.status(400).json({ error: 'type must be product, event, or announcement' }); return;
+    }
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      res.status(400).json({ error: 'title is required' }); return;
+    }
+    if (!body || typeof body !== 'string' || body.trim().length === 0) {
+      res.status(400).json({ error: 'body is required' }); return;
+    }
+    if (title.trim().length > 200) {
+      res.status(400).json({ error: 'title must be 200 characters or fewer' }); return;
+    }
+    if (body.trim().length > 2000) {
+      res.status(400).json({ error: 'body must be 2000 characters or fewer' }); return;
+    }
+
+    const autoLink = buildAutoLink(store);
+    const drop = await createDrop({
+      storeId,
+      userId,
+      type: type.trim(),
+      title: title.trim(),
+      body: body.trim(),
+      autoLink,
+      customLink: customLink?.trim() || undefined,
+    });
+
+    res.status(201).json(drop);
+  } catch (err: any) {
+    console.error('[Drops] Error creating drop:', err?.message || err);
+    res.status(500).json({ error: 'Failed to create drop' });
+  }
+});
+
+router.get('/owner/stores/:id/drops', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const userId = getUserId(req);
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const claimed = await getClaimedStoresForOwner(userId);
+      const owns = claimed.some((s: any) => s.id === storeId);
+      if (!owns) { res.status(403).json({ error: 'You do not own this store' }); return; }
+    }
+
+    const drops = await getDropsByStore(storeId);
+    res.json(drops);
+  } catch (err: any) {
+    console.error('[Drops] Error fetching drops:', err?.message || err);
+    res.status(500).json({ error: 'Failed to fetch drops' });
+  }
+});
+
+router.delete('/owner/stores/:id/drops/:dropId', isAuthenticated as RequestHandler, requireOwnerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const storeId = paramId(req.params);
+    const dropId = parseInt(req.params.dropId);
+    const userId = getUserId(req);
+    if (!userId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (isNaN(dropId)) { res.status(400).json({ error: 'Invalid drop ID' }); return; }
+
+    const role = await getUserRole(userId);
+    if (role !== 'admin') {
+      const claimed = await getClaimedStoresForOwner(userId);
+      const owns = claimed.some((s: any) => s.id === storeId);
+      if (!owns) { res.status(403).json({ error: 'You do not own this store' }); return; }
+    }
+
+    const cancelled = await cancelDrop(dropId, storeId);
+    if (!cancelled) { res.status(404).json({ error: 'Drop not found or cannot be cancelled (only pending drops can be cancelled)' }); return; }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[Drops] Error cancelling drop:', err?.message || err);
+    res.status(500).json({ error: 'Failed to cancel drop' });
+  }
+});
+
+router.get('/admin/drops', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res: Response) => {
+  try {
+    const { status, page, limit } = req.query;
+    const result = await adminGetDrops({
+      status: status as string | undefined,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[Drops] Error fetching admin drops:', err?.message || err);
+    res.status(500).json({ error: 'Failed to fetch drops' });
+  }
+});
+
+router.patch('/admin/drops/:id/review', isAuthenticated as RequestHandler, requireAdmin, async (req: any, res: Response) => {
+  try {
+    const dropId = parseInt(req.params.id);
+    if (isNaN(dropId)) { res.status(400).json({ error: 'Invalid drop ID' }); return; }
+
+    const { action, scheduledAt, adminNotes } = req.body;
+    if (!action || !['approve', 'reject'].includes(action)) {
+      res.status(400).json({ error: 'action must be approve or reject' }); return;
+    }
+    if (action === 'approve' && !scheduledAt) {
+      res.status(400).json({ error: 'scheduledAt is required when approving' }); return;
+    }
+
+    const drop = await adminReviewDrop(dropId, action, { scheduledAt, adminNotes });
+    if (!drop) { res.status(404).json({ error: 'Drop not found or already reviewed' }); return; }
+
+    const adminId = getUserId(req)!;
+    await createAuditLog(adminId, `drop_${action}d`, 'drop', String(dropId), {
+      dropTitle: drop.title,
+      storeId: drop.storeId,
+      scheduledAt: drop.scheduledAt,
+      adminNotes: drop.adminNotes,
+    }).catch((e: any) => console.error('[Drops] Audit log error:', e?.message));
+
+    res.json(drop);
+  } catch (err: any) {
+    console.error('[Drops] Error reviewing drop:', err?.message || err);
+    res.status(500).json({ error: 'Failed to review drop' });
   }
 });
 
