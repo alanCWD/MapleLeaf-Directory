@@ -1941,7 +1941,9 @@ router.post('/owner/stores/:id/drops/:dropId/cover-image', isAuthenticated as Re
     if (isBunnyStorageConfigured()) {
       url = await uploadImageToStorage(processed, filename, 'drop-covers');
     } else {
-      url = await uploadImageLocal(processed, filename, 'drop-covers');
+      const relativePath = await uploadImageLocal(processed, filename, 'drop-covers');
+      const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
+      url = domain ? `https://${domain}${relativePath}` : relativePath;
     }
 
     const drop = await updateDropCoverImage(dropId, storeId, url);
