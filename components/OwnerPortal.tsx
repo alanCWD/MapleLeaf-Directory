@@ -552,7 +552,7 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
                     </span>
                     <span className="text-xs text-stone-400 font-medium capitalize">{drop.type}</span>
                   </div>
-                  <p className="font-bold text-stone-800 text-sm truncate">{drop.title}</p>
+                  <p className="font-bold text-stone-800 text-sm">{drop.title}</p>
                   <p className="text-xs text-stone-400 mt-0.5">{formatDropDate(drop.createdAt)}</p>
                   {drop.scheduledAt && (
                     <p className="text-xs text-blue-600 font-medium mt-0.5">Scheduled: {formatDropDate(drop.scheduledAt)}</p>
@@ -562,6 +562,9 @@ const StoreDropsSection: React.FC<{ store: Store }> = ({ store }) => {
                   )}
                   {drop.adminNotes && drop.status === 'rejected' && (
                     <p className="text-xs text-red-600 mt-1 italic">"{drop.adminNotes}"</p>
+                  )}
+                  {drop.body && (
+                    <p className="text-xs text-stone-500 leading-relaxed whitespace-pre-wrap mt-2">{drop.body}</p>
                   )}
                 </div>
                 {drop.status === 'pending_approval' && (

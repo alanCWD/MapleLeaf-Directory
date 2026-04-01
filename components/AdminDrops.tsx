@@ -109,10 +109,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ drop, onClose, onDone }) => {
               className="w-full h-40 object-cover"
             />
           )}
-          <div className="p-4">
-            <p className="font-bold text-stone-800 mb-1">{drop.title}</p>
-            <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap line-clamp-4">{drop.body}</p>
-            <p className="text-xs text-emerald-600 font-medium mt-2 truncate">
+          <div className="p-4 max-h-64 overflow-y-auto">
+            <p className="font-bold text-stone-800 mb-2">{drop.title}</p>
+            <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap">{drop.body}</p>
+            <p className="text-xs text-emerald-600 font-medium mt-3 break-all">
               Link: {drop.customLink || drop.autoLink}
             </p>
           </div>
@@ -328,7 +328,7 @@ export const AdminDrops: React.FC = () => {
                 )}
               </div>
 
-              <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap mb-4 line-clamp-3">{drop.body}</p>
+              <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap mb-4">{drop.body}</p>
 
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-stone-400 font-medium border-t border-stone-100 pt-3">
                 <span>
